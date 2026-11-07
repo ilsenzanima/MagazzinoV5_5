@@ -16,7 +16,7 @@ import { notify } from "@/lib/notify"
 import Image from "next/image"
 import { supabase } from "@/lib/supabase"
 import { itemTypesApi } from "@/lib/services/inventory"
-import { costAnalysisApi } from "@/lib/services/cost-analysis"
+import { loadJobPriceMap } from "@/lib/services/job-price-lookup"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
 import { NotchTabs, NotchActions, NotchSearch, NotchStat } from "@/components/ui/notch-tabs"
@@ -69,15 +69,15 @@ export function JobStock({ movements, jobId }: JobStockProps) {
         loadPrices()
     }, [jobId])
 
-    // Prezzi ufficiali dei costi della commessa (Analisi costi): solo admin e operativo
+    // Prezzi di commessa, gli stessi usati in Economico > Costi (prezzo impostato in Analisi costi,
+    // altrimenti prezzo massimo d'acquisto, altrimenti prezzo dell'offerta): solo admin e operativo
+    const priceIdsKey = useMemo(() => Array.from(new Set(movements.map(m => m.itemId).filter(Boolean))).sort().join(','), [movements])
     useEffect(() => {
         if (userRole !== 'admin' && userRole !== 'operativo') return
-        costAnalysisApi.getByJobId(jobId).then(rows => {
-            const m = new Map<string, number>()
-            rows.forEach(r => { if (r.itemId && r.unitPrice !== null) m.set(r.itemId, r.unitPrice) })
-            setOfficialPrices(m)
-        }).catch(() => { /* non bloccante: il valore resta "—" */ })
-    }, [jobId, userRole])
+        loadJobPriceMap(jobId, priceIdsKey ? priceIdsKey.split(',') : [])
+            .then(setOfficialPrices)
+            .catch(() => { /* non bloccante: si usa il prezzo del lotto */ })
+    }, [jobId, userRole, priceIdsKey])
 
     // Foto e tipologia degli articoli
     useEffect(() => {
@@ -275,12 +275,13 @@ export function JobStock({ movements, jobId }: JobStockProps) {
         })
     }, [groupedStock, searchTerm])
 
-    // Valore di un articolo: prezzo ufficiale dell'Analisi costi x quantita' in cantiere (per i fittizi senza prezzo vale quello inserito a mano)
+    // Valore di un articolo: prezzo di commessa (come in Economico > Costi) x quantita' in cantiere (per i fittizi senza prezzo vale quello inserito a mano)
     const itemValue = (item: GroupedItem): number | null => {
         const p = officialPrices.get(item.itemId)
         if (p !== undefined) return round2(item.totalQty * p)
         if (item.isFictitious) return round2(item.totalQty * (fictitiousPrices[item.itemId] ?? 0))
-        return null
+        // come in Economico > Costi: senza prezzo di commessa resta il prezzo del lotto
+        return item.totalValue > 0 ? item.totalValue : null
     }
     const totalValue = useMemo(() => round2(groupedStock.reduce((sum, i) => sum + (itemValue(i) ?? 0), 0)),
         // eslint-disable-next-line react-hooks/exhaustive-deps

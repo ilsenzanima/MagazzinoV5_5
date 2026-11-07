@@ -26,6 +26,7 @@ import * as XLSX from "xlsx-js-style"
 import { useBatchUpload } from "@/hooks/useBatchUpload"
 import { UploadStatusBar } from "@/components/ui/upload-status-row"
 import { formatNumber } from "@/lib/utils/format"
+import { NotchTabs, NotchActions, NotchButton, NotchStat } from "@/components/ui/notch-tabs"
 
 interface JobCostiSALProps {
     jobId: string
@@ -77,43 +78,35 @@ interface WorkerCostRow {
     total: number
 }
 
-// ─── Collapsible section wrapper ────────────────────────────────────────────
+// ─── Contenuto di una scheda: totale e pulsanti vanno nella striscia scura, qui resta solo la tabella ───
 function Section({
-    icon, title, total, expanded, onToggle, badge, actions, children,
+    visible, total, statLabel = 'Totale', actions, children,
 }: {
-    icon: React.ReactNode
-    title: string
+    visible: boolean
+    icon?: React.ReactNode
+    title?: string
     total?: number
-    expanded: boolean
-    onToggle: () => void
+    statLabel?: string
+    expanded?: boolean
+    onToggle?: () => void
     badge?: React.ReactNode
     actions?: React.ReactNode
     children: React.ReactNode
 }) {
+    if (!visible) return null
     const fmt = (n: number) => formatNumber(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     return (
-        <Card>
-            <div
-                className="flex items-center gap-3 p-4 cursor-pointer select-none"
-                onClick={onToggle}
-            >
-                <div className="text-blue-600">{icon}</div>
-                <div className="flex-1 font-semibold text-slate-800 dark:text-slate-100">{title}</div>
-                {badge}
-                {total !== undefined && (
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400 ml-auto mr-2">
-                        € {fmt(total)}
-                    </span>
-                )}
-                {actions && <div onClick={e => e.stopPropagation()}>{actions}</div>}
-                {expanded ? <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" /> : <ChevronRight className="h-4 w-4 text-slate-400 shrink-0" />}
-            </div>
-            {expanded && (
-                <CardContent className="pt-0 pb-4 px-4">
+        <>
+            <NotchActions>
+                {total !== undefined && <NotchStat label={statLabel} value={`€ ${fmt(total)}`} />}
+                {actions}
+            </NotchActions>
+            <Card>
+                <CardContent className="p-4">
                     {children}
                 </CardContent>
-            )}
-        </Card>
+            </Card>
+        </>
     )
 }
 
@@ -198,8 +191,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
     const [loading, setLoading] = useState(true)
 
     // ── Layout ────────────────────────────────────────────────────────────────
-    const [expanded, setExpanded] = useState({ materiali: true, ore: true, altri: true, totali: true })
-    const toggle = (k: keyof typeof expanded) => setExpanded(p => ({ ...p, [k]: !p[k] }))
+    const [costTab, setCostTab] = useState<'materiali' | 'ore' | 'altri' | 'totali'>('materiali')
 
     // ── SAL filter ────────────────────────────────────────────────────────────
     const [activeFilter, setActiveFilter] = useState<'all' | string>('all')
@@ -1129,6 +1121,17 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
 
     return (
         <div className="space-y-4">
+        <NotchTabs
+            title="Costi"
+            value={costTab}
+            onValueChange={v => setCostTab(v as typeof costTab)}
+            items={[
+                { value: 'materiali', label: 'Materiali', icon: <Package /> },
+                { value: 'ore', label: 'Ore operai', icon: <Users /> },
+                { value: 'altri', label: 'Altri costi', icon: <ReceiptText /> },
+                { value: 'totali', label: 'Totali', icon: <Euro /> },
+            ]}
+        >
 
             {/* ── TAG filter bar ─────────────────────────────────────────── */}
             <div className="flex items-center gap-2 flex-wrap">
@@ -1203,21 +1206,13 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                 icon={<Package className="h-5 w-5" />}
                 title="Materiali"
                 total={materialTotal}
-                expanded={expanded.materiali}
-                onToggle={() => toggle('materiali')}
+                visible={costTab === 'materiali'}
                 actions={
-                    <div className="flex gap-2">
-                        <Button
-                            size="sm"
-                            onClick={handleOpenAddSal}
-                            disabled={selectedIds.size === 0}
-                            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 h-8 text-xs"
-                        >
-                            <Tag className="h-3.5 w-3.5 mr-1" />
-                            Aggiungi al TAG
-                            {selectedIds.size > 0 && <span className="ml-1 opacity-80">({selectedIds.size})</span>}
-                        </Button>
-                    </div>
+                    <NotchButton onClick={handleOpenAddSal} disabled={selectedIds.size === 0} className="disabled:opacity-50">
+                        <Tag />
+                        Aggiungi al TAG
+                        {selectedIds.size > 0 && <span className="opacity-70">({selectedIds.size})</span>}
+                    </NotchButton>
                 }
             >
                 {filteredMaterialGroups.length === 0 ? (
@@ -1397,18 +1392,12 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                 icon={<Users className="h-5 w-5" />}
                 title="Ore Operai"
                 total={workerTotal}
-                expanded={expanded.ore}
-                onToggle={() => toggle('ore')}
+                visible={costTab === 'ore'}
                 actions={
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleOpenWorkerHours}
-                        className="h-8 text-xs"
-                    >
-                        <Clock className="h-3.5 w-3.5 mr-1" />
+                    <NotchButton onClick={handleOpenWorkerHours}>
+                        <Clock />
                         Calcola ore operai
-                    </Button>
+                    </NotchButton>
                 }
             >
                 {(() => {
@@ -1529,22 +1518,16 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                 icon={<ReceiptText className="h-5 w-5" />}
                 title="Altri Costi"
                 total={otherCostsTotal}
-                expanded={expanded.altri}
-                onToggle={() => toggle('altri')}
+                visible={costTab === 'altri'}
                 actions={
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                            setNewCostDesc(''); setNewCostAmount('')
-                            setNewCostSal(activeFilter !== 'all' ? activeFilter : '__none__')
-                            setIsAddCostOpen(true)
-                        }}
-                        className="h-8 text-xs"
-                    >
-                        <PlusCircle className="h-3.5 w-3.5 mr-1" />
-                        Aggiungi Costo
-                    </Button>
+                    <NotchButton onClick={() => {
+                        setNewCostDesc(''); setNewCostAmount('')
+                        setNewCostSal(activeFilter !== 'all' ? activeFilter : '__none__')
+                        setIsAddCostOpen(true)
+                    }}>
+                        <PlusCircle />
+                        Aggiungi costo
+                    </NotchButton>
                 }
             >
                 {filteredCosts.length === 0 ? (
@@ -1681,9 +1664,9 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
             {/* ── 4. Totali ──────────────────────────────────────────────── */}
             <Section
                 icon={<Euro className="h-5 w-5" />}
-                title={activeFilter === 'all' ? 'Totali' : activeFilter === '__no_tag__' ? 'Totali — senza TAG' : `Totali — ${activeFilter}`}
-                expanded={expanded.totali}
-                onToggle={() => toggle('totali')}
+                visible={costTab === 'totali'}
+                total={grandTotal}
+                statLabel="Totale complessivo"
             >
                 <table className="w-full text-sm">
                     <tbody>
@@ -2006,6 +1989,7 @@ export function JobCostiSAL({ jobId, jobCode, jobName, materialCost, movements }
                 description={`Eliminare il TAG "${salToDelete ?? ''}" e tutte le sue voci?`}
                 onConfirm={doDeleteSal}
             />
+        </NotchTabs>
         </div>
     )
 }

@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
+import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs"
 import { Loader2, PlusCircle, X, Package, FileText, Calculator, Info, Upload } from "lucide-react"
 import { firstMovementDates } from '@/lib/utils/first-movement-dates'
 import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams, JobPriceAlert, effectiveUnitPrice } from "@/lib/services/cost-analysis"
@@ -305,6 +306,9 @@ const DEFAULT_PARAMS: Omit<CostAnalysisParams, 'jobId'> = {
     sfrido: 5, sconto: 0, trasporto: 0, posa: 0, ricarico: 30, margineTrattativa: 10,
 }
 
+// Voci generiche e riepilogo prezzi: nascosti nella scheda Prezzi materiali (il codice resta)
+const SHOW_PRICE_SUMMARY = false
+
 export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiProps) {
     const [rows, setRows] = useState<CostAnalysisRow[]>([])
     const [params, setParams] = useState<CostAnalysisParams>({ jobId, ...DEFAULT_PARAMS })
@@ -474,17 +478,24 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
     return (
         <div className="space-y-4">
             <Tabs value={subTab} onValueChange={v => setSubTab(v as 'prezzi' | 'offerta' | 'terzi')}>
-                <TabsList>
-                    <TabsTrigger value="prezzi">
-                        <Package className="h-4 w-4 mr-1" />Prezzi Materiali
-                    </TabsTrigger>
-                    <TabsTrigger value="offerta">
-                        <Calculator className="h-4 w-4 mr-1" />Analisi Costi Offerta
-                    </TabsTrigger>
-                    <TabsTrigger value="terzi">
-                        <Upload className="h-4 w-4 mr-1" />Caricate da Terzi
-                    </TabsTrigger>
-                </TabsList>
+                <NotchTabs
+                    title="Analisi costi"
+                    value={subTab}
+                    onValueChange={v => setSubTab(v as 'prezzi' | 'offerta' | 'terzi')}
+                    items={[
+                        { value: 'prezzi', label: 'Prezzi materiali', icon: <Package /> },
+                        { value: 'offerta', label: 'Analisi costi offerta', icon: <Calculator /> },
+                        { value: 'terzi', label: 'Caricate da terzi', icon: <Upload /> },
+                    ]}
+                >
+                {subTab === 'prezzi' && (
+                    <NotchActions>
+                        <NotchButton onClick={() => setSelectorOpen(true)}>
+                            <PlusCircle />
+                            Aggiungi articolo
+                        </NotchButton>
+                    </NotchActions>
+                )}
 
                 <TabsContent value="prezzi" className="space-y-6 pt-4">
                     <p className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-md p-3">
@@ -497,10 +508,6 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
                 <div className="flex items-center gap-3 p-4 border-b">
                     <Package className="h-5 w-5 text-blue-600" />
                     <span className="flex-1 font-semibold text-slate-800 dark:text-slate-100">Materiali da Magazzino</span>
-                    <Button size="sm" onClick={() => setSelectorOpen(true)} className="bg-blue-600 hover:bg-blue-700 h-8 text-xs">
-                        <PlusCircle className="h-3.5 w-3.5 mr-1" />
-                        Aggiungi articolo
-                    </Button>
                 </div>
                 <CardContent className="pt-0 pb-4 px-4">
                     {inventoryRows.length === 0 ? (
@@ -513,6 +520,9 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
                 </CardContent>
             </Card>
 
+            {/* Voci Generiche e Riepilogo Prezzi: nascoste per ora, basta mettere SHOW_PRICE_SUMMARY a true */}
+            {SHOW_PRICE_SUMMARY && (
+            <>
             {/* ── Voci Generiche ──────────────────────────────────────────── */}
             <Card>
                 <div className="flex items-center gap-3 p-4 border-b">
@@ -605,6 +615,8 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
                     </div>
                 </CardContent>
             </Card>
+            </>
+            )}
                 </TabsContent>
 
                 <TabsContent value="offerta" className="space-y-4 pt-4">
@@ -626,6 +638,7 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
                     </p>
                     <CostAnalysisDocuments jobId={jobId} jobLabel={jobLabel} />
                 </TabsContent>
+                </NotchTabs>
             </Tabs>
 
             <ItemSelectorDialog
