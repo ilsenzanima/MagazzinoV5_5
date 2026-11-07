@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
-import { ArrowLeft, BarChart2, Calculator, CheckCircle2, ChevronDown, FileText, GanttChartSquare, Info, Loader2, MapPin, Pencil, ShieldCheck, Trash2, Truck, Upload } from "lucide-react"
+import { ArrowLeft, ArrowUpRight, Menu, BarChart2, Calculator, CheckCircle2, ChevronDown, FileText, GanttChartSquare, Info, Loader2, MapPin, Pencil, ShieldCheck, Trash2, Truck, Upload } from "lucide-react"
 import { clientProposalsApi, ClientProposal, ProposalStatus } from "@/lib/services/client-proposals"
 import { clientsApi } from "@/lib/api"
 import { jobsApi, jobTasksApi } from "@/lib/api"
@@ -40,7 +40,7 @@ import { jobSiteDocumentTypesApi } from "@/lib/services/job-site-document-types"
 import { ProposalConformita } from "@/components/clients/detail/ProposalConformita"
 import { JobSectionMenu, type SectionMenuGroup } from "@/components/jobs/JobSectionMenu"
 import { NotchTabs, NotchActions, NotchStat } from "@/components/ui/notch-tabs"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ProposalCronoprogramma } from "@/components/clients/detail/ProposalCronoprogramma"
 import { useAuth } from "@/components/auth-provider"
 
@@ -363,6 +363,27 @@ export default function ProposalDetailPage() {
         proposal.siteProvince && `(${proposal.siteProvince.toUpperCase()})`,
     ].filter(Boolean).join(", ")
 
+    // La commessa collegata esiste ancora (non è nel cestino): si può aprire; altrimenti l'offerta si può riconvertire
+    const hasLinkedJob = !!proposal.convertedJobId && linkedJobAlive !== false
+    const canConvert = !proposal.convertedJobId || proposal.status === "pending" || linkedJobAlive === false
+
+    const startConvert = async () => {
+        setConvertStartDate("")
+        try {
+            const proposalTasks = await proposalTasksApi.getByProposalId(proposalId)
+            setConvertHasTasks(proposalTasks.length > 0)
+        } catch { setConvertHasTasks(false) }
+        if (proposal.convertedJobId) {
+            try {
+                const status = await jobsApi.getStatusById(proposal.convertedJobId)
+                setConvertReuseJobId(status.exists ? proposal.convertedJobId : null)
+            } catch { setConvertReuseJobId(null) }
+        } else {
+            setConvertReuseJobId(null)
+        }
+        setConvertOpen(true)
+    }
+
     const icon = "h-4 w-4"
     const menuGroups: SectionMenuGroup[] = [
         {
@@ -428,35 +449,35 @@ export default function ProposalDetailPage() {
                             Creata il {format(new Date(proposal.createdAt), "d MMM yyyy", { locale: it })}
                         </div>
                         {canEdit && (
-                            <div className="flex flex-wrap justify-end gap-2">
-                                {(!proposal.convertedJobId || proposal.status === "pending" || linkedJobAlive === false) && (
-                                    <Button size="sm" variant="outline" className="text-green-700 border-green-300 hover:bg-green-50" onClick={async () => {
-                                        setConvertStartDate("")
-                                        try {
-                                            const proposalTasks = await proposalTasksApi.getByProposalId(proposalId)
-                                            setConvertHasTasks(proposalTasks.length > 0)
-                                        } catch { setConvertHasTasks(false) }
-                                        if (proposal.convertedJobId) {
-                                            try {
-                                                const status = await jobsApi.getStatusById(proposal.convertedJobId)
-                                                setConvertReuseJobId(status.exists ? proposal.convertedJobId : null)
-                                            } catch { setConvertReuseJobId(null) }
-                                        } else {
-                                            setConvertReuseJobId(null)
-                                        }
-                                        setConvertOpen(true)
-                                    }}>
-                                        <CheckCircle2 className="h-4 w-4 mr-1" />Converti in Commessa
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="gap-2 px-2 md:px-3" aria-label="Azioni dell'offerta">
+                                        <Menu className="h-4 w-4" />
+                                        <span className="hidden md:inline">Azioni</span>
                                     </Button>
-                                )}
-                                {proposal.convertedJobId && proposal.status !== "pending" && linkedJobAlive !== false && (
-                                    <Link href={`/jobs/${proposal.convertedJobId}`}>
-                                        <Button size="sm" variant="outline" className="text-blue-600">Vai alla Commessa</Button>
-                                    </Link>
-                                )}
-                                <Button size="sm" variant="outline" onClick={openEdit}><Pencil className="h-4 w-4 mr-1" />Modifica</Button>
-                                <Button size="sm" variant="outline" className="text-red-600 hover:border-red-300" onClick={() => setDeleteOpen(true)}><Trash2 className="h-4 w-4 mr-1" />Elimina</Button>
-                            </div>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="min-w-56">
+                                    <DropdownMenuItem onClick={openEdit}>
+                                        <Pencil className="mr-2 h-4 w-4" />Modifica
+                                    </DropdownMenuItem>
+                                    {canConvert && (
+                                        <DropdownMenuItem onClick={startConvert} className="text-green-700 focus:text-green-700">
+                                            <CheckCircle2 className="mr-2 h-4 w-4" />Converti in commessa
+                                        </DropdownMenuItem>
+                                    )}
+                                    {hasLinkedJob && (
+                                        <DropdownMenuItem asChild>
+                                            <Link href={`/jobs/${proposal.convertedJobId}`}>
+                                                <ArrowUpRight className="mr-2 h-4 w-4" />Vai alla commessa
+                                            </Link>
+                                        </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="text-red-600 focus:text-red-600">
+                                        <Trash2 className="mr-2 h-4 w-4" />Elimina
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
                         )}
                     </div>
 
@@ -464,6 +485,17 @@ export default function ProposalDetailPage() {
                     <TabsContent value="info" className="space-y-6 focus-visible:outline-none">
                         <NotchTabs title="Dettagli">
                             <NotchActions>
+                                {hasLinkedJob && (
+                                    <Link
+                                        href={`/jobs/${proposal.convertedJobId}`}
+                                        title="Questa offerta è stata trasformata in commessa: apri la commessa"
+                                        className="inline-flex h-7 items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 text-xs font-medium normal-case tracking-normal text-emerald-200 transition-colors hover:bg-emerald-500/30"
+                                    >
+                                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                                        <span>Convertita in commessa</span>
+                                        <ArrowUpRight className="h-3 w-3 shrink-0" />
+                                    </Link>
+                                )}
                                 {canEdit ? (
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
@@ -570,18 +602,6 @@ export default function ProposalDetailPage() {
                                                 </div>
                                             </CardContent>
                                         </Card>
-                                    )}
-
-                                    {proposal.convertedJobId && linkedJobAlive !== false && (
-                                        <div className="flex items-center justify-between gap-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 dark:border-green-800 dark:bg-green-950/30">
-                                            <div>
-                                                <p className="mb-0.5 text-xs uppercase tracking-wide text-green-600">Convertita in commessa</p>
-                                                <p className="text-xs text-slate-500">Questa proposta è stata accettata e trasformata in commessa.</p>
-                                            </div>
-                                            <Link href={`/jobs/${proposal.convertedJobId}`}>
-                                                <Button size="sm" variant="outline" className="shrink-0 border-green-300 text-green-700">Vai alla Commessa</Button>
-                                            </Link>
-                                        </div>
                                     )}
 
                                     {proposal.convertedJobId && linkedJobAlive === false && (
