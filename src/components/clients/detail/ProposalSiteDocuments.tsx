@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Upload, Trash2, Loader2, Pencil, X, FolderInput, FolderPlus, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
+import { Upload, Trash2, Loader2, Pencil, X, FolderInput, FolderPlus, ArrowUp, ArrowDown, ArrowUpDown, MoreHorizontal, Images, ExternalLink, Download } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { JobPhotoCollection, PhotoThumb } from "@/components/jobs/details/JobPhotoCollection"
+import { useHistoryStep } from "@/hooks/useHistoryStep"
 import { proposalSiteDocumentsApi } from "@/lib/services/proposal-site-documents"
 import { SiteDocument } from "@/lib/services/job-site-documents"
 import { jobSiteDocumentTypesApi, JobSiteDocumentType } from "@/lib/services/job-site-document-types"
@@ -90,7 +93,11 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
 
     // Move to folder dialog
     const [moveOpen, setMoveOpen] = useState(false)
-    const [movingDoc, setMovingDoc] = useState<SiteDocument | null>(null)
+    const [movingDocs, setMovingDocs] = useState<SiteDocument[]>([])
+    const [bulkDeleteDocs, setBulkDeleteDocs] = useState<SiteDocument[]>([])
+    const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+    // Raccolta di foto aperta: un passo della cronologia, cosi «indietro» torna alla tabella
+    const [openCollection, showCollection, closeCollection] = useHistoryStep<{ typeId: string; folderId: string | null }>("magSiteCollection")
     const [moveFolderId, setMoveFolderId] = useState("root")
     const [moving, setMoving] = useState(false)
 
@@ -154,10 +161,10 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
         setEditOpen(true)
     }
 
-    const openUpload = () => {
+    const openUpload = (preset?: { typeId: string; folderId: string | null }) => {
         setUpStep(1)
-        setUpDocTypeId("")
-        setUpFolderId("")
+        setUpDocTypeId(preset?.typeId ?? "")
+        setUpFolderId(preset?.folderId ?? "")
         setPendingFiles([])
         setDragOver(false)
         batchUpload.reset()
@@ -201,24 +208,29 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
         }
     }
 
-    const openMove = (doc: SiteDocument) => {
-        setMovingDoc(doc)
-        setMoveFolderId(doc.folderId || "root")
+    const isDriveFile = (doc: SiteDocument) => !!doc.fileUrl && !doc.fileUrl.includes('/')
+
+    const openMove = (list: SiteDocument[]) => {
+        setMovingDocs(list)
+        setMoveFolderId(list.length === 1 ? (list[0].folderId || "root") : "root")
         setMoveOpen(true)
     }
 
     const handleMove = async () => {
-        if (!movingDoc) return
+        if (movingDocs.length === 0) return
         const targetFolderId = moveFolderId === "root" ? null : moveFolderId
-        if (targetFolderId === (movingDoc.folderId || null)) { setMoveOpen(false); return }
+        const toMove = movingDocs.filter(d => (d.folderId || null) !== targetFolderId)
+        if (toMove.length === 0) { setMoveOpen(false); return }
+        let done = 0
         try {
             setMoving(true)
-            const type = docTypes.find(t => t.id === movingDoc.documentTypeId)
+            const type = docTypes.find(t => t.id === toMove[0].documentTypeId)
             const targetFolder = targetFolderId ? folders.find(f => f.id === targetFolderId) : undefined
             const segments = targetFolder ? [...typeBaseSegments(type), targetFolder.name] : typeBaseSegments(type)
 
-            // Il file su Drive va spostato solo se è un vero id Drive (non un vecchio path Supabase)
-            if (movingDoc.fileUrl && !movingDoc.fileUrl.includes('/')) {
+            // I file su Drive vanno spostati solo se hanno un vero id Drive (non un vecchio path Supabase)
+            let driveFolderId: string | null = null
+            if (toMove.some(isDriveFile)) {
                 const ensureRes = await fetch('/api/drive/ensure-folder', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -226,24 +238,62 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                 })
                 const ensured = await ensureRes.json()
                 if (!ensureRes.ok) throw new Error(ensured.error || 'Errore risoluzione cartella')
-                const moveRes = await fetch('/api/drive/move-file', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fileId: movingDoc.fileUrl, newParentId: ensured.folderId }),
-                })
-                const moved = await moveRes.json()
-                if (!moveRes.ok) throw new Error(moved.error || 'Errore spostamento file')
+                driveFolderId = ensured.folderId
             }
-
-            await proposalSiteDocumentsApi.update(movingDoc.id, { folderId: targetFolderId })
-            notify.success("Documento spostato")
+            for (const doc of toMove) {
+                if (driveFolderId && isDriveFile(doc)) {
+                    const moveRes = await fetch('/api/drive/move-file', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fileId: doc.fileUrl, newParentId: driveFolderId }),
+                    })
+                    const moved = await moveRes.json()
+                    if (!moveRes.ok) throw new Error(moved.error || 'Errore spostamento file')
+                }
+                await proposalSiteDocumentsApi.update(doc.id, { folderId: targetFolderId })
+                done++
+            }
+            notify.success(toMove.length > 1 ? `${toMove.length} documenti spostati` : "Documento spostato")
             setMoveOpen(false)
-            await load()
         } catch {
-            notify.error("Errore durante lo spostamento")
+            notify.error(toMove.length > 1 ? `Spostati ${done} documenti su ${toMove.length}: errore durante lo spostamento` : "Errore durante lo spostamento")
         } finally {
             setMoving(false)
+            await load()
         }
+    }
+
+    const handleBulkDelete = async () => {
+        const list = bulkDeleteDocs
+        if (list.length === 0) return
+        const deleted = new Set<string>()
+        for (const doc of list) {
+            try {
+                const path = doc.fileUrl?.includes('/public/documents/') ? doc.fileUrl.split('/public/documents/')[1] : undefined
+                if (path) await supabase.storage.from('documents').remove([path])
+                await proposalSiteDocumentsApi.delete(doc.id)
+                deleted.add(doc.id)
+            } catch (error) {
+                console.error("Delete failed", doc.id, error)
+            }
+        }
+        setDocuments(prev => prev.filter(d => !deleted.has(d.id)))
+        setBulkDeleteDocs([])
+        if (deleted.size === list.length) notify.success(list.length > 1 ? `${list.length} documenti eliminati` : "Documento eliminato")
+        else notify.error(`Eliminati ${deleted.size} documenti su ${list.length}`)
+    }
+
+    // Una cartella si elimina solo se e' vuota: le foto vanno prima spostate o eliminate
+    const deleteFolder = async (folder: JobSiteDocumentFolder) => {
+        if (documents.some(d => d.folderId === folder.id)) {
+            notify.error("La cartella non e' vuota: sposta o elimina prima le foto")
+            return
+        }
+        if (!confirm(`Eliminare la cartella "${folder.name}"?`)) return
+        try {
+            await jobSiteDocumentFoldersApi.delete(folder.id)
+            await load()
+        } catch { notify.error("Errore durante l'eliminazione della cartella") }
     }
 
     const handleFilesSelected = (files: FileList | null) => {
@@ -394,120 +444,231 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
         </button>
     )
 
-    const shown = useMemo(() => {
+    type Row = {
+        id: string; kind: 'doc' | 'collection'; name: string; typeId: string; typeName: string; folderId: string; folderName: string
+        date: string; size: number; notes: string; docs: SiteDocument[]; doc?: SiteDocument; folder?: JobSiteDocumentFolder | null
+    }
+    const typeNameOf = (d: SiteDocument) => docTypes.find(t => t.id === d.documentTypeId)?.name || 'Senza tipo'
+    const folderNameOf = (d: SiteDocument) => (d.folderId ? folders.find(f => f.id === d.folderId)?.name : undefined) || ''
+    const latest = (list: SiteDocument[]) => list.reduce((m, d) => (d.createdAt > m ? d.createdAt : m), '')
+
+    // Righe: una per raccolta di foto (il tipo e ogni sua cartella) + una per documento
+    const photoTypes = docTypes.filter(t => t.isPhotoGallery)
+    const photoTypeIds = new Set(photoTypes.map(t => t.id))
+    const allRows: Row[] = [
+        ...photoTypes.flatMap(t => {
+            const typeDocs = documents.filter(d => d.documentTypeId === t.id)
+            const groups: { folder: JobSiteDocumentFolder | null; docs: SiteDocument[] }[] = [
+                { folder: null, docs: typeDocs.filter(d => !d.folderId) },
+                ...folders.filter(f => f.documentTypeId === t.id).map(f => ({ folder: f, docs: typeDocs.filter(d => d.folderId === f.id) })),
+            ]
+            return groups.map((g): Row => ({
+                id: `c:${t.id}:${g.folder?.id ?? 'root'}`, kind: 'collection', name: g.folder ? g.folder.name : t.name,
+                typeId: t.id, typeName: t.name, folderId: g.folder?.id ?? '', folderName: g.folder?.name ?? '',
+                date: latest(g.docs), size: g.docs.reduce((n, d) => n + (d.fileSize ?? 0), 0),
+                notes: g.folder?.notes ?? '', docs: g.docs, folder: g.folder,
+            }))
+        }),
+        ...documents.filter(d => !photoTypeIds.has(d.documentTypeId ?? '')).map((doc): Row => ({
+            id: doc.id, kind: 'doc', name: doc.name, typeId: doc.documentTypeId ?? '', typeName: typeNameOf(doc),
+            folderId: doc.folderId ?? '', folderName: folderNameOf(doc), date: doc.createdAt, size: doc.fileSize ?? 0,
+            notes: doc.notes || '', docs: [doc], doc,
+        })),
+    ]
+
+    const rows = useMemo(() => {
         const words = search.toLowerCase().split(/\s+/).filter(Boolean)
         const dir = sortDir === 'asc' ? 1 : -1
-        return documents.filter(d => {
-            if (typeFilter === UNTYPED_KEY ? !!d.documentTypeId : typeFilter !== 'all' && d.documentTypeId !== typeFilter) return false
-            if (folderFilter === 'root' ? !!d.folderId : folderFilter !== 'all' && d.folderId !== folderFilter) return false
-            const target = `${d.name} ${d.notes || ''} ${docTypes.find(t => t.id === d.documentTypeId)?.name || ''}`.toLowerCase()
+        return allRows.filter(r => {
+            if (typeFilter === UNTYPED_KEY ? r.typeId !== '' : typeFilter !== 'all' && r.typeId !== typeFilter) return false
+            if (folderFilter === 'root' ? r.folderId !== '' : folderFilter !== 'all' && r.folderId !== folderFilter) return false
+            const target = `${r.name} ${r.typeName} ${r.folderName} ${r.notes} ${r.kind === 'collection' ? r.docs.map(d => d.name).join(' ') : ''}`.toLowerCase()
             return words.every(w => target.includes(w))
         }).sort((x, y) => sortKey === 'name'
             ? dir * x.name.localeCompare(y.name, 'it', { numeric: true })
-            : sortKey === 'size'
-                ? dir * ((x.fileSize ?? 0) - (y.fileSize ?? 0))
-                : dir * String(x.createdAt).localeCompare(String(y.createdAt)))
-    }, [documents, docTypes, search, typeFilter, folderFilter, sortKey, sortDir])
+            : sortKey === 'size' ? dir * (x.size - y.size) : dir * x.date.localeCompare(y.date))
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [documents, docTypes, folders, search, typeFilter, folderFilter, sortKey, sortDir])
+    const shownDocs = rows.filter(r => r.kind === 'doc').map(r => r.doc!)
 
     const hasUntyped = documents.some(d => !d.documentTypeId)
     const folderTypes = docTypes.filter(t => t.allowsFolders)
     const folderTypeForNew = (typeFilter !== 'all' && folderTypes.find(t => t.id === typeFilter)?.id) || folderTypes[0]?.id
     const headCls = "border-r text-xs font-semibold uppercase tracking-wide text-slate-600"
 
+    const openDocument = (doc: SiteDocument, siblings: SiteDocument[] = shownDocs) =>
+        isImageFileType(doc.fileType) ? openGalleryForDoc(doc, siblings) : openDoc(doc.fileUrl)
+    const askDeleteDoc = (doc: SiteDocument) => { setBulkDeleteDocs([doc]); setBulkDeleteOpen(true) }
+
+    const rowMenu = (doc: SiteDocument, siblings: SiteDocument[] = shownDocs) => (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" aria-label="Azioni documento" onClick={e => e.stopPropagation()}>
+                    <MoreHorizontal className="h-4 w-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                <DropdownMenuItem onClick={() => openDocument(doc, siblings)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>
+                {isDriveFile(doc) && (
+                    <DropdownMenuItem onClick={() => window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank')}>
+                        <Download className="mr-2 h-4 w-4" />Scarica
+                    </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={e => openEdit(doc, e as unknown as React.MouseEvent)}><Pencil className="mr-2 h-4 w-4" />Modifica</DropdownMenuItem>
+                {docTypes.find(t => t.id === doc.documentTypeId)?.allowsFolders && (
+                    <DropdownMenuItem onClick={() => openMove([doc])}><FolderInput className="mr-2 h-4 w-4" />Sposta in cartella</DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => askDeleteDoc(doc)} className="text-red-600 focus:text-red-600">
+                    <Trash2 className="mr-2 h-4 w-4" />Elimina
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    )
+
+    const collectionMenu = (r: Row) => (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" aria-label="Azioni raccolta" onClick={e => e.stopPropagation()}>
+                    <MoreHorizontal className="h-4 w-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                <DropdownMenuItem onClick={() => showCollection({ typeId: r.typeId, folderId: r.folder?.id ?? null })}><Images className="mr-2 h-4 w-4" />Apri raccolta</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => openUpload({ typeId: r.typeId, folderId: r.folder?.id ?? null })}><Upload className="mr-2 h-4 w-4" />Aggiungi foto</DropdownMenuItem>
+                {r.folder && (
+                    <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => deleteFolder(r.folder!)} className="text-red-600 focus:text-red-600">
+                            <Trash2 className="mr-2 h-4 w-4" />Elimina cartella
+                        </DropdownMenuItem>
+                    </>
+                )}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    )
+
+    // Raccolta aperta: pagina dedicata alle foto
+    const collection = openCollection
+        ? (() => {
+            const type = docTypes.find(t => t.id === openCollection.typeId)
+            const folder = openCollection.folderId ? folders.find(f => f.id === openCollection.folderId) : undefined
+            const docs = documents.filter(d => d.documentTypeId === openCollection.typeId && (d.folderId ?? null) === openCollection.folderId)
+            return { type, folder, docs, title: `${type?.name ?? 'Foto'}${folder ? ` › ${folder.name}` : ''}` }
+        })()
+        : null
+
     return (
-        <NotchTabs title="Documenti cantiere">
-            <NotchActions>
-                <NotchSearch value={search} onChange={setSearch} placeholder="Cerca per nome o nota" />
-                <NotchStat label="Documenti" value={String(documents.length)} />
-            </NotchActions>
-
-            {loading ? (
-                <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>
+        <>
+            {collection ? (
+                <JobPhotoCollection
+                    title={collection.title}
+                    docs={collection.docs}
+                    onBack={closeCollection}
+                    backLabel="Documenti cantiere"
+                    onMoveSelected={docs => openMove(docs)}
+                    onDeleteSelected={docs => { setBulkDeleteDocs(docs); setBulkDeleteOpen(true) }}
+                    onAdd={() => openUpload({ typeId: openCollection!.typeId, folderId: openCollection!.folderId })}
+                    onOpen={doc => openDocument(doc, collection.docs)}
+                    menu={doc => rowMenu(doc, collection.docs)}
+                />
             ) : (
-                <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
-                    <TableHeader>
-                        <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
-                            <TableHead className={headCls}>{sortBtn('name', 'Documento')}</TableHead>
-                            <TableHead className={`w-44 ${headCls}`}>
-                                <Select value={typeFilter} onValueChange={v => { setTypeFilter(v); setFolderFilter('all') }}>
-                                    <SelectTrigger aria-label="Filtra per tipo" className="h-7 min-w-0 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
-                                        <SelectValue>{typeFilter === 'all' ? 'Tipo' : typeFilter === UNTYPED_KEY ? 'Senza tipo' : docTypes.find(t => t.id === typeFilter)?.name}</SelectValue>
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">Tutti i tipi</SelectItem>
-                                        {docTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                                        {hasUntyped && <SelectItem value={UNTYPED_KEY}>Senza tipo</SelectItem>}
-                                    </SelectContent>
-                                </Select>
-                            </TableHead>
-                            {folders.length > 0 && (
-                                <TableHead className={`w-44 ${headCls}`}>
-                                    <Select value={folderFilter} onValueChange={setFolderFilter}>
-                                        <SelectTrigger aria-label="Filtra per cartella" className="h-7 min-w-0 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
-                                            <SelectValue>{folderFilter === 'all' ? 'Cartella' : folderFilter === 'root' ? 'Senza cartella' : folders.find(f => f.id === folderFilter)?.name}</SelectValue>
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">Tutte le cartelle</SelectItem>
-                                            <SelectItem value="root">Senza cartella</SelectItem>
-                                            {folders.filter(f => typeFilter === 'all' || f.documentTypeId === typeFilter).map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                </TableHead>
-                            )}
-                            <TableHead className={`w-28 ${headCls}`}>{sortBtn('date', 'Data')}</TableHead>
-                            <TableHead className={`w-28 ${headCls}`}>{sortBtn('size', 'Dimensione')}</TableHead>
-                            <TableHead className={`w-[22%] ${headCls}`}>Nota</TableHead>
-                            <TableHead className="w-20" />
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {shown.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={folders.length > 0 ? 7 : 6} className="py-10 text-center text-slate-400 dark:text-slate-500">
-                                    {documents.length === 0 ? 'Nessun documento. Carica progetti, permessi, o foto del cantiere.' : 'Nessun documento corrisponde ai filtri.'}
-                                </TableCell>
-                            </TableRow>
-                        ) : shown.map(doc => (
-                            <TableRow key={doc.id} className="cursor-pointer" onClick={() => isImageFileType(doc.fileType) ? openGalleryForDoc(doc, shown) : openDoc(doc.fileUrl)}>
-                                <TableCell className="border-r py-2">
-                                    <span className="flex items-center gap-2 font-medium text-slate-900 dark:text-white">
-                                        <span className="shrink-0">{getFileIcon(doc.fileType)}</span>
-                                        <span className="truncate" title={doc.name}>{doc.name}</span>
-                                        <OldRevBadges isOld={doc.isOld} isRev={doc.isRev} />
-                                    </span>
-                                </TableCell>
-                                <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300">{docTypes.find(t => t.id === doc.documentTypeId)?.name || <span className="text-slate-300">—</span>}</TableCell>
-                                {folders.length > 0 && (
-                                    <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300">{folders.find(f => f.id === doc.folderId)?.name || <span className="text-slate-300">—</span>}</TableCell>
-                                )}
-                                <TableCell className="whitespace-nowrap border-r py-2 text-sm text-slate-600 dark:text-slate-300">{format(new Date(doc.createdAt), 'dd/MM/yyyy', { locale: it })}</TableCell>
-                                <TableCell className="whitespace-nowrap border-r py-2 text-sm text-slate-600 dark:text-slate-300">{doc.fileSize != null ? formatFileSize(doc.fileSize) : <span className="text-slate-300">—</span>}</TableCell>
-                                <TableCell className="truncate border-r py-2 text-sm text-slate-500" title={doc.notes || undefined}>{doc.notes || <span className="text-slate-300">—</span>}</TableCell>
-                                <TableCell className="py-2" onClick={e => e.stopPropagation()}>
-                                    <div className="flex items-center justify-end gap-0.5">
-                                        {docTypes.find(t => t.id === doc.documentTypeId)?.allowsFolders && (
-                                            <button type="button" title="Sposta in cartella" onClick={() => openMove(doc)} className="p-1 text-slate-400 hover:text-slate-800"><FolderInput className="h-4 w-4" /></button>
-                                        )}
-                                        <button type="button" title="Modifica" onClick={e => openEdit(doc, e)} className="p-1 text-slate-400 hover:text-blue-600"><Pencil className="h-4 w-4" /></button>
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            )}
+                <NotchTabs title="Documenti cantiere">
+                    <NotchActions>
+                        <NotchSearch value={search} onChange={setSearch} placeholder="Cerca per nome o nota" />
+                        <NotchStat label="Documenti" value={String(documents.length)} />
+                    </NotchActions>
 
-            <FloatingAddButton
-                label="Carica documenti"
-                icon={<Upload className="h-6 w-6" />}
-                showOnMobile
-                {...(folderTypeForNew
-                    ? { actions: [
-                        { label: "Carica documenti", onClick: openUpload },
-                        { label: "Nuova cartella", onClick: () => openNewFolder(folderTypeForNew) },
-                    ] }
-                    : { onClick: openUpload })}
-            />
+                    {loading ? (
+                        <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>
+                    ) : (
+                        <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+                            <TableHeader>
+                                <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                    <TableHead className={headCls}>{sortBtn('name', 'Documento')}</TableHead>
+                                    <TableHead className={`w-44 ${headCls}`}>
+                                        <Select value={typeFilter} onValueChange={v => { setTypeFilter(v); setFolderFilter('all') }}>
+                                            <SelectTrigger aria-label="Filtra per tipo" className="h-7 min-w-0 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
+                                                <SelectValue>{typeFilter === 'all' ? 'Tipo' : typeFilter === UNTYPED_KEY ? 'Senza tipo' : docTypes.find(t => t.id === typeFilter)?.name}</SelectValue>
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">Tutti i tipi</SelectItem>
+                                                {docTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                                                {hasUntyped && <SelectItem value={UNTYPED_KEY}>Senza tipo</SelectItem>}
+                                            </SelectContent>
+                                        </Select>
+                                    </TableHead>
+                                    <TableHead className={`w-44 ${headCls}`}>
+                                        <Select value={folderFilter} onValueChange={setFolderFilter}>
+                                            <SelectTrigger aria-label="Filtra per cartella" className="h-7 min-w-0 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
+                                                <SelectValue>{folderFilter === 'all' ? 'Cartella' : folderFilter === 'root' ? 'Senza cartella' : folders.find(f => f.id === folderFilter)?.name}</SelectValue>
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">Tutte le cartelle</SelectItem>
+                                                <SelectItem value="root">Senza cartella</SelectItem>
+                                                {folders.filter(f => typeFilter === 'all' || f.documentTypeId === typeFilter).map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </TableHead>
+                                    <TableHead className={`w-28 ${headCls}`}>{sortBtn('date', 'Data')}</TableHead>
+                                    <TableHead className={`w-28 ${headCls}`}>{sortBtn('size', 'Dimensione')}</TableHead>
+                                    <TableHead className={`w-[22%] ${headCls}`}>Nota</TableHead>
+                                    <TableHead className="w-14" />
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {rows.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                                            {documents.length === 0 ? 'Nessun documento. Carica progetti, permessi, o foto del cantiere.' : 'Nessun documento corrisponde ai filtri.'}
+                                        </TableCell>
+                                    </TableRow>
+                                ) : rows.map(r => (
+                                    <TableRow key={r.id} className="cursor-pointer" onClick={() => r.kind === 'collection' ? showCollection({ typeId: r.typeId, folderId: r.folder?.id ?? null }) : openDocument(r.doc!)}>
+                                        <TableCell className="border-r py-2">
+                                            {r.kind === 'collection' ? (
+                                                <div className="flex min-w-0 items-center gap-2">
+                                                    {r.docs[0]
+                                                        ? <PhotoThumb doc={r.docs[0]} className="h-9 w-9 shrink-0 rounded" />
+                                                        : <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-slate-100 dark:bg-slate-800"><Images className="h-5 w-5 text-slate-400" /></span>}
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-sm font-semibold" title={r.name}>{r.name}</p>
+                                                        <p className="text-xs text-blue-600">{r.docs.length} foto</p>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex min-w-0 items-center gap-2">
+                                                    <span className="shrink-0">{getFileIcon(r.doc!.fileType, "h-5 w-5")}</span>
+                                                    <span className="truncate text-sm font-medium" title={r.doc!.name}>{r.doc!.name}</span>
+                                                    <OldRevBadges isOld={r.doc!.isOld} isRev={r.doc!.isRev} />
+                                                </div>
+                                            )}
+                                        </TableCell>
+                                        <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300" title={r.typeName}>{r.typeName}</TableCell>
+                                        <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300" title={r.folderName}>{r.folderName || <span className="text-slate-300">—</span>}</TableCell>
+                                        <TableCell className="whitespace-nowrap border-r py-2 text-sm text-slate-600 dark:text-slate-300">{r.date ? format(new Date(r.date), 'dd/MM/yyyy', { locale: it }) : <span className="text-slate-300">—</span>}</TableCell>
+                                        <TableCell className="whitespace-nowrap border-r py-2 text-sm text-slate-600 dark:text-slate-300">{r.size > 0 ? formatFileSize(r.size) : <span className="text-slate-300">—</span>}</TableCell>
+                                        <TableCell className="truncate border-r py-2 text-sm text-slate-500" title={r.notes || undefined}>{r.notes || <span className="text-slate-300">—</span>}</TableCell>
+                                        <TableCell className="py-2 text-right">{r.kind === 'doc' ? rowMenu(r.doc!) : collectionMenu(r)}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    )}
+
+                    <FloatingAddButton
+                        label="Carica documenti"
+                        icon={<Upload className="h-6 w-6" />}
+                        showOnMobile
+                        {...(folderTypeForNew
+                            ? { actions: [
+                                { label: "Carica documenti", onClick: () => openUpload() },
+                                { label: "Nuova cartella", onClick: () => openNewFolder(folderTypeForNew) },
+                            ] }
+                            : { onClick: () => openUpload() })}
+                    />
+                </NotchTabs>
+            )}
 
             {/* Upload dialog - step 1: tipo + file multipli */}
             <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
@@ -679,6 +840,16 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                 onConfirm={handleDelete}
             />
 
+            <ConfirmDeleteDialog
+                open={bulkDeleteOpen}
+                onOpenChange={setBulkDeleteOpen}
+                title={bulkDeleteDocs.length > 1 ? `Elimina ${bulkDeleteDocs.length} documenti` : "Elimina documento"}
+                description={bulkDeleteDocs.length > 1
+                    ? `I ${bulkDeleteDocs.length} documenti selezionati verranno eliminati definitivamente e non potranno essere recuperati.`
+                    : `Il documento "${bulkDeleteDocs[0]?.name || 'selezionato'}" verra eliminato definitivamente e non potra essere recuperato.`}
+                onConfirm={handleBulkDelete}
+            />
+
             {/* Nuova cartella */}
             <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
                 <DialogContent className="max-w-sm">
@@ -704,14 +875,14 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
             {/* Sposta in cartella */}
             <Dialog open={moveOpen} onOpenChange={setMoveOpen}>
                 <DialogContent className="max-w-sm">
-                    <DialogHeader><DialogTitle>Sposta in cartella</DialogTitle></DialogHeader>
+                    <DialogHeader><DialogTitle>{movingDocs.length > 1 ? `Sposta ${movingDocs.length} documenti` : "Sposta in cartella"}</DialogTitle></DialogHeader>
                     <div className="space-y-1.5 py-2">
                         <Label>Cartella di destinazione</Label>
                         <Select value={moveFolderId} onValueChange={setMoveFolderId}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="root">Nessuna cartella</SelectItem>
-                                {folders.filter(f => f.documentTypeId === movingDoc?.documentTypeId).map(f => (
+                                {folders.filter(f => f.documentTypeId === movingDocs[0]?.documentTypeId).map(f => (
                                     <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                                 ))}
                             </SelectContent>
@@ -734,6 +905,6 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                     onClose={() => setGalleryOpen(false)}
                 />
             )}
-        </NotchTabs>
+        </>
     )
 }
