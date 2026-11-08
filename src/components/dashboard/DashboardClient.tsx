@@ -8,7 +8,6 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { NotchTabs, NotchActions } from "@/components/ui/notch-tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/components/auth-provider";
 import { formatCurrency } from "@/lib/utils/format";
 import {
