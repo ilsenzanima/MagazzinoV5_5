@@ -316,7 +316,8 @@ function RailSidebar() {
 const BAND_W = 250
 const CURVE_W = 150
 const BAND_H = 54
-const LINE_H = 15const CAP_R = CR + 5 // raggio dell'incavo che segue l'angolo del menu
+const LINE_H = 15
+const CAP_R = CR + 5 // raggio dell'incavo che segue l'angolo del menu
 
 function TopBar() {
   const pathname = usePathname()
