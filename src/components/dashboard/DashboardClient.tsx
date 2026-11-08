@@ -185,10 +185,11 @@ export const DashboardClient = memo(function DashboardClient({ stats, todo }: Da
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Sinistra: ricerca rapida (barra in evidenza, sotto si sceglie dove cercare) */}
             <div className="space-y-3">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-400" />
+              {/* Bordo sfumato: rosso che sfuma in arancio e rosa, con un alone morbido quando si scrive */}
+              <div className="group relative rounded-xl bg-gradient-to-r from-red-400/80 via-orange-300/70 to-rose-400/80 p-[2px] shadow-[0_2px_10px_rgba(244,63,94,0.18)] transition-shadow focus-within:shadow-[0_0_0_4px_rgba(251,113,133,0.18),0_4px_16px_rgba(244,63,94,0.28)]">
+                <Search className="pointer-events-none absolute left-4 top-1/2 z-10 h-6 w-6 -translate-y-1/2 text-slate-400" />
                 <Input
-                  className="h-14 bg-white pl-12 text-lg shadow-sm dark:bg-slate-900"
+                  className="h-14 rounded-[10px] border-0 bg-white pl-12 text-lg shadow-none focus-visible:ring-0 dark:bg-slate-900"
                   placeholder="Cerca…"
                   value={query}
                   onChange={e => setQuery(e.target.value)}
