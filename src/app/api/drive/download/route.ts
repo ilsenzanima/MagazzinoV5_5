@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 
         // HEIC/HEIF non si vedono nei browser (tranne Safari): per la visualizzazione si serve
         // la versione grande (JPEG) generata da Drive. Il download diretto resta l'originale.
-        if (!forceDownload && /^image\/hei[cf]/i.test(mimeType)) {
+        if (!forceDownload && (/^image\/hei[cf]/i.test(mimeType) || /\.hei[cf]$/i.test(name))) {
             const big = await getDriveThumbnail(fileId, 2048).catch(() => null)
             if (big) {
                 return new NextResponse(new Uint8Array(big), {
