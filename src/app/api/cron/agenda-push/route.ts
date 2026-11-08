@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient as createAdmin } from "@supabase/supabase-js"
 import { getAgendaDue, getAutoItems, kindInfo, todayIso } from "@/lib/services/agenda"
+import { getMissingDays } from "@/lib/services/attendance-check"
 import { configurePush, sendPushToUsers } from "@/lib/push-server"
 
 // Riepilogo giornaliero sul telefono di admin e operativi: voci dell'agenda da ricordare e scadenze di corsi e visite.
@@ -24,11 +25,21 @@ export async function GET(req: NextRequest) {
     ...reminders.map(i => `${kindInfo(i.kind).label}: ${i.title}${(i.endDate ?? i.date) < today ? " (scaduto)" : i.date <= today ? " (oggi)" : ""}`),
     ...autos.map(i => `${i.title}${i.date < today ? " (scaduto)" : ""}`),
   ]
+
+  // Articoli con scorta minima impostata ed esauriti (come nella campanella: solo quelli gia' verificati)
+  const { data: stock } = await admin.from("inventory").select("quantity").is("deleted_at", null).gt("min_stock", 0).not("verified_at", "is", null).limit(1000)
+  const out = (stock ?? []).filter(i => (Number(i.quantity) || 0) <= 0).length
+  if (out > 0) lines.push(out === 1 ? "1 articolo esaurito" : `${out} articoli esauriti`)
+
+  // Giorni con presenze da segnare
+  const missing = await getMissingDays(admin).catch(() => [])
+  if (missing.length > 0) lines.push(missing.length === 1 ? "1 giorno con presenze da segnare" : `${missing.length} giorni con presenze da segnare`)
+
   if (lines.length === 0) return NextResponse.json({ sent: 0, lines: 0 })
 
   const body = lines.slice(0, 4).join("\n") + (lines.length > 4 ? `\n...e altre ${lines.length - 4}` : "")
   const result = await sendPushToUsers(admin, userIds, {
-    title: lines.length === 1 ? "Agenda: 1 voce da ricordare" : `Agenda: ${lines.length} voci da ricordare`,
+    title: lines.length === 1 ? "Magazzino: 1 cosa da vedere" : `Magazzino: ${lines.length} cose da vedere`,
     body,
     url: "/agenda",
     tag: "agenda-digest",

@@ -75,7 +75,7 @@ function PushCard() {
       <CardHeader>
         <CardTitle>Notifiche sul telefono</CardTitle>
         <CardDescription>
-          Ogni mattina ricevi un riepilogo dell&apos;Agenda (voci da ricordare, corsi e visite mediche in scadenza) anche con l&apos;app chiusa. Vale solo per questo dispositivo.
+          Ogni mattina ricevi un riepilogo (voci dell&apos;Agenda da ricordare, corsi e visite in scadenza, articoli esauriti, giorni di presenze da segnare) e, subito, ogni nuova richiesta di permesso. Funziona anche con l&apos;app chiusa e vale solo per questo dispositivo.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

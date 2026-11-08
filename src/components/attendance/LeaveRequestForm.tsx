@@ -71,6 +71,12 @@ export function LeaveRequestForm({ workers, onSuccess }: LeaveRequestFormProps) 
                 endDate: values.endDate,
                 hours: values.hours,
             })
+            // Avviso sul telefono a admin e operativi: se non parte non e' un problema per chi invia
+            fetch("/api/push/leave", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ workerId: values.workerId, startDate: values.startDate, endDate: values.endDate, hours: values.hours }),
+            }).catch(() => {})
             toast.success("Richiesta inviata con successo")
             form.reset({
                 workerId: "",
