@@ -11,6 +11,8 @@ export interface SectionDef {
   icon: ReactNode
   render: () => ReactNode
   hidden?: boolean
+  // Vecchie chiavi (?v=) che portano a questa voce
+  aliases?: string[]
   // Pallino rosso sulla scheda
   dot?: boolean
 }
@@ -20,7 +22,8 @@ function Inner({ title, sections, merge }: { title: string; sections: SectionDef
   const pathname = usePathname()
   const params = useSearchParams()
   const visible = sections.filter(s => !s.hidden)
-  const current = visible.find(s => s.key === params.get("v")) ?? visible[0]
+  const wanted = params.get("v")
+  const current = visible.find(s => s.key === wanted || s.aliases?.includes(wanted ?? "")) ?? visible[0]
 
   return (
     <DashboardLayout>

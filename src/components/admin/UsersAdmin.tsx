@@ -3,9 +3,9 @@
 import { notify } from "@/lib/notify";;
 import { confirmDialog } from "@/components/ui/confirm-host";
 
-import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { KeyRound, Shield, ShieldAlert, Trash2, UserCog, UserPlus } from "lucide-react";
@@ -155,15 +155,6 @@ export function UsersAdmin() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h3 className="text-lg font-medium">Amministrazione</h3>
-                <p className="text-sm text-muted-foreground">
-                    Gestisci utenti, ruoli e impostazioni globali del sistema.
-                </p>
-            </div>
-
-            <Separator />
-
             {/* Connection Status */}
             <Card className={connectionStatus === 'connected' ? "border-green-500" : connectionStatus === 'error' ? "border-red-500" : ""}>
                 <CardHeader className="pb-2">
@@ -241,42 +232,37 @@ export function UsersAdmin() {
 
             {userRole === 'admin' ? (
                 <>
-                    <Card>
-                        <CardHeader>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <CardTitle>Gestione Utenti</CardTitle>
-                                    <CardDescription>
-                                        Visualizza e modifica i ruoli degli utenti registrati.
-                                    </CardDescription>
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
+                    <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+                        <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+                            <TableHeader>
+                                <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Utente</TableHead>
+                                    <TableHead className="hidden text-xs font-semibold uppercase tracking-wide text-slate-600 md:table-cell">Email</TableHead>
+                                    <TableHead className="w-32 text-xs font-semibold uppercase tracking-wide text-slate-600">Ruolo</TableHead>
+                                    <TableHead className="w-36" />
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
                                 {loadingUsers ? (
-                                    <div className="flex justify-center p-4">
-                                        <Loader2 className="h-6 w-6 animate-spin" />
-                                    </div>
-                                ) : (
-                                    users.map((user) => (
-                                        <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg">
-                                            <div className="flex items-center space-x-4">
-                                                <Avatar>
-                                                    <AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback>
-                                                </Avatar>
-                                                <div>
-                                                    <p className="text-sm font-medium leading-none">{user.name}</p>
-                                                    <p className="text-sm text-muted-foreground">{user.email}</p>
-                                                </div>
+                                    <TableRow><TableCell colSpan={4} className="py-10 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-slate-400" /></TableCell></TableRow>
+                                ) : users.map((user) => (
+                                    <TableRow key={user.id}>
+                                        <TableCell className="py-2">
+                                            <div className="flex items-center gap-3">
+                                                <Avatar className="h-8 w-8"><AvatarFallback>{user.email?.charAt(0).toUpperCase()}</AvatarFallback></Avatar>
+                                                <span className="truncate text-sm font-medium">{user.name}</span>
                                             </div>
-                                            <div className="flex items-center space-x-2">
-                                                <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                                                    {user.role}
-                                                </Badge>
+                                        </TableCell>
+                                        <TableCell className="hidden truncate py-2 text-sm text-muted-foreground md:table-cell">{user.email}</TableCell>
+                                        <TableCell className="py-2">
+                                            <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>{user.role}</Badge>
+                                        </TableCell>
+                                        <TableCell className="py-2">
+                                            <div className="flex items-center justify-end gap-1">
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
+                                                    title="Cambia ruolo"
                                                     onClick={() => {
                                                         setSelectedUser(user);
                                                         setNewRole(user.role as 'admin' | 'user' | 'operativo');
@@ -296,7 +282,7 @@ export function UsersAdmin() {
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    className="text-red-500 hover:text-red-700 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    className="text-red-500 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                                                     onClick={() => handleDeleteUser(user.id)}
                                                     disabled={user.role === 'admin'}
                                                     title={user.role === 'admin' ? "Non puoi eliminare un admin. Cambia prima il ruolo." : "Elimina utente"}
@@ -304,12 +290,12 @@ export function UsersAdmin() {
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </>
             ) : (
                 <Alert>

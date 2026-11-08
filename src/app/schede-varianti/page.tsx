@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { confirmDialog } from "@/components/ui/confirm-host";
 import { ArrowDown, ArrowUp, Check, Loader2, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { NotchTabs, NotchHelp } from "@/components/ui/notch-tabs";
+import { PageStrip, NotchHelp } from "@/components/ui/notch-tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ const EMPTY_TEMPLATE: VariantTemplate = { version: 2, pattern: "", fields: [] };
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
-export default function SchedeVariantiPage() {
+export function SchedeVariantiContent({ embedded = false }: { embedded?: boolean }) {
     const { userRole, realRole } = useAuth();
     const isAdmin = userRole === "admin" || realRole === "admin";
 
@@ -185,7 +185,7 @@ export default function SchedeVariantiPage() {
     return (
         <DashboardLayout>
             <div className="space-y-4">
-                <NotchTabs title="Schede varianti">
+                <PageStrip embedded={embedded} title="Schede varianti">
                     <NotchHelp
                         title="Schede varianti"
                         lines={[
@@ -193,7 +193,7 @@ export default function SchedeVariantiPage() {
                             "I sottotipi non sono nuove tipologie: servono solo a scegliere quali campi chiedere (es. nelle Porte: porta, telaio, maniglione).",
                         ]}
                     />
-                </NotchTabs>
+                </PageStrip>
 
                 <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
                     {/* Elenco tipologie */}
@@ -469,4 +469,8 @@ export default function SchedeVariantiPage() {
             </div>
         </DashboardLayout>
     );
+}
+
+export default function SchedeVariantiPage() {
+    return <SchedeVariantiContent />;
 }

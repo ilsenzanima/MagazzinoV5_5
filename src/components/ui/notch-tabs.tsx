@@ -68,6 +68,11 @@ export const useNotchSlots = () => useContext(SlotsCtx)
 // Vero quando la pagina sta sotto la striscia di una pagina unita: la sua striscia piatta si avvicina a quella sopra
 export const NestedStripCtx = createContext(false)
 
+// Striscia di una pagina: se la pagina e' dentro un'altra striscia (embedded) ne usa la sua, mettendoci solo aiuto e pulsanti
+export function PageStrip({ embedded, title, children }: { embedded?: boolean; title: ReactNode; children?: ReactNode }) {
+  return embedded ? <>{children}</> : <NotchTabs title={title}>{children}</NotchTabs>
+}
+
 // Stile unico dei pulsanti nella striscia, uguale in ogni pagina
 export function NotchButton({ className, ...props }: React.ComponentProps<typeof Button>) {
   return (

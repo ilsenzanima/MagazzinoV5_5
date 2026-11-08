@@ -3,43 +3,41 @@
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { countExpiredTrash } from "@/lib/services/trash"
-import { UsersAdmin } from "@/components/admin/UsersAdmin"
-import { AttendanceWorkersSettings } from "@/components/admin/AttendanceWorkersSettings"
-import { AlertTriangle, Boxes, CalendarCheck, Shield, ListChecks, PackageCheck, ScanSearch, Trash2, TrendingUp, UserPlus } from "lucide-react"
+import { inventoryApi } from "@/lib/services/inventory"
+import { ArticoliControlli } from "@/components/admin/ArticoliControlli"
+import { VariantiConfezioni } from "@/components/admin/VariantiConfezioni"
+import { AcquistiSpostamenti } from "@/components/admin/AcquistiSpostamenti"
+import { UtentiOperai } from "@/components/admin/UtentiOperai"
+import { PackageCheck, ListChecks, ScanSearch, Users, Trash2 } from "lucide-react"
 import { SectionsPage } from "@/components/layout/SectionsPage"
 import { useAuth } from "@/components/auth-provider"
-import VerificaPage from "../inventory/verifica/page"
-import AnomaliePage from "../anomalie/page"
-import ControlloAcquistiPage from "../controllo-acquisti/page"
-import SchedeVariantiPage from "../schede-varianti/page"
-import ConfezioniPage from "../confezioni/page"
 import CestinoPage from "../cestino/page"
-import AnalyticsPage from "../analytics/page"
-import { CreateUserForm } from "@/components/admin/CreateUserForm"
 
+// Voci raggruppate per argomento; le vecchie voci (?v=anomalie, ?v=confezioni...) portano alla voce che le contiene
 export default function StrumentiAdminPage() {
   const { userRole } = useAuth()
   const admin = userRole === "admin"
   const icon = "h-4 w-4"
-  // Pallino sul Cestino quando ci sono elementi scaduti da eliminare
+
+  // Pallini: articoli da controllare / anomalie, elementi scaduti nel cestino
+  const [articleAlerts, setArticleAlerts] = useState(0)
   const [expiredTrash, setExpiredTrash] = useState(0)
   useEffect(() => {
     if (!admin) return
+    Promise.all([inventoryApi.getUnverifiedCount(), inventoryApi.getNegativeLotMovements(), inventoryApi.getOrphanedJobReferences()])
+      .then(([unverified, negative, orphaned]) => setArticleAlerts(unverified + negative.length + orphaned.length))
+      .catch(console.error)
     countExpiredTrash(supabase).then(setExpiredTrash).catch(console.error)
   }, [admin])
+
   return (
     <SectionsPage
       title="Strumenti admin"
       sections={[
-        { key: "controllo-articoli", label: "Controllo Articoli", icon: <PackageCheck className={icon} />, hidden: !admin, render: () => <VerificaPage /> },
-        { key: "anomalie", label: "Anomalie", icon: <AlertTriangle className={icon} />, hidden: !admin, render: () => <AnomaliePage /> },
-        { key: "controllo-acquisti", label: "Controllo Acquisti", icon: <ScanSearch className={icon} />, hidden: !admin, render: () => <ControlloAcquistiPage /> },
-        { key: "schede-varianti", label: "Schede Varianti", icon: <ListChecks className={icon} />, hidden: !admin, render: () => <SchedeVariantiPage /> },
-        { key: "confezioni", label: "Quantità Confezioni", icon: <Boxes className={icon} />, hidden: !admin, render: () => <ConfezioniPage /> },
-        { key: "spostamenti", label: "Analisi Spostamenti", icon: <TrendingUp className={icon} />, hidden: !admin, render: () => <AnalyticsPage /> },
-        { key: "presenze-operai", label: "Presenze operai", icon: <CalendarCheck className={icon} />, hidden: !admin, render: () => <AttendanceWorkersSettings /> },
-        { key: "utenti", label: "Utenti e ruoli", icon: <Shield className={icon} />, hidden: !admin, render: () => <UsersAdmin /> },
-        { key: "nuovo-utente", label: "Nuovo utente", icon: <UserPlus className={icon} />, hidden: !admin, render: () => <CreateUserForm /> },
+        { key: "articoli", aliases: ["controllo-articoli", "anomalie"], label: "Controllo articoli", dot: articleAlerts > 0, icon: <PackageCheck className={icon} />, hidden: !admin, render: () => <ArticoliControlli /> },
+        { key: "varianti", aliases: ["schede-varianti", "confezioni"], label: "Varianti e confezioni", icon: <ListChecks className={icon} />, hidden: !admin, render: () => <VariantiConfezioni /> },
+        { key: "acquisti", aliases: ["controllo-acquisti", "spostamenti"], label: "Acquisti e spostamenti", icon: <ScanSearch className={icon} />, hidden: !admin, render: () => <AcquistiSpostamenti /> },
+        { key: "utenti", aliases: ["nuovo-utente", "presenze-operai"], label: "Utenti e operai", icon: <Users className={icon} />, hidden: !admin, render: () => <UtentiOperai /> },
         { key: "cestino", label: "Cestino", dot: expiredTrash > 0, icon: <Trash2 className={icon} />, hidden: !admin, render: () => <CestinoPage /> },
       ]}
     />

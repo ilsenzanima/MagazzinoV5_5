@@ -15,7 +15,7 @@ import {
   YAxis,
 } from "recharts";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { NotchTabs, NotchHelp } from "@/components/ui/notch-tabs";
+import { PageStrip, NotchHelp } from "@/components/ui/notch-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,7 +46,7 @@ const formatDate = (d: Date | null): string => (d ? d.toLocaleDateString("it-IT"
 
 const jobLabel = (job: JobOption): string => (job.title ? `${job.code} · ${job.title}` : job.code);
 
-export default function AnalyticsPage() {
+export function AnalyticsContent({ embedded = false }: { embedded?: boolean }) {
   const [jobs, setJobs] = useState<JobOption[]>([]);
   const [jobsLoading, setJobsLoading] = useState(true);
   const [jobsError, setJobsError] = useState(false);
@@ -147,12 +147,12 @@ export default function AnalyticsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 pb-8">
-        <NotchTabs title="Analisi spostamenti">
+        <PageStrip embedded={embedded} title="Analisi spostamenti">
           <NotchHelp
             title="Analisi spostamenti"
             lines={["Scegli una o più commesse: vedi quali materiali sono andati e quali sono rientrati, la quantità reale rimasta in commessa e come cambia nel tempo."]}
           />
-        </NotchTabs>
+        </PageStrip>
 
         {/* Scelta commesse */}
         <Card>
@@ -434,4 +434,8 @@ export default function AnalyticsPage() {
       </div>
     </DashboardLayout>
   );
+}
+
+export default function AnalyticsPage() {
+    return <AnalyticsContent />;
 }

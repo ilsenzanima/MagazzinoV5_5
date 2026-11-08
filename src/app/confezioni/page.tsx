@@ -4,17 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { NotchTabs, NotchHelp } from "@/components/ui/notch-tabs";
+import { PageStrip, NotchHelp, NotchActions, NotchSearch, NotchButton } from "@/components/ui/notch-tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/components/auth-provider";
 import { notify } from "@/lib/notify";
 import { purchaseAuditApi, PackItem } from "@/lib/services/purchase-audit";
 
-export default function ConfezioniPage() {
+export function ConfezioniContent({ embedded = false }: { embedded?: boolean }) {
     const { userRole, realRole } = useAuth();
     const isAdmin = userRole === 'admin' || realRole === 'admin';
 
@@ -88,32 +87,21 @@ export default function ConfezioniPage() {
                 </Alert>
             ) : (
                 <div className="space-y-4">
-                    <NotchTabs title="Quantità per confezione">
+                    <PageStrip embedded={embedded} title="Quantità per confezione">
                         <NotchHelp wide title="Quantità per confezione" lines={["Quanti pezzi, metri o chili ci sono normalmente in una confezione, nell'unità dell'articolo. Si salva da solo uscendo dal campo o premendo Invio. Serve al Controllo Acquisti per segnalare prezzi o quantità che non tornano con la confezione."]} />
-                    </NotchTabs>
-                    <Card>
-                        <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-                            <Input
-                                className="sm:w-72"
-                                placeholder="Cerca per nome, modello, marca o codice..."
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                            />
-                            <label className="flex items-center gap-2 text-sm">
-                                <Checkbox checked={onlyMissing} onCheckedChange={v => setOnlyMissing(v === true)} />
+                        <NotchActions>
+                            <NotchSearch value={search} onChange={setSearch} placeholder="Cerca nome, modello, marca o codice..." />
+                            <NotchButton type="button" onClick={() => setOnlyMissing(v => !v)} className={onlyMissing ? "ring-2 ring-blue-400" : undefined}>
                                 Solo senza quantità
-                            </label>
-                            <Button variant="outline" onClick={load} disabled={loading}>
-                                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                                Ricarica
-                            </Button>
+                            </NotchButton>
+                            <NotchButton type="button" onClick={load} disabled={loading}>
+                                {loading ? <Loader2 className="animate-spin" /> : <RefreshCw />} Ricarica
+                            </NotchButton>
                             {!loading && !error && (
-                                <span className="text-sm text-muted-foreground">
-                                    {filledCount} di {items.length} compilati · {visible.length} mostrati
-                                </span>
+                                <span className="text-xs text-slate-300">{filledCount} di {items.length} compilati · {visible.length} mostrati</span>
                             )}
-                        </CardContent>
-                    </Card>
+                        </NotchActions>
+                    </PageStrip>
 
                     {error && (
                         <Alert variant="destructive">
@@ -122,60 +110,62 @@ export default function ConfezioniPage() {
                         </Alert>
                     )}
 
-                    <Card>
-                        <CardContent className="overflow-x-auto p-0">
-                            <table className="w-full text-sm">
-                                <thead className="sticky top-0 bg-background">
-                                    <tr className="border-b text-left text-xs text-muted-foreground">
-                                        <th className="px-3 py-2">Articolo</th>
-                                        <th className="px-3 py-2">Modello</th>
-                                        <th className="px-3 py-2">Marca</th>
-                                        <th className="px-3 py-2">Unità</th>
-                                        <th className="px-3 py-2">Quantità per confezione</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {visible.map((it, idx) => {
-                                        const sameAsPrev = idx > 0 && visible[idx - 1].name === it.name;
-                                        return (
-                                            <tr key={it.id} className="border-b last:border-0">
-                                                <td className="px-3 py-1.5">
-                                                    <Link
-                                                        href={`/inventory/${it.id}`}
-                                                        className={sameAsPrev ? "text-muted-foreground hover:underline" : "font-medium hover:underline"}
-                                                    >
-                                                        {sameAsPrev ? `↳ ${it.name}` : it.name}
-                                                    </Link>
-                                                </td>
-                                                <td className="px-3 py-1.5">{it.model || "-"}</td>
-                                                <td className="px-3 py-1.5">{it.brand || "-"}</td>
-                                                <td className="px-3 py-1.5">{it.unit || "-"}</td>
-                                                <td className="px-3 py-1.5">
-                                                    <div className="flex items-center gap-2">
-                                                        <Input
-                                                            className="h-8 w-28"
-                                                            inputMode="decimal"
-                                                            placeholder="es. 18"
-                                                            value={drafts[it.id] ?? (it.packQuantity !== null ? String(it.packQuantity) : "")}
-                                                            onChange={e => setDrafts(d => ({ ...d, [it.id]: e.target.value }))}
-                                                            onBlur={() => save(it)}
-                                                            onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                                                        />
-                                                        {saving === it.id && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    {!loading && visible.length === 0 && (
-                                        <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">Nessun articolo trovato</td></tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </CardContent>
-                    </Card>
+                    <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+                        <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+                            <TableHeader>
+                                <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Articolo</TableHead>
+                                    <TableHead className="hidden w-40 text-xs font-semibold uppercase tracking-wide text-slate-600 md:table-cell">Modello</TableHead>
+                                    <TableHead className="hidden w-40 text-xs font-semibold uppercase tracking-wide text-slate-600 md:table-cell">Marca</TableHead>
+                                    <TableHead className="w-20 text-xs font-semibold uppercase tracking-wide text-slate-600">Unità</TableHead>
+                                    <TableHead className="w-44 text-xs font-semibold uppercase tracking-wide text-slate-600">Q.tà per confezione</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {visible.map((it, idx) => {
+                                    const sameAsPrev = idx > 0 && visible[idx - 1].name === it.name;
+                                    return (
+                                        <TableRow key={it.id}>
+                                            <TableCell className="truncate py-1.5">
+                                                <Link
+                                                    href={`/inventory/${it.id}`}
+                                                    className={sameAsPrev ? "text-muted-foreground hover:underline" : "font-medium hover:underline"}
+                                                >
+                                                    {sameAsPrev ? `↳ ${it.name}` : it.name}
+                                                </Link>
+                                            </TableCell>
+                                            <TableCell className="hidden truncate py-1.5 md:table-cell">{it.model || "-"}</TableCell>
+                                            <TableCell className="hidden truncate py-1.5 md:table-cell">{it.brand || "-"}</TableCell>
+                                            <TableCell className="py-1.5">{it.unit || "-"}</TableCell>
+                                            <TableCell className="py-1.5">
+                                                <div className="flex items-center gap-2">
+                                                    <Input
+                                                        className="h-8 w-28"
+                                                        inputMode="decimal"
+                                                        placeholder="es. 18"
+                                                        value={drafts[it.id] ?? (it.packQuantity !== null ? String(it.packQuantity) : "")}
+                                                        onChange={e => setDrafts(d => ({ ...d, [it.id]: e.target.value }))}
+                                                        onBlur={() => save(it)}
+                                                        onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                                                    />
+                                                    {saving === it.id && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    );
+                                })}
+                                {!loading && visible.length === 0 && (
+                                    <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">Nessun articolo trovato</TableCell></TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </div>
             )}
         </DashboardLayout>
     );
+}
+
+export default function ConfezioniPage() {
+    return <ConfezioniContent />;
 }

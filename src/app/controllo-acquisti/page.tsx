@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Loader2, Package, RefreshCw, ShieldAlert, Users } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { NotchTabs, NotchHelp } from "@/components/ui/notch-tabs";
+import { PageStrip, NotchHelp } from "@/components/ui/notch-tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ import { formatCurrency, formatNumber } from "@/lib/utils/format";
 
 type Mode = 'any' | 'price' | 'pack' | 'authors';
 
-export default function ControlloAcquistiPage() {
+export function ControlloAcquistiContent({ embedded = false }: { embedded?: boolean }) {
     const { userRole, realRole } = useAuth();
     const isAdmin = userRole === 'admin' || realRole === 'admin';
 
@@ -117,9 +117,9 @@ export default function ControlloAcquistiPage() {
                 </Alert>
             ) : (
                 <div className="space-y-4">
-                    <NotchTabs title="Controllo acquisti">
+                    <PageStrip embedded={embedded} title="Controllo acquisti">
                         <NotchHelp wide title="Controllo acquisti" lines={["Per ogni articolo confronta i prezzi unitari dei lotti d'acquisto (solo acquisti veri, non ordini). Un lotto è anomalo se il prezzo si discosta dalla mediana degli altri lotti oltre la soglia. Spunta \"Controllato\" quando le differenze sono accettabili: verranno segnalati di nuovo solo i lotti inseriti dopo."]} />
-                    </NotchTabs>
+                    </PageStrip>
                     <Card>
                         <CardContent className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
                             <Select value={mode} onValueChange={(v: Mode) => setMode(v)}>
@@ -274,4 +274,8 @@ export default function ControlloAcquistiPage() {
             )}
         </DashboardLayout>
     );
+}
+
+export default function ControlloAcquistiPage() {
+    return <ControlloAcquistiContent />;
 }
