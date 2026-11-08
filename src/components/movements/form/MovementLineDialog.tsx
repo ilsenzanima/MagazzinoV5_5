@@ -1,5 +1,6 @@
 "use client";
 
+import { Stepper } from "@/components/ui/stepper";
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { AlertTriangle, ArrowLeft, Check, Loader2, Plus } from "lucide-react";
@@ -131,10 +132,7 @@ export function MovementLineDialog({
                         {isReturnFromJob ? "Reso da cantiere" : isWaste ? "Eccedenza" : isTransfer ? "Trasferimento" : activeTab === "sale" ? "Vendita" : activeTab === "entry" ? "Entrata" : "Uscita"}
                     </DialogTitle>
                     <DialogDescription>Passo 2 di 2: {isWaste ? "peso" : "lotto e quantità"}</DialogDescription>
-                    <div className="mt-2 flex gap-1">
-                        <div className="h-1.5 flex-1 rounded bg-blue-600" />
-                        <div className="h-1.5 flex-1 rounded bg-blue-600" />
-                    </div>
+                    <Stepper steps={["Materiale", isWaste ? "Peso" : "Lotto e quantità"]} current={1} />
                 </DialogHeader>
 
                 <div className="flex-1 space-y-4 overflow-y-auto py-2">
