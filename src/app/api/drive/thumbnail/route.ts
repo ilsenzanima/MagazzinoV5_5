@@ -3,7 +3,7 @@ import { createServerClient } from "@supabase/ssr"
 import { createClient } from "@supabase/supabase-js"
 import { cookies } from "next/headers"
 import sharp from "sharp"
-import { downloadFile } from "@/lib/google-drive"
+import { downloadFile, getDriveThumbnail } from "@/lib/google-drive"
 
 // Miniatura di una foto su Drive (~360px, WebP). Si genera la prima volta che serve
 // e si conserva nel bucket privato "thumbnails": dalla volta dopo si legge il file
@@ -44,11 +44,20 @@ export async function GET(req: NextRequest) {
         }
 
         const { buffer } = await downloadFile(fileId, { onlyMimePrefix: "image/" })
-        const thumb = await sharp(buffer)
+        const toThumb = (input: Buffer) => sharp(input)
             .rotate()
             .resize({ width: MAX_SIDE, height: MAX_SIDE, fit: "inside", withoutEnlargement: true })
             .webp({ quality: 72 })
             .toBuffer()
+        let thumb: Buffer
+        try {
+            thumb = await toThumb(buffer)
+        } catch (decodeErr) {
+            // Formati che il server non decodifica (es. HEIC): si usa la miniatura che genera Drive
+            const fromDrive = await getDriveThumbnail(fileId, MAX_SIDE).catch(() => null)
+            if (!fromDrive) throw decodeErr
+            thumb = await toThumb(fromDrive)
+        }
 
         if (admin) {
             const { error } = await admin.storage.from(BUCKET).upload(path, thumb, { contentType: "image/webp", upsert: true })

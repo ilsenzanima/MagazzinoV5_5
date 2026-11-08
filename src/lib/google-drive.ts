@@ -299,6 +299,27 @@ export async function markFolderDeleted(segments: string[]): Promise<void> {
     await drive.files.update({ fileId: parentId, requestBody: { name: `ELIMINATO - ${name}` } });
 }
 
+/**
+ * Miniatura generata da Drive stesso (serve per formati che il server non sa decodificare, come HEIC).
+ * Restituisce null se Drive non ne ha una per il file.
+ */
+export async function getDriveThumbnail(fileId: string, size = 360): Promise<Buffer | null> {
+    const drive = getDriveClient();
+    const { data } = await drive.files.get({ fileId, fields: 'thumbnailLink' });
+    const link = data.thumbnailLink;
+    if (!link) return null;
+    const url = link.replace(/=s\d+$/, `=s${size}`);
+    let res = await fetch(url);
+    if (!res.ok) {
+        // Alcuni link richiedono l'autorizzazione dell'account
+        const { token } = await getOAuthClient().getAccessToken();
+        if (!token) return null;
+        res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return null;
+    }
+    return Buffer.from(await res.arrayBuffer());
+}
+
 export async function downloadFile(
     fileId: string,
     options?: { onlyMimePrefix?: string }
