@@ -13,6 +13,7 @@ import { reassignLotToEntries } from "@/app/inventory/[id]/actions";
 import Link from "next/link";
 import { notify } from "@/lib/notify";
 import { formatCurrency } from "@/lib/utils/format";
+import { useAuth } from "@/components/auth-provider";
 
 interface LotInfo {
     id: string;
@@ -41,6 +42,8 @@ interface ItemLotsProps {
 import { PageControls, paginate } from "@/components/ui/page-controls";
 
 export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedPieces, onReassignComplete }: ItemLotsProps) {
+    const { userRole } = useAuth();
+    const canSeePrice = userRole === "admin" || userRole === "operativo";
     const [isReassignOpen, setIsReassignOpen] = useState(false);
     const [selectedLot, setSelectedLot] = useState("");
     const [quantityToAssign, setQuantityToAssign] = useState(untrackedQuantity.toString());
@@ -175,7 +178,7 @@ export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedP
                                 <TableRow>
                                     <TableHead>Rif. Acquisto</TableHead>
                                     <TableHead>Data</TableHead>
-                                    <TableHead className="text-right">Prezzo Unit.</TableHead>
+                                    {canSeePrice && <TableHead className="text-right">Prezzo Unit.</TableHead>}
                                     <TableHead className="text-right">Disponibile</TableHead>
                                     <TableHead className="text-right">Usato %</TableHead>
                                 </TableRow>
@@ -205,6 +208,7 @@ export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedP
                                             <TableCell className="text-sm text-slate-500 dark:text-slate-400">
                                                 {format(new Date(lot.date), 'dd/MM/yyyy')}
                                             </TableCell>
+                                            {canSeePrice && (
                                             <TableCell className="text-right text-sm">
                                                 {lot.price !== undefined && lot.price !== null ? (
                                                     <span className="font-medium">{formatCurrency(lot.price)}</span>
@@ -212,6 +216,7 @@ export function ItemLots({ itemId, itemUnit, lots, untrackedQuantity, untrackedP
                                                     <span className="text-slate-400 text-xs">N/D</span>
                                                 )}
                                             </TableCell>
+                                            )}
                                             <TableCell className="text-right">
                                                 <div className="font-bold">{lot.remainingQty.toFixed(2)} {itemUnit}</div>
                                                 {lot.remainingPieces !== undefined && (

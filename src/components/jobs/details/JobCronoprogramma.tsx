@@ -15,6 +15,7 @@ import { NotchTabs, NotchHelp } from "@/components/ui/notch-tabs"
 import { FloatingAddButton } from "@/components/ui/floating-add-button"
 import { jobTasksApi, attendanceApi, jobTaskAssignmentsApi, workersApi, Job, JobTask, Attendance, JobTaskAssignment, Worker } from "@/lib/api"
 import { notify } from "@/lib/notify"
+import { useAuth } from "@/components/auth-provider"
 import { TimelineChart } from "@/components/jobs/cronoprogramma/TimelineChart"
 import { HelpTip } from "@/components/ui/help-tip"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
@@ -62,6 +63,9 @@ const emptyForm = {
 }
 
 export function JobCronoprogramma({ jobId, job }: JobCronoprogrammaProps) {
+    // L'utente semplice vede il cronoprogramma ma non puo' modificarlo
+    const { userRole } = useAuth()
+    const canEdit = userRole === 'admin' || userRole === 'operativo'
     const [tasks, setTasks] = useState<JobTask[]>([])
     const [attendance, setAttendance] = useState<Attendance[]>([])
     const [assignments, setAssignments] = useState<JobTaskAssignment[]>([])
@@ -303,7 +307,7 @@ export function JobCronoprogramma({ jobId, job }: JobCronoprogrammaProps) {
                             height={`clamp(260px, ${rows.length * 40 + 130}px, 68vh)`}
                             popupContent={presencePopupContent}
                             rowPresence={rowPresence}
-                            onTaskClick={(id) => { if (isSummaryId(id)) return; const t = tasks.find(t => t.id === id); if (t) openEdit(t) }}
+                            onTaskClick={(id) => { if (isSummaryId(id)) return; const t = tasks.find(t => t.id === id); if (t && canEdit) openEdit(t) }}
                             onDateChange={handleDateChange}
                             onProgressChange={handleProgressChange}
                         />
@@ -346,6 +350,7 @@ export function JobCronoprogramma({ jobId, job }: JobCronoprogrammaProps) {
                                         </p>
                                     )}
                                 </div>
+                                {canEdit && (
                                 <div className="flex items-center gap-1 shrink-0">
                                     <Button variant="ghost" size="icon" onClick={() => openEdit(task)}>
                                         <Pencil className="h-4 w-4" />
@@ -354,6 +359,7 @@ export function JobCronoprogramma({ jobId, job }: JobCronoprogrammaProps) {
                                         <Trash2 className="h-4 w-4 text-red-500" />
                                     </Button>
                                 </div>
+                                )}
                             </CardContent>
                         </Card>
                     ))
@@ -487,7 +493,7 @@ export function JobCronoprogramma({ jobId, job }: JobCronoprogrammaProps) {
                 onConfirm={handleDelete}
             />
         </div>
-        <FloatingAddButton onClick={openCreate} label="Aggiungi fase" />
+        {canEdit && <FloatingAddButton onClick={openCreate} label="Aggiungi fase" />}
         </NotchTabs>
     )
 }

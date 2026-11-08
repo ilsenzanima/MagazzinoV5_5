@@ -1,5 +1,5 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { SidebarNav } from "./components/settings-sidebar";
+import { SidebarNav, SettingsGuard } from "./components/settings-sidebar";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -13,7 +13,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
       <div className="space-y-6 pb-16">
         <div className="flex flex-col space-y-6">
           <SidebarNav />
-          <div className="flex-1 max-w-4xl">{children}</div>
+          <div className="flex-1 max-w-4xl"><SettingsGuard>{children}</SettingsGuard></div>
         </div>
       </div>
     </DashboardLayout>

@@ -826,6 +826,10 @@ export default function PurchaseDetailPage() {
     if (!purchase) return <DashboardLayout><div>Acquisto non trovato</div></DashboardLayout>;
 
     const isOrder = purchase.orderType === 'order';
+    // Gli ordini possono contenere prezzi e documenti riservati
+    if (isOrder && userRole === 'user') {
+        return <DashboardLayout><div className="py-20 text-center text-slate-500">Non hai accesso agli ordini.</div></DashboardLayout>;
+    }
     const hasMissingPrices = items.some(i => i.price === 0);
     // Mostra colonne trasporto solo se il trasporto è impostato ma non ancora applicato a tutte le righe
     const showTransportCols = transportCost > 0 && items.length > 0 && items.some(i => !i.transportApplied);

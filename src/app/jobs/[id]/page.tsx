@@ -98,7 +98,7 @@ function buildMenuGroups(canSeeAll: boolean): SectionMenuGroup[] {
                         emptyText: "Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Offerte per crearne uno.",
                     },
                 }] : []),
-                { key: 'ordini', label: 'Ordini', icon: <ClipboardList className={`${icon} text-orange-500`} /> },
+                ...(canSeeAll ? [{ key: 'ordini', label: 'Ordini', icon: <ClipboardList className={`${icon} text-orange-500`} /> }] : []),
             ],
         },
     ]
@@ -674,7 +674,7 @@ export default function JobDetailsPage() {
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             )}
-                            {linkedProposal && (
+                            {linkedProposal && (userRole === 'admin' || userRole === 'operativo') && (
                                 <Link
                                     href={`/clients/${linkedProposal.clientId}/proposals/${linkedProposal.id}`}
                                     title={`Creata dalla proposta: ${linkedProposal.title}`}

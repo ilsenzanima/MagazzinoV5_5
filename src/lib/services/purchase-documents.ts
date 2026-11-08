@@ -31,6 +31,7 @@ interface Options {
     sort?: PurchaseDocumentSortKey;
     dir?: 'asc' | 'desc';
     includeInvoices?: boolean;
+    includeOrders?: boolean;
 }
 
 // Una parola di ricerca senza i caratteri che spezzano i filtri (virgole e parentesi) o fanno da jolly
@@ -55,7 +56,7 @@ function applySearch<T extends { ilike: (c: string, p: string) => T; or: (f: str
 export const purchaseDocumentsApi = {
     getPaginated: async ({
         page = 1, limit = 50, search = '', kind = 'all', supplierId = '',
-        dateFrom = '', dateTo = '', sort = 'date', dir = 'desc', includeInvoices = true,
+        dateFrom = '', dateTo = '', sort = 'date', dir = 'desc', includeInvoices = true, includeOrders = true,
     }: Options) => {
         const from = (page - 1) * limit;
         const to = from + limit - 1;
@@ -65,8 +66,12 @@ export const purchaseDocumentsApi = {
             .select('id, doc_type', { count: 'exact' });
 
         if (kind !== 'all') query = query.eq('doc_type', kind);
-        else if (!includeInvoices) query = query.neq('doc_type', 'invoice');
+        else {
+            if (!includeInvoices) query = query.neq('doc_type', 'invoice');
+            if (!includeOrders) query = query.neq('doc_type', 'order');
+        }
         if (kind === 'invoice' && !includeInvoices) return { data: [] as PurchaseDocument[], total: 0 };
+        if (kind === 'order' && !includeOrders) return { data: [] as PurchaseDocument[], total: 0 };
 
         if (supplierId) query = query.eq('supplier_id', supplierId);
         if (dateFrom) query = query.gte('doc_date', dateFrom);

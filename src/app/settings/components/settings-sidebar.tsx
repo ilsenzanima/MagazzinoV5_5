@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { NotchTabs } from "@/components/ui/notch-tabs";
@@ -8,7 +9,6 @@ import {
   User,
   Bell,
   Settings,
-  Shield,
   Database,
   HardDrive
 } from "lucide-react";
@@ -40,11 +40,6 @@ const sidebarNavItems = [
     href: "/settings/backup",
     icon: HardDrive,
   },
-  {
-    title: "Amministrazione",
-    href: "/settings/admin",
-    icon: Shield,
-  },
 ];
 
 interface SidebarNavProps extends React.HTMLAttributes<HTMLElement> { }
@@ -56,10 +51,12 @@ export function SidebarNav({ className, ...props }: SidebarNavProps) {
 
   const items = sidebarNavItems
     .filter(item => {
-      if (item.href === "/settings/admin" || item.href === "/settings/backup") {
+      if (item.href === "/settings/backup") {
         // Show if effectively admin OR real admin (so they can disable simulation)
         return userRole === 'admin' || realRole === 'admin';
       }
+      // Dati (tipi, unita', magazzini...) solo per admin e operativi
+      if (item.href === "/settings/data") return userRole === 'admin' || userRole === 'operativo';
       return true;
     })
     .map(item => ({ value: item.href, label: item.title, icon: <item.icon /> }));
@@ -69,4 +66,25 @@ export function SidebarNav({ className, ...props }: SidebarNavProps) {
       <NotchTabs title="Impostazioni" items={items} value={pathname} onValueChange={(href) => router.push(href)} />
     </div>
   );
+}
+
+// Impedisce di aprire dall'indirizzo le pagine delle impostazioni riservate
+export function SettingsGuard({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { userRole, realRole } = useAuth();
+  const adminOnly = pathname.startsWith("/settings/backup");
+  const staffOnly = pathname.startsWith("/settings/data");
+  const allowed = adminOnly
+    ? userRole === 'admin' || realRole === 'admin'
+    : staffOnly
+      ? userRole === 'admin' || userRole === 'operativo'
+      : true;
+  const blocked = !!userRole && !allowed;
+
+  useEffect(() => {
+    if (blocked) router.replace("/settings");
+  }, [blocked, router]);
+
+  return blocked ? null : <>{children}</>;
 }

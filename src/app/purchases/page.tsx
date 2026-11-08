@@ -59,6 +59,8 @@ function PurchasesPageContent() {
   const searchParams = useSearchParams();
   const canSeeAmounts = userRole === "admin" || userRole === "operativo";
   const canSeeFatture = canSeeAmounts;
+  // Gli ordini possono contenere prezzi: l'utente semplice non li vede
+  const canSeeOrders = canSeeAmounts;
 
   const [kind, setKind] = useState<DocumentKind | "all">(kindFromParams(searchParams));
   const [searchTerm, setSearchTerm] = useState(searchParams?.get("q") || "");
@@ -75,7 +77,7 @@ function PurchasesPageContent() {
   const requestId = useRef(0);
 
   // Chi non vede le fatture non può filtrarle
-  const effectiveKind: DocumentKind | "all" = kind === "invoice" && !canSeeFatture ? "all" : kind;
+  const effectiveKind: DocumentKind | "all" = (kind === "invoice" && !canSeeFatture) || (kind === "order" && !canSeeOrders) ? "all" : kind;
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -110,7 +112,7 @@ function PurchasesPageContent() {
       setLoading(true);
       const { data, total } = await purchaseDocumentsApi.getPaginated({
         page, limit: PAGE_SIZE, search: debouncedSearch, kind: effectiveKind, supplierId,
-        sort: sortKey, dir: sortDir, includeInvoices: canSeeFatture,
+        sort: sortKey, dir: sortDir, includeInvoices: canSeeFatture, includeOrders: canSeeOrders,
       });
       if (id !== requestId.current) return;
       setDocs(data);
@@ -126,7 +128,7 @@ function PurchasesPageContent() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearch, effectiveKind, supplierId, sortKey, sortDir, canSeeFatture]);
+  }, [page, debouncedSearch, effectiveKind, supplierId, sortKey, sortDir, canSeeFatture, canSeeOrders]);
 
   const toggleSort = (key: PurchaseDocumentSortKey) => {
     if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"));
@@ -203,7 +205,7 @@ function PurchasesPageContent() {
         items={[
           { value: "all", label: "Tutti", icon: <Layers /> },
           { value: "purchase", label: "Acquisti", icon: <ShoppingCart /> },
-          { value: "order", label: "Ordini", icon: <ClipboardList /> },
+          ...(canSeeOrders ? [{ value: "order", label: "Ordini", icon: <ClipboardList /> }] : []),
           ...(canSeeFatture ? [{ value: "invoice", label: "Fatture", icon: <Receipt /> }] : []),
         ]}
         value={effectiveKind}

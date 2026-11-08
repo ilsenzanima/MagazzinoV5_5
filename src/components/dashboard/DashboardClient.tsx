@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/components/auth-provider";
 import { formatCurrency } from "@/lib/utils/format";
 import {
-  Search, Loader2, Truck, ShoppingCart, Briefcase, FileText, AlertTriangle, FileEdit, Hourglass, ClipboardList, ChevronRight, type LucideIcon,
+  Search, Loader2, Truck, ShoppingCart, Briefcase, FileText, AlertTriangle, FileEdit, Hourglass, ClipboardList, ChevronRight, CalendarX, type LucideIcon,
 } from "lucide-react";
 
 interface DashboardStats {
@@ -24,7 +24,7 @@ interface DashboardStats {
 
 interface DashboardClientProps {
   stats: DashboardStats;
-  todo: { draftDDTCount: number; pendingProposalsCount: number; pendingLoadNotesCount: number };
+  todo: { draftDDTCount: number; pendingProposalsCount: number; pendingLoadNotesCount: number; missingAttendanceDays: number };
 }
 
 // Saluto in base all'ora del giorno; di sera e di notte con una battuta
@@ -113,8 +113,14 @@ async function searchHits(scope: string, raw: string): Promise<SearchHit[]> {
       return (data ?? []).map((r: any) => ({ id: r.id, title: r.title, sub: r.clients?.name, href: `/clients/${r.client_id}/proposals/${r.id}` }));
     }
     case "purchases": {
+      // Si cerca sia per numero DDT sia per nome del fornitore
+      const { data: sup } = await supabase.from("suppliers").select("id").is("deleted_at", null).ilike("name", like).limit(30);
+      const supIds = (sup ?? []).map((s: any) => s.id);
+      const orFilter = supIds.length > 0
+        ? `delivery_note_number.ilike.${like},supplier_id.in.(${supIds.join(",")})`
+        : `delivery_note_number.ilike.${like}`;
       const { data } = await supabase.from("purchases").select("id, delivery_note_number, suppliers(name)").eq("order_type", "purchase").is("deleted_at", null)
-        .ilike("delivery_note_number", like).limit(8);
+        .or(orFilter).order("created_at", { ascending: false }).limit(8);
       return (data ?? []).map((r: any) => ({ id: r.id, title: `DDT ${r.delivery_note_number}`, sub: r.suppliers?.name, href: `/purchases/${r.id}` }));
     }
     default:
@@ -252,6 +258,9 @@ export const DashboardClient = memo(function DashboardClient({ stats, todo }: Da
                 <TodoRow href="/load-notes" icon={ClipboardList} text="Note di carico da processare" count={todo.pendingLoadNotesCount} alert />
                 <TodoRow href="/inventory?tab=low_stock" icon={AlertTriangle} text="Articoli sotto scorta minima" count={stats.lowStockCount} alert />
                 <TodoRow href="/movements" icon={FileEdit} text="Bozze di DDT da completare" count={todo.draftDDTCount} alert />
+                {(userRole === "admin" || userRole === "operativo") && (
+                  <TodoRow href="/attendance" icon={CalendarX} text="Giorni con presenze da segnare" count={todo.missingAttendanceDays} alert />
+                )}
                 <TodoRow href="/proposals" icon={Hourglass} text="Offerte in attesa di risposta" count={todo.pendingProposalsCount} />
               </Card>
             </div>

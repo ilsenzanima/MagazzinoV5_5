@@ -360,7 +360,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                     {canSeeValue && (
                         <NotchStat label="Valore totale" value={`€ ${totalValue.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: true })}`} />
                     )}
-                    <NotchStat label="Articoli" value={`${realItemsCount}${fictItemsCount > 0 ? ` + ${fictItemsCount} fittizi` : ''}`} />
+                    <NotchStat label="Articoli" value={`${realItemsCount}${fictItemsCount > 0 && canSeeValue ? ` + ${fictItemsCount} fittizi` : ''}`} />
                     {tab === "stock" && <NotchSearch value={searchTerm} onChange={setSearchTerm} placeholder="Cerca materiale per nome o codice" />}
                 </NotchActions>
 
@@ -435,7 +435,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                             <TableCell className="border-r py-1.5">{thumb(item)}</TableCell>
                                             <TableCell className="border-r py-2 font-medium text-slate-900 dark:text-white">
                                                 {item.name}
-                                                {item.isFictitious && (
+                                                {item.isFictitious && canSeeValue && (
                                                     <Badge variant="outline" className="ml-2 h-5 border-amber-200 bg-amber-50 px-1.5 text-[10px] text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400">Fittizio</Badge>
                                                 )}
                                             </TableCell>
@@ -498,7 +498,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                             <ArrowUpRight className="h-3 w-3" /> Reso
                                                         </Badge>
                                                     )}
-                                                    {move.isFictitious && (
+                                                    {move.isFictitious && canSeeValue && (
                                                         <Badge variant="outline" className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800 text-xs">
                                                             Fittizio
                                                         </Badge>
@@ -571,7 +571,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                             <span className="font-medium text-slate-900 dark:text-white flex items-center gap-2">
                                                                 {move.itemName || 'Articolo Cancellato'}
                                                                 {move.itemModel && <span className="text-slate-500 dark:text-slate-400 font-normal">({move.itemModel})</span>}
-                                                                {move.isFictitious && (
+                                                                {move.isFictitious && canSeeValue && (
                                                                     <Badge variant="outline" className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800 text-[10px] h-5 px-1.5">
                                                                         Fittizio
                                                                     </Badge>
@@ -594,7 +594,7 @@ export function JobStock({ movements, jobId }: JobStockProps) {
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="text-sm text-slate-600 dark:text-slate-400">
-                                                        {move.isFictitious ? (
+                                                        {(move.isFictitious && canSeeValue) ? (
                                                             <Badge variant="outline" className="bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800">
                                                                 Fittizio
                                                             </Badge>

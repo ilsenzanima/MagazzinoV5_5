@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getMissingDays } from "@/lib/services/attendance-check";
 import { DashboardClient } from "@/components/dashboard/DashboardClient";
 
 type PurchaseRow = { purchase_items: { price: number | null; quantity: number | null }[] | null };
@@ -90,7 +91,15 @@ export default async function DashboardPage() {
         : 0,
   };
 
+  let missingAttendanceDays = 0;
+  try {
+    missingAttendanceDays = (await getMissingDays(supabase)).length;
+  } catch {
+    missingAttendanceDays = 0;
+  }
+
   const todo = {
+    missingAttendanceDays,
     pendingLoadNotesCount: countOf(loadNotesResult),
     draftDDTCount: countOf(draftsCountResult),
     pendingProposalsCount: countOf(pendingProposalsResult),

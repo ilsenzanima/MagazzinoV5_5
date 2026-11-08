@@ -119,7 +119,7 @@ function RailSidebar() {
       { key: "anagrafiche", label: "Committenti e fornitori", icon: Users, href: "/anagrafiche", active: is("/anagrafiche", "/clients", "/suppliers") },
       ...(staff ? [{ key: "proposals", label: "Offerte generali", icon: FileText, href: "/proposals", active: pathname === "/proposals" }] : []),
     ],
-    [{ key: "report", label: "Report", icon: BarChart3, href: "/reports", active: is("/report-analisi", "/reports") }],
+    ...(staff ? [[{ key: "report", label: "Report", icon: BarChart3, href: "/reports", active: is("/report-analisi", "/reports") }]] : []),
   ]
   const items = groups.flat()
   // Le voci si stringono se la finestra è bassa, così stanno tutte senza barra di scorrimento

@@ -1,6 +1,8 @@
 "use client"
 
-import { AlertTriangle, Boxes, ListChecks, PackageCheck, ScanSearch, Trash2, TrendingUp, UserPlus } from "lucide-react"
+import { UsersAdmin } from "@/components/admin/UsersAdmin"
+import { AttendanceWorkersSettings } from "@/components/admin/AttendanceWorkersSettings"
+import { AlertTriangle, Boxes, CalendarCheck, Shield, ListChecks, PackageCheck, ScanSearch, Trash2, TrendingUp, UserPlus } from "lucide-react"
 import { SectionsPage } from "@/components/layout/SectionsPage"
 import { useAuth } from "@/components/auth-provider"
 import VerificaPage from "../inventory/verifica/page"
@@ -26,6 +28,8 @@ export default function StrumentiAdminPage() {
         { key: "schede-varianti", label: "Schede Varianti", icon: <ListChecks className={icon} />, hidden: !admin, render: () => <SchedeVariantiPage /> },
         { key: "confezioni", label: "Quantità Confezioni", icon: <Boxes className={icon} />, hidden: !admin, render: () => <ConfezioniPage /> },
         { key: "spostamenti", label: "Analisi Spostamenti", icon: <TrendingUp className={icon} />, hidden: !admin, render: () => <AnalyticsPage /> },
+        { key: "presenze-operai", label: "Presenze operai", icon: <CalendarCheck className={icon} />, hidden: !admin, render: () => <AttendanceWorkersSettings /> },
+        { key: "utenti", label: "Utenti e ruoli", icon: <Shield className={icon} />, hidden: !admin, render: () => <UsersAdmin /> },
         { key: "nuovo-utente", label: "Nuovo utente", icon: <UserPlus className={icon} />, hidden: !admin, render: () => <CreateUserForm /> },
         { key: "cestino", label: "Cestino", icon: <Trash2 className={icon} />, hidden: !admin, render: () => <CestinoPage /> },
       ]}

@@ -204,7 +204,7 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
                                 </TableCell>
                             </TableRow>
                         ) : pageRows.map((worker) => (
-                            <TableRow key={worker.id} className="cursor-pointer" onClick={() => router.push(`/workers/${worker.id}`)}>
+                            <TableRow key={worker.id} className={canEdit ? "cursor-pointer" : undefined} onClick={() => { if (canEdit) router.push(`/workers/${worker.id}`) }}>
                                 <TableCell className="border-r py-2 font-medium capitalize text-slate-900 dark:text-white">{worker.firstName} {worker.lastName}</TableCell>
                                 <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">
                                     {worker.email ? (
@@ -255,7 +255,7 @@ export default function WorkersContent({ initialWorkers }: WorkersContentProps) 
                         <p>Nessun operaio trovato</p>
                     </div>
                 ) : pageRows.map((worker) => (
-                    <Card key={worker.id} className="cursor-pointer transition-shadow hover:shadow-md" onClick={() => router.push(`/workers/${worker.id}`)}>
+                    <Card key={worker.id} className={canEdit ? "cursor-pointer transition-shadow hover:shadow-md" : undefined} onClick={() => { if (canEdit) router.push(`/workers/${worker.id}`) }}>
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center justify-between">
                                 <span className="truncate capitalize">{worker.firstName} {worker.lastName}</span>

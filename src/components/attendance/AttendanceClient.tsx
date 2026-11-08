@@ -16,11 +16,14 @@ import { NotchButton } from "@/components/ui/notch-tabs";
 import { warehousesApi } from "@/lib/services/warehouses";
 import type { Warehouse } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Loader2, Users, Filter, X, FilePlus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Users, Filter, X, FilePlus, CalendarX } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { useAuth } from "@/components/auth-provider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { supabase } from "@/lib/supabase";
+import { getMissingDays, type MissingDay } from "@/lib/services/attendance-check";
 
 interface AttendanceClientProps {
     initialWorkers: Worker[];
@@ -69,6 +72,13 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
 
     // Job filter state
     const [filterJobId, setFilterJobId] = useState<string | null>(null);
+
+    // Giorni lavorativi con presenze da segnare (operai controllati sotto le 8 ore)
+    const [missingDays, setMissingDays] = useState<MissingDay[]>([]);
+    const [missingOpen, setMissingOpen] = useState(false);
+    useEffect(() => {
+        getMissingDays(supabase).then(setMissingDays).catch(console.error);
+    }, [attendanceList]);
 
     useEffect(() => {
         if (!isMobile || !selectedWorker) return;
@@ -448,7 +458,37 @@ export default function AttendanceClient({ initialWorkers, initialJobs }: Attend
                     {isLoading && <Loader2 className="h-4 w-4 animate-spin text-slate-300" />}
                 </div>
 
-                <div className="flex items-center gap-2 md:justify-end">
+                <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                    <Popover open={missingOpen} onOpenChange={setMissingOpen}>
+                        <PopoverTrigger asChild>
+                            <NotchButton type="button" className={missingDays.length > 0 ? "text-amber-700" : undefined}>
+                                <CalendarX className="h-4 w-4" />
+                                Da segnare ({missingDays.length})
+                            </NotchButton>
+                        </PopoverTrigger>
+                        <PopoverContent align="end" className="w-80 p-0">
+                            <div className="border-b px-3 py-2 text-sm font-semibold">
+                                {missingDays.length === 0 ? "Tutte le presenze sono segnate" : "Giorni con presenze da segnare"}
+                            </div>
+                            <div className="max-h-80 divide-y overflow-y-auto">
+                                {missingDays.map(d => (
+                                    <button
+                                        key={d.date}
+                                        type="button"
+                                        className="block w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-muted"
+                                        onClick={() => { setCurrentDate(new Date(`${d.date}T12:00:00`)); setMissingOpen(false); }}
+                                    >
+                                        <div className="text-sm font-medium capitalize">
+                                            {format(new Date(`${d.date}T12:00:00`), 'EEEE d MMMM', { locale: it })}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {d.workers.map(w => `${w.name}${w.hours > 0 ? ` (${w.hours}h)` : ''}`).join(', ')}
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </PopoverContent>
+                    </Popover>
                     <Filter className="h-4 w-4 shrink-0 text-slate-300" />
                     <Select
                         value={filterJobId || "all"}
