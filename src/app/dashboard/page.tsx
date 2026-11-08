@@ -18,7 +18,7 @@ export default async function DashboardPage() {
     monthPurchasesResult,
     lowStockResult,
     activeJobsCountResult,
-    onSiteJobsResult,
+    loadNotesResult,
     draftsCountResult,
     pendingProposalsResult,
   ] = await Promise.allSettled([
@@ -75,14 +75,12 @@ export default async function DashboardPage() {
       .eq("status", "active")
       .is("deleted_at", null),
 
-    // Commesse segnate «in cantiere» (elmetto)
+    // Note di carico da processare
     supabase
-      .from("jobs")
-      .select("id, code, name, clients(name)")
-      .eq("on_site", true)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(12),
+      .from("load_notes")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending")
+      .is("deleted_at", null),
 
     // Bozze di DDT da completare
     supabase.from("delivery_note_drafts").select("id", { count: "exact", head: true }),
@@ -148,9 +146,9 @@ export default async function DashboardPage() {
       ? Number(lowStockResult.value.data?.lowStockCount ?? 0)
       : 0;
 
-  const onSiteJobs =
-    onSiteJobsResult.status === "fulfilled" ? (onSiteJobsResult.value.data ?? []) : [];
   const todo = {
+    pendingLoadNotesCount:
+      loadNotesResult.status === "fulfilled" ? (loadNotesResult.value.count ?? 0) : 0,
     draftDDTCount:
       draftsCountResult.status === "fulfilled" ? (draftsCountResult.value.count ?? 0) : 0,
     pendingProposalsCount:
@@ -171,7 +169,6 @@ export default async function DashboardPage() {
   return (
     <DashboardClient
       stats={stats}
-      onSiteJobs={onSiteJobs as any[]}
       todo={todo}
     />
   );

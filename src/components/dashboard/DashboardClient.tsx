@@ -1,6 +1,7 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -11,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/components/auth-provider";
 import { formatCurrency } from "@/lib/utils/format";
 import {
-  Search, Truck, ShoppingCart, Briefcase, FileText, HardHat, AlertTriangle, FileEdit, Hourglass, ChevronRight, type LucideIcon,
+  Search, Loader2, Truck, ShoppingCart, Briefcase, FileText, AlertTriangle, FileEdit, Hourglass, ClipboardList, ChevronRight, type LucideIcon,
 } from "lucide-react";
 
 interface DashboardStats {
@@ -24,8 +25,7 @@ interface DashboardStats {
 
 interface DashboardClientProps {
   stats: DashboardStats;
-  onSiteJobs: { id: string; code: string; name: string; clients: { name: string } | null }[];
-  todo: { draftDDTCount: number; pendingProposalsCount: number };
+  todo: { draftDDTCount: number; pendingProposalsCount: number; pendingLoadNotesCount: number };
 }
 
 // Saluto in base all'ora del giorno; di sera e di notte con una battuta
@@ -83,7 +83,47 @@ const SEARCH_SCOPES: { value: string; label: string; path: string }[] = [
   { value: "purchases", label: "Acquisti", path: "/purchases" },
 ];
 
-export const DashboardClient = memo(function DashboardClient({ stats, onSiteJobs, todo }: DashboardClientProps) {
+interface SearchHit { id: string; title: string; sub?: string; href: string }
+
+// Risultati mentre si scrive: pochi, per capire al volo se e' quello che cerchi
+async function searchHits(scope: string, raw: string): Promise<SearchHit[]> {
+  const q = raw.replace(/[,()%*]/g, " ").trim();
+  if (q.length < 2) return [];
+  const like = `%${q}%`;
+  switch (scope) {
+    case "inventory": {
+      const { data } = await supabase.from("inventory").select("id, code, name, brand").is("deleted_at", null)
+        .or(`name.ilike.${like},code.ilike.${like},brand.ilike.${like}`).limit(8);
+      return (data ?? []).map((r: any) => ({ id: r.id, title: r.name, sub: [r.code, r.brand].filter(Boolean).join(" · "), href: `/inventory/${r.id}` }));
+    }
+    case "jobs": {
+      const { data } = await supabase.from("jobs").select("id, code, name, clients(name)").is("deleted_at", null)
+        .or(`name.ilike.${like},code.ilike.${like}`).limit(8);
+      return (data ?? []).map((r: any) => ({ id: r.id, title: r.name, sub: [r.code, r.clients?.name].filter(Boolean).join(" · "), href: `/jobs/${r.id}` }));
+    }
+    case "suppliers": {
+      const { data } = await supabase.from("suppliers").select("id, name").is("deleted_at", null).ilike("name", like).limit(8);
+      return (data ?? []).map((r: any) => ({ id: r.id, title: r.name, href: `/suppliers/${r.id}` }));
+    }
+    case "clients": {
+      const { data } = await supabase.from("clients").select("id, name").is("deleted_at", null).ilike("name", like).limit(8);
+      return (data ?? []).map((r: any) => ({ id: r.id, title: r.name, href: `/clients/${r.id}` }));
+    }
+    case "proposals": {
+      const { data } = await supabase.from("client_proposals").select("id, title, client_id, clients(name)").is("deleted_at", null).ilike("title", like).limit(8);
+      return (data ?? []).map((r: any) => ({ id: r.id, title: r.title, sub: r.clients?.name, href: `/clients/${r.client_id}/proposals/${r.id}` }));
+    }
+    case "purchases": {
+      const { data } = await supabase.from("purchases").select("id, delivery_note_number, suppliers(name)").eq("order_type", "purchase").is("deleted_at", null)
+        .ilike("delivery_note_number", like).limit(8);
+      return (data ?? []).map((r: any) => ({ id: r.id, title: `DDT ${r.delivery_note_number}`, sub: r.suppliers?.name, href: `/purchases/${r.id}` }));
+    }
+    default:
+      return [];
+  }
+}
+
+export const DashboardClient = memo(function DashboardClient({ stats, todo }: DashboardClientProps) {
   const router = useRouter();
   const { fullName, userRole } = useAuth();
   const canSeePrices = userRole === "admin" || userRole === "operativo";
@@ -91,6 +131,25 @@ export const DashboardClient = memo(function DashboardClient({ stats, onSiteJobs
   const monthName = new Date().toLocaleString("it-IT", { month: "long" });
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState("inventory");
+
+  const [hits, setHits] = useState<SearchHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  useEffect(() => {
+    if (query.trim().length < 2) { setHits([]); setSearching(false); return; }
+    let cancelled = false;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await searchHits(scope, query);
+        if (!cancelled) setHits(res);
+      } catch {
+        if (!cancelled) setHits([]);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [query, scope]);
 
   const doSearch = () => {
     const q = query.trim();
@@ -118,70 +177,80 @@ export const DashboardClient = memo(function DashboardClient({ stats, onSiteJobs
             <StripLink href="/inventory?tab=low_stock" label="Scorta minima" value={stats.lowStockCount} alert={stats.lowStockCount > 0} />
           </NotchActions>
 
-          <div className="space-y-6">
-            {/* Ricerca rapida */}
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <div className="relative flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Sinistra: ricerca rapida (barra in evidenza, sotto si sceglie dove cercare) */}
+            <div className="space-y-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-400" />
                 <Input
-                  className="h-12 bg-white pl-10 text-base dark:bg-slate-900"
-                  placeholder="Cerca articolo, commessa, fornitore…"
+                  className="h-14 bg-white pl-12 text-lg shadow-sm dark:bg-slate-900"
+                  placeholder="Cerca…"
                   value={query}
                   onChange={e => setQuery(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") doSearch(); }}
+                  aria-label="Ricerca rapida"
                 />
               </div>
-              <Select value={scope} onValueChange={setScope}>
-                <SelectTrigger className="h-12 w-full bg-white sm:w-44 dark:bg-slate-900" aria-label="Dove cercare"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {SEARCH_SCOPES.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-slate-500">Cerca in</span>
+                {SEARCH_SCOPES.map(sc => (
+                  <button
+                    key={sc.value}
+                    type="button"
+                    onClick={() => setScope(sc.value)}
+                    aria-pressed={scope === sc.value}
+                    className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${scope === sc.value ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"}`}
+                  >
+                    {sc.label}
+                  </button>
+                ))}
+              </div>
 
-            {/* Azioni di tutti i giorni */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <QuickAction href="/movements/new" icon={Truck} label="Nuovo DDT" color="bg-blue-50 text-blue-600 dark:bg-blue-900/30" />
-              <QuickAction href="/purchases/new" icon={ShoppingCart} label="Nuovo acquisto" color="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30" />
-              {(userRole === "admin" || userRole === "operativo") && (
-                <>
-                  <QuickAction href="/jobs/new" icon={Briefcase} label="Nuova commessa" color="bg-violet-50 text-violet-600 dark:bg-violet-900/30" />
-                  <QuickAction href="/proposals" icon={FileText} label="Nuova offerta" color="bg-amber-50 text-amber-600 dark:bg-amber-900/30" />
-                </>
+              {/* Risultati mentre si scrive */}
+              {query.trim().length >= 2 && (
+                <Card className="gap-0 overflow-hidden py-0">
+                  {searching && hits.length === 0 ? (
+                    <div className="flex items-center gap-2 px-4 py-4 text-sm text-slate-400"><Loader2 className="h-4 w-4 animate-spin" />Cerco…</div>
+                  ) : hits.length === 0 ? (
+                    <p className="px-4 py-4 text-sm text-slate-400">Nessun risultato in «{SEARCH_SCOPES.find(sc => sc.value === scope)?.label}».</p>
+                  ) : (
+                    <>
+                      {hits.map(h => (
+                        <Link key={h.id} href={h.href} className="flex items-center gap-3 border-b px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-slate-800 dark:text-slate-100">{h.title}</span>
+                            {h.sub && <span className="block truncate text-xs text-slate-500">{h.sub}</span>}
+                          </span>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                        </Link>
+                      ))}
+                      <button type="button" onClick={doSearch} className="w-full px-4 py-2.5 text-left text-xs font-medium text-blue-600 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        Vedi tutti i risultati
+                      </button>
+                    </>
+                  )}
+                </Card>
               )}
             </div>
 
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              {/* Le tue commesse: quelle segnate «in cantiere» */}
-              <Card className="gap-0 py-0">
-                <div className="flex items-center gap-2 border-b px-4 py-3">
-                  <HardHat className="h-4 w-4 text-amber-500" />
-                  <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">In cantiere</h2>
-                  <Link href="/jobs" className="ml-auto text-xs text-slate-400 hover:text-blue-600">Tutte le commesse</Link>
-                </div>
-                <div className="flex flex-wrap gap-2 p-4">
-                  {onSiteJobs.length === 0 ? (
-                    <p className="text-sm text-slate-400">Nessuna commessa in cantiere. Segna con l&apos;elmetto quelle su cui stai lavorando, nell&apos;elenco commesse.</p>
-                  ) : onSiteJobs.map(j => (
-                    <Link
-                      key={j.id}
-                      href={`/jobs/${j.id}`}
-                      title={j.clients?.name ? `${j.name} · ${j.clients.name}` : j.name}
-                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-950 transition-colors hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-100"
-                    >
-                      <HardHat className="h-3.5 w-3.5 shrink-0" />
-                      <span className="font-mono">{j.code}</span>
-                      <span className="truncate text-amber-800/80 dark:text-amber-200/80">{j.name}</span>
-                    </Link>
-                  ))}
-                </div>
-              </Card>
+            {/* Destra: azioni rapide e cose da fare */}
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
+                <QuickAction href="/movements/new" icon={Truck} label="Nuovo DDT" color="bg-blue-50 text-blue-600 dark:bg-blue-900/30" />
+                <QuickAction href="/purchases/new" icon={ShoppingCart} label="Nuovo acquisto" color="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30" />
+                {(userRole === "admin" || userRole === "operativo") && (
+                  <>
+                    <QuickAction href="/jobs/new" icon={Briefcase} label="Nuova commessa" color="bg-violet-50 text-violet-600 dark:bg-violet-900/30" />
+                    <QuickAction href="/proposals" icon={FileText} label="Nuova offerta" color="bg-amber-50 text-amber-600 dark:bg-amber-900/30" />
+                  </>
+                )}
+              </div>
 
-              {/* Da fare */}
               <Card className="gap-0 overflow-hidden py-0">
                 <div className="border-b px-4 py-3">
                   <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Da fare</h2>
                 </div>
+                <TodoRow href="/load-notes" icon={ClipboardList} text="Note di carico da processare" count={todo.pendingLoadNotesCount} alert />
                 <TodoRow href="/inventory?tab=low_stock" icon={AlertTriangle} text="Articoli sotto scorta minima" count={stats.lowStockCount} alert />
                 <TodoRow href="/movements" icon={FileEdit} text="Bozze di DDT da completare" count={todo.draftDDTCount} alert />
                 <TodoRow href="/proposals" icon={Hourglass} text="Offerte in attesa di risposta" count={todo.pendingProposalsCount} />
