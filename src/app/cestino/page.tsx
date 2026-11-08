@@ -204,9 +204,13 @@ function CestinoContent() {
   // restores the exact view instead of resetting it.
   useEffect(() => {
     const params = new URLSearchParams();
+    // Dentro Strumenti admin resta su quella pagina e mantiene la sezione scelta (?v=)
+    const here = typeof window !== "undefined" ? window.location.pathname : "/cestino";
+    const section = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("v") : null;
+    if (section) params.set("v", section);
     if (activeTab !== "purchases") params.set("tab", activeTab);
     const query = params.toString();
-    router.replace(query ? `/cestino?${query}` : "/cestino", { scroll: false });
+    router.replace(query ? `${here}?${query}` : here, { scroll: false });
   }, [activeTab, router]);
 
   const [sections, setSections] = useState<Record<SectionKey, SectionState>>(() => ({
@@ -333,8 +337,10 @@ function CestinoContent() {
   const [purging, setPurging] = useState(false)
   const [purgeResult, setPurgeResult] = useState<string | null>(null)
 
+  const [confirmPurge, setConfirmPurge] = useState(false)
+
   const handlePurge = async () => {
-    if (!confirm("Eliminare definitivamente tutti gli elementi scaduti (>30 giorni)? I file allegati verranno rimossi da storage. Azione irreversibile.")) return
+    setConfirmPurge(false)
     setPurging(true)
     setPurgeResult(null)
     try {
@@ -429,7 +435,7 @@ function CestinoContent() {
             <NotchActions>
               {purgeResult && <span className="text-xs text-slate-300">{purgeResult}</span>}
               <NotchButton
-                type="button" onClick={handlePurge} disabled={purging}
+                type="button" onClick={() => setConfirmPurge(true)} disabled={purging}
                 className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white"
               >
                 {purging ? <Loader2 className="animate-spin" /> : <ShieldAlert />} Purga elementi scaduti
@@ -538,6 +544,15 @@ function CestinoContent() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <ConfirmDeleteDialog
+        open={confirmPurge}
+        onOpenChange={setConfirmPurge}
+        title="Elimina definitivamente gli elementi scaduti"
+        description="Verranno eliminati in modo permanente tutti gli elementi nel cestino da più di 30 giorni. I file allegati verranno rimossi dallo storage. Azione irreversibile."
+        loading={purging}
+        onConfirm={handlePurge}
+      />
     </DashboardLayout>
   );
 }
