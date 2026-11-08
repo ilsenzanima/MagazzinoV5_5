@@ -159,6 +159,33 @@ export const guestSitesApi = {
         if (assocError) throw assocError;
     },
 
+    // Cantieri ospiti nel cestino
+    getDeleted: async (): Promise<GuestSite[]> => {
+        const { data, error } = await supabase
+            .from('guest_sites')
+            .select('*')
+            .not('deleted_at', 'is', null)
+            .order('deleted_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(mapSite);
+    },
+
+    // Ripristina il cantiere e le associazioni che erano state eliminate insieme a lui
+    restore: async (id: string): Promise<void> => {
+        const { data: site, error: readError } = await supabase.from('guest_sites').select('deleted_at').eq('id', id).single();
+        if (readError) throw readError;
+        const { error: siteError } = await supabase.from('guest_sites').update({ deleted_at: null }).eq('id', id);
+        if (siteError) throw siteError;
+        if (site?.deleted_at) {
+            const { error: assocError } = await supabase
+                .from('guest_site_jobs')
+                .update({ deleted_at: null })
+                .eq('guest_site_id', id)
+                .eq('deleted_at', site.deleted_at);
+            if (assocError) throw assocError;
+        }
+    },
+
     // --- Gestione Associazioni Commesse ---
 
     getJobsForSite: async (guestSiteId: string): Promise<GuestSiteJob[]> => {

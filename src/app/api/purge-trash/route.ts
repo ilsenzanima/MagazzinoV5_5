@@ -29,6 +29,50 @@ async function deleteDriveFiles(fileIds: string[]) {
     await Promise.allSettled(fileIds.map(id => deleteFile(id)))
 }
 
+async function deleteAllFiles(admin: SupabaseClient, urls: (string | null | undefined)[]) {
+    await deleteStorageFiles(admin, extractStoragePaths(urls))
+    await deleteDriveFiles(extractDriveFileIds(urls))
+}
+
+// URL dei file delle proposte: restano quelli ancora usati da una commessa (job_id valorizzato)
+async function proposalFileUrls(admin: SupabaseClient, proposalIds: string[]) {
+    if (!proposalIds.length) return []
+    const [sharedDocs, sharedSiteDocs, supplierOffers] = await Promise.all([
+        admin.from('shared_documents').select('file_url, job_id').in('proposal_id', proposalIds),
+        admin.from('shared_site_documents').select('file_url, job_id').in('proposal_id', proposalIds),
+        admin.from('shared_supplier_offers').select('file_url, job_id').in('proposal_id', proposalIds),
+    ])
+    const own = <T extends { job_id: string | null }>(rows: T[] | null) => (rows ?? []).filter(r => !r.job_id)
+    return [
+        ...own(sharedDocs.data).map((r: any) => r.file_url),
+        ...own(sharedSiteDocs.data).map((r: any) => r.file_url),
+        ...own(supplierOffers.data).map((r: any) => r.file_url),
+    ]
+}
+
+// URL dei file di una commessa: restano quelli ancora usati dall'offerta di origine (proposal_id valorizzato)
+async function jobFileUrls(admin: SupabaseClient, jobId: string) {
+    const [jobDocs, sharedDocs, sharedSiteDocs, supplierOffers, salCosts, salApprovati, fattureCommittente] = await Promise.all([
+        admin.from('job_documents').select('file_url').eq('job_id', jobId),
+        admin.from('shared_documents').select('file_url, proposal_id').eq('job_id', jobId),
+        admin.from('shared_site_documents').select('file_url, proposal_id').eq('job_id', jobId),
+        admin.from('shared_supplier_offers').select('file_url, proposal_id').eq('job_id', jobId),
+        admin.from('job_sal_costs').select('document_urls').eq('job_id', jobId),
+        admin.from('job_sal_approvati').select('document_url').eq('job_id', jobId),
+        admin.from('job_fatture_committente').select('document_url').eq('job_id', jobId),
+    ])
+    const own = <T extends { proposal_id: string | null }>(rows: T[] | null) => (rows ?? []).filter(r => !r.proposal_id)
+    return [
+        ...(jobDocs.data ?? []).map((r: any) => r.file_url),
+        ...own(sharedDocs.data).map((r: any) => r.file_url),
+        ...own(sharedSiteDocs.data).map((r: any) => r.file_url),
+        ...own(supplierOffers.data).map((r: any) => r.file_url),
+        ...(salCosts.data ?? []).flatMap((r: any) => r.document_urls ?? []),
+        ...(salApprovati.data ?? []).map((r: any) => r.document_url),
+        ...(fattureCommittente.data ?? []).map((r: any) => r.document_url),
+    ]
+}
+
 export async function POST(req: NextRequest) {
     // Verifica sessione admin
     const cookieStore = await cookies()
@@ -43,149 +87,113 @@ export async function POST(req: NextRequest) {
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     if (!serviceKey) return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY non configurata' }, { status: 500 })
 
-    const adminCheck = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false } })
-    const { data: profile } = await adminCheck.from('profiles').select('role').eq('id', user.id).single()
+    const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey, { auth: { persistSession: false } })
+    const { data: profile } = await admin.from('profiles').select('role').eq('id', user.id).single()
     if (profile?.role !== 'admin') return NextResponse.json({ error: 'Solo gli admin possono eseguire il purge' }, { status: 403 })
 
-    const admin = adminCheck
     const cutoff = THIRTY_DAYS_AGO()
     const results: Record<string, number> = {}
+    const skipped: { section: string; id: string; reason: string }[] = []
 
-    // Purchases — elimina anche i file
-    {
-        const { data } = await admin.from('purchases').select('id, document_url, document_urls')
-            .not('deleted_at', 'is', null).lt('deleted_at', cutoff)
-        if (data?.length) {
-            const allUrls = data.flatMap(r =>
-                Array.isArray(r.document_urls) && r.document_urls.length ? r.document_urls : r.document_url ? [r.document_url] : []
-            )
-            await deleteStorageFiles(admin, extractStoragePaths(allUrls))
-            await deleteDriveFiles(extractDriveFileIds(allUrls))
-            await admin.from('purchases').delete().in('id', data.map(r => r.id))
-            results.acquisti = data.length
-        }
-    }
-
-    // Invoices — elimina anche i file
-    {
-        const { data } = await admin.from('invoices').select('id, document_urls')
-            .not('deleted_at', 'is', null).lt('deleted_at', cutoff)
-        if (data?.length) {
-            const allUrls = data.flatMap(r => r.document_urls ?? [])
-            await deleteStorageFiles(admin, extractStoragePaths(allUrls))
-            await deleteDriveFiles(extractDriveFileIds(allUrls))
-            await admin.from('invoices').delete().in('id', data.map(r => r.id))
-            results.fatture = data.length
-        }
-    }
-
-    // Jobs — elimina anche i file collegati (documenti cantiere, condivisi, SAL, fatture committente).
-    // shared_documents/shared_site_documents/shared_supplier_offers condividono la stessa riga tra
-    // commessa e offerta di origine: se una riga ha ANCHE proposal_id valorizzato, il file resta
-    // necessario sull'offerta e non va cancellato (la riga sopravvive con job_id azzerato via FK).
-    {
-        const { data } = await admin.from('jobs').select('id, code, name')
-            .not('deleted_at', 'is', null).lt('deleted_at', cutoff)
-        if (data?.length) {
-            const jobIds = data.map(r => r.id)
-            const [jobDocs, sharedDocs, sharedSiteDocs, supplierOffers, salCosts, salApprovati, fattureCommittente] = await Promise.all([
-                admin.from('job_documents').select('file_url').in('job_id', jobIds),
-                admin.from('shared_documents').select('file_url, proposal_id').in('job_id', jobIds),
-                admin.from('shared_site_documents').select('file_url, proposal_id').in('job_id', jobIds),
-                admin.from('shared_supplier_offers').select('file_url, proposal_id').in('job_id', jobIds),
-                admin.from('job_sal_costs').select('document_urls').in('job_id', jobIds),
-                admin.from('job_sal_approvati').select('document_url').in('job_id', jobIds),
-                admin.from('job_fatture_committente').select('document_url').in('job_id', jobIds),
-            ])
-            const onlyJobOwned = <T extends { proposal_id: string | null }>(rows: T[] | null) => (rows ?? []).filter(r => !r.proposal_id)
-            const allUrls = [
-                ...(jobDocs.data ?? []).map(r => r.file_url),
-                ...onlyJobOwned(sharedDocs.data).map(r => r.file_url),
-                ...onlyJobOwned(sharedSiteDocs.data).map(r => r.file_url),
-                ...onlyJobOwned(supplierOffers.data).map(r => r.file_url),
-                ...(salCosts.data ?? []).flatMap(r => r.document_urls ?? []),
-                ...(salApprovati.data ?? []).map(r => r.document_url),
-                ...(fattureCommittente.data ?? []).map(r => r.document_url),
-            ]
-            await deleteStorageFiles(admin, extractStoragePaths(allUrls))
-            await deleteDriveFiles(extractDriveFileIds(allUrls))
-            await admin.from('jobs').delete().in('id', jobIds)
-            await Promise.allSettled(data.map(job => markFolderDeleted(['Cantieri', `${job.code} ${job.name}`])))
-            results.commesse = jobIds.length
-        }
-    }
-
-    // Proposte — elimina anche i file collegati (documenti condivisi, offerte fornitori).
-    // Stesso ragionamento, speculare: non cancella il file se la riga è ancora collegata
-    // a una commessa (job_id valorizzato), che continua a usarlo.
-    {
-        const { data } = await admin.from('client_proposals').select('id')
-            .not('deleted_at', 'is', null).lt('deleted_at', cutoff)
-        if (data?.length) {
-            const proposalIds = data.map(r => r.id)
-            const [sharedDocs, sharedSiteDocs, supplierOffers] = await Promise.all([
-                admin.from('shared_documents').select('file_url, job_id').in('proposal_id', proposalIds),
-                admin.from('shared_site_documents').select('file_url, job_id').in('proposal_id', proposalIds),
-                admin.from('shared_supplier_offers').select('file_url, job_id').in('proposal_id', proposalIds),
-            ])
-            const onlyProposalOwned = <T extends { job_id: string | null }>(rows: T[] | null) => (rows ?? []).filter(r => !r.job_id)
-            const allUrls = [
-                ...onlyProposalOwned(sharedDocs.data).map(r => r.file_url),
-                ...onlyProposalOwned(sharedSiteDocs.data).map(r => r.file_url),
-                ...onlyProposalOwned(supplierOffers.data).map(r => r.file_url),
-            ]
-            await deleteStorageFiles(admin, extractStoragePaths(allUrls))
-            await deleteDriveFiles(extractDriveFileIds(allUrls))
-            await admin.from('client_proposals').delete().in('id', proposalIds)
-            await Promise.allSettled(proposalIds.map(id => markFolderDeleted(['Proposte', id])))
-            results.proposte = proposalIds.length
-        }
-    }
-
-    // Committenti — le loro proposte muoiono in cascata: pulisce i file delle proposte
-    // (solo quelli non ancora collegati a una commessa, che continua a usarli)
-    {
-        const { data } = await admin.from('clients').select('id')
-            .not('deleted_at', 'is', null).lt('deleted_at', cutoff)
-        if (data?.length) {
-            const clientIds = data.map(r => r.id)
-            const { data: proposals } = await admin.from('client_proposals').select('id').in('client_id', clientIds)
-            const proposalIds = (proposals ?? []).map(p => p.id)
-            if (proposalIds.length > 0) {
-                const [sharedDocs, sharedSiteDocs, supplierOffers] = await Promise.all([
-                    admin.from('shared_documents').select('file_url, job_id').in('proposal_id', proposalIds),
-                    admin.from('shared_site_documents').select('file_url, job_id').in('proposal_id', proposalIds),
-                    admin.from('shared_supplier_offers').select('file_url, job_id').in('proposal_id', proposalIds),
-                ])
-                const onlyProposalOwned = <T extends { job_id: string | null }>(rows: T[] | null) => (rows ?? []).filter(r => !r.job_id)
-                const allUrls = [
-                    ...onlyProposalOwned(sharedDocs.data).map(r => r.file_url),
-                    ...onlyProposalOwned(sharedSiteDocs.data).map(r => r.file_url),
-                    ...onlyProposalOwned(supplierOffers.data).map(r => r.file_url),
-                ]
-                await deleteStorageFiles(admin, extractStoragePaths(allUrls))
-                await deleteDriveFiles(extractDriveFileIds(allUrls))
-                await Promise.allSettled(proposalIds.map(pid => markFolderDeleted(['Proposte', pid])))
+    // Elimina una riga alla volta: i file si cancellano solo DOPO che la riga e' stata eliminata davvero.
+    // Se la riga e' protetta da dati collegati (FK) viene saltata e resta nel cestino con i suoi file.
+    const purge = async (opts: {
+        table: string
+        label: string
+        ids: string[]
+        urls?: (id: string) => Promise<(string | null | undefined)[]>
+        useRpc?: string
+        after?: (id: string) => Promise<void>
+    }) => {
+        for (const id of opts.ids) {
+            try {
+                const urls = opts.urls ? await opts.urls(id) : []
+                const { error } = opts.useRpc
+                    ? await admin.rpc(opts.useRpc, { p_id: id })
+                    : await admin.from(opts.table).delete().eq('id', id)
+                if (error) {
+                    skipped.push({ section: opts.label, id, reason: error.code === '23503' ? 'ha dati collegati da preservare' : error.message })
+                    continue
+                }
+                if (urls.length) await deleteAllFiles(admin, urls)
+                if (opts.after) await opts.after(id).catch(() => {})
+                results[opts.label] = (results[opts.label] ?? 0) + 1
+            } catch (e: any) {
+                skipped.push({ section: opts.label, id, reason: e?.message ?? 'errore' })
             }
-            await admin.from('clients').delete().in('id', clientIds)
-            results.committenti = clientIds.length
         }
+    }
+
+    const expired = async (table: string, cols = 'id') => {
+        const { data } = await admin.from(table).select(cols).not('deleted_at', 'is', null).lt('deleted_at', cutoff)
+        return (data ?? []) as any[]
+    }
+
+    // Acquisti: via RPC, cosi' il trigger non sottrae di nuovo le quantita' dall'inventario (gia' corretto al soft-delete)
+    {
+        const rows = await expired('purchases', 'id, document_url, document_urls')
+        const byId = new Map(rows.map(r => [r.id, r]))
+        await purge({
+            table: 'purchases', label: 'acquisti', ids: rows.map(r => r.id), useRpc: 'hard_delete_purchase',
+            urls: async id => {
+                const r = byId.get(id)
+                return Array.isArray(r.document_urls) && r.document_urls.length ? r.document_urls : r.document_url ? [r.document_url] : []
+            },
+        })
+    }
+
+    // Fatture
+    {
+        const rows = await expired('invoices', 'id, document_urls')
+        const byId = new Map(rows.map(r => [r.id, r]))
+        await purge({ table: 'invoices', label: 'fatture', ids: rows.map(r => r.id), urls: async id => byId.get(id).document_urls ?? [] })
+    }
+
+    // Commesse (+ cartella Drive)
+    {
+        const rows = await expired('jobs', 'id, code, name')
+        const byId = new Map(rows.map(r => [r.id, r]))
+        await purge({
+            table: 'jobs', label: 'commesse', ids: rows.map(r => r.id),
+            urls: id => jobFileUrls(admin, id),
+            after: async id => { const j = byId.get(id); await markFolderDeleted(['Cantieri', `${j.code} ${j.name}`]) },
+        })
+    }
+
+    // Proposte (+ cartella Drive)
+    {
+        const rows = await expired('client_proposals')
+        await purge({
+            table: 'client_proposals', label: 'proposte', ids: rows.map(r => r.id),
+            urls: id => proposalFileUrls(admin, [id]),
+            after: async id => { await markFolderDeleted(['Proposte', id]) },
+        })
+    }
+
+    // Committenti: le loro proposte muoiono in cascata, quindi si puliscono i loro file
+    {
+        const rows = await expired('clients')
+        const proposalsOf = new Map<string, string[]>()
+        await purge({
+            table: 'clients', label: 'committenti', ids: rows.map(r => r.id),
+            urls: async id => {
+                const { data } = await admin.from('client_proposals').select('id').eq('client_id', id)
+                const ids = (data ?? []).map((p: any) => p.id)
+                proposalsOf.set(id, ids)
+                return proposalFileUrls(admin, ids)
+            },
+            after: async id => { await Promise.allSettled((proposalsOf.get(id) ?? []).map(pid => markFolderDeleted(['Proposte', pid]))) },
+        })
     }
 
     // Record senza file
-    const tableLabels: Record<string, string> = {
-        suppliers: 'fornitori', inventory: 'inventario',
-        workers: 'operai', load_notes: 'note_carico'
-    }
-    for (const [table, label] of Object.entries(tableLabels)) {
-        const { data } = await admin.from(table).select('id')
-            .not('deleted_at', 'is', null).lt('deleted_at', cutoff)
-        if (data?.length) {
-            await admin.from(table).delete().in('id', data.map(r => r.id))
-            results[label] = data.length
-        }
+    for (const [table, label] of Object.entries({
+        suppliers: 'fornitori', inventory: 'inventario', workers: 'operai', load_notes: 'note_carico', guest_sites: 'cantieri_ospiti',
+    })) {
+        const rows = await expired(table)
+        await purge({ table, label, ids: rows.map(r => r.id) })
     }
 
     const total = Object.values(results).reduce((s, n) => s + n, 0)
-    return NextResponse.json({ purged: results, total })
+    return NextResponse.json({ purged: results, total, skipped })
 }

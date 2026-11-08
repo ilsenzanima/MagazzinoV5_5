@@ -23,6 +23,7 @@ import { inventoryApi } from "@/lib/services/inventory";
 import { jobsApi } from "@/lib/services/jobs";
 import { workersApi } from "@/lib/services/workers";
 import { clientProposalsApi } from "@/lib/services/client-proposals";
+import { guestSitesApi } from "@/lib/services/guest-sites";
 import { FileText } from "lucide-react";
 
 function daysUntilDeletion(deletedAt: string): number {
@@ -167,7 +168,7 @@ function TrashTable({ items, loading, onRestore, onHardDelete, emptyMessage }: T
   );
 }
 
-type SectionKey = "purchases" | "invoices" | "load-notes" | "clients" | "suppliers" | "inventory" | "jobs" | "workers" | "proposals";
+type SectionKey = "purchases" | "invoices" | "load-notes" | "clients" | "suppliers" | "inventory" | "jobs" | "workers" | "proposals" | "guest-sites";
 
 const SECTION_LABELS: Record<SectionKey, string> = {
   purchases: "Acquisti",
@@ -179,12 +180,15 @@ const SECTION_LABELS: Record<SectionKey, string> = {
   jobs: "Commesse",
   workers: "Operai",
   proposals: "Proposte",
+  "guest-sites": "Cantieri ospiti",
 };
 
 interface SectionState {
   items: TrashItem[];
   loading: boolean;
 }
+
+const ALL_KEYS: SectionKey[] = ["purchases", "invoices", "load-notes", "clients", "suppliers", "inventory", "jobs", "workers", "proposals", "guest-sites"];
 
 function CestinoContent() {
   const { userRole } = useAuth();
@@ -215,6 +219,7 @@ function CestinoContent() {
     jobs: { items: [], loading: false },
     workers: { items: [], loading: false },
     proposals: { items: [], loading: false },
+    "guest-sites": { items: [], loading: false },
   }));
 
   const loadSection = useCallback(async (key: SectionKey) => {
@@ -302,6 +307,14 @@ function CestinoContent() {
           sublabel: p.clientName || undefined,
           deletedAt: p.deletedAt,
         }));
+      } else if (key === "guest-sites") {
+        const data = await guestSitesApi.getDeleted();
+        items = data.map((g) => ({
+          id: g.id,
+          label: g.name,
+          sublabel: g.address || undefined,
+          deletedAt: g.deletedAt as string,
+        }));
       }
 
       setSections((prev: Record<SectionKey, SectionState>) => ({ ...prev, [key]: { items, loading: false } }));
@@ -314,8 +327,7 @@ function CestinoContent() {
 
   useEffect(() => {
     if (userRole !== "admin") return;
-    const keys: SectionKey[] = ["purchases", "invoices", "load-notes", "clients", "suppliers", "inventory", "jobs", "workers", "proposals"];
-    keys.forEach(loadSection);
+    ALL_KEYS.forEach(loadSection);
   }, [userRole, loadSection]);
 
   const [purging, setPurging] = useState(false)
@@ -330,9 +342,12 @@ function CestinoContent() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       const total = data.total ?? 0
-      setPurgeResult(total === 0 ? "Nessun elemento scaduto da eliminare." : `Eliminati definitivamente ${total} elementi.`)
-      const keys: SectionKey[] = ["purchases", "invoices", "load-notes", "clients", "suppliers", "inventory", "jobs", "workers", "proposals"]
-      keys.forEach(loadSection)
+      const skipped = (data.skipped ?? []).length
+      setPurgeResult(
+        (total === 0 ? "Nessun elemento eliminato." : `Eliminati definitivamente ${total} elementi.`) +
+        (skipped > 0 ? ` ${skipped} non eliminati perché hanno dati collegati da preservare.` : "")
+      )
+      ALL_KEYS.forEach(loadSection)
     } catch (e: any) {
       setPurgeResult("Errore: " + e.message)
     } finally {
@@ -381,6 +396,7 @@ function CestinoContent() {
     { key: "jobs" as SectionKey, label: "Commesse", icon: Briefcase },
     { key: "workers" as SectionKey, label: "Operai", icon: HardHat },
     { key: "proposals" as SectionKey, label: "Proposte", icon: FileText },
+    { key: "guest-sites" as SectionKey, label: "Cantieri ospiti", icon: Building2 },
   ];
 
   const totalCount = Object.values(sections).reduce((sum, s) => sum + s.items.length, 0);
@@ -400,6 +416,8 @@ function CestinoContent() {
               value: key,
               label: sections[key].items.length > 0 ? `${label} (${sections[key].items.length})` : label,
               icon: <Icon />,
+              // Pallino rosso se ci sono elementi nel cestino da piu' di 30 giorni
+              dot: sections[key].items.some(i => daysUntilDeletion(i.deletedAt) === 0),
             }))}
             value={activeTab}
             onValueChange={(v) => setActiveTab(v as SectionKey)}
@@ -506,6 +524,16 @@ function CestinoContent() {
               onRestore={makeRestorer("proposals", clientProposalsApi.restore)}
               onHardDelete={makeHardDeleter("proposals")}
               emptyMessage="Nessuna proposta nel cestino"
+            />
+          </TabsContent>
+
+          <TabsContent value="guest-sites" className="mt-4">
+            <TrashTable
+              items={sections["guest-sites"].items}
+              loading={sections["guest-sites"].loading}
+              onRestore={makeRestorer("guest-sites", guestSitesApi.restore)}
+              onHardDelete={makeHardDeleter("guest-sites")}
+              emptyMessage="Nessun cantiere ospite nel cestino"
             />
           </TabsContent>
         </Tabs>

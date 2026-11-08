@@ -14,6 +14,8 @@ export interface NotchTabItem {
   icon: ReactNode
   // Colore della bolla quando la voce è attiva (default blu), es. "bg-amber-500"
   bubbleClass?: string
+  // Pallino rosso di avviso sulla scheda
+  dot?: boolean
 }
 
 interface NotchTabsProps {
@@ -271,6 +273,7 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
                       {it.icon}
                     </span>
                     <span className={cn("max-w-full truncate", !active && "max-sm:hidden")}>{it.label}</span>
+                    {it.dot && <span className="absolute right-[18%] top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-slate-800" aria-label="Da controllare" />}
                   </button>
                 )
               })}

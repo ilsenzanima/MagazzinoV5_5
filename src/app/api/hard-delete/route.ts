@@ -5,6 +5,7 @@ import { cookies } from "next/headers"
 import { deleteFile, markFolderDeleted } from "@/lib/google-drive"
 
 const TABLE_MAP: Record<string, string> = {
+    "guest-sites": "guest_sites",
     purchases: "purchases",
     invoices: "invoices",
     "load-notes": "load_notes",
@@ -60,21 +61,29 @@ export async function POST(req: NextRequest) {
     const table = TABLE_MAP[section]
     if (!table || !id) return NextResponse.json({ error: 'Parametri non validi' }, { status: 400 })
 
-    // Cleanup file allegati (storage legacy + Google Drive)
+    // I file si cancellano solo dopo l'eliminazione della riga: se questa e' bloccata da dati collegati, i file restano
+    let cleanup: () => Promise<void> = async () => {}
+
+    // Raccolta file allegati (storage legacy + Google Drive)
     if (section === "purchases") {
         const { data } = await admin.from('purchases').select('document_url, document_urls').eq('id', id).single()
         if (data) {
             const urls = Array.isArray(data.document_urls) && data.document_urls.length
                 ? data.document_urls
                 : data.document_url ? [data.document_url] : []
-            await deleteStorageFiles(admin, extractStoragePaths(urls))
-            await deleteDriveFiles(extractDriveFileIds(urls))
+            cleanup = async () => {
+                await deleteStorageFiles(admin, extractStoragePaths(urls))
+                await deleteDriveFiles(extractDriveFileIds(urls))
+            }
         }
     } else if (section === "invoices") {
         const { data } = await admin.from('invoices').select('document_urls').eq('id', id).single()
         if (data?.document_urls?.length) {
-            await deleteStorageFiles(admin, extractStoragePaths(data.document_urls))
-            await deleteDriveFiles(extractDriveFileIds(data.document_urls))
+            const urls = data.document_urls
+            cleanup = async () => {
+                await deleteStorageFiles(admin, extractStoragePaths(urls))
+                await deleteDriveFiles(extractDriveFileIds(urls))
+            }
         }
     } else if (section === "jobs") {
         // shared_documents/shared_site_documents/shared_supplier_offers condividono la
@@ -102,10 +111,12 @@ export async function POST(req: NextRequest) {
             ...(salApprovati.data ?? []).map(r => r.document_url),
             ...(fattureCommittente.data ?? []).map(r => r.document_url),
         ]
-        await deleteStorageFiles(admin, extractStoragePaths(allUrls))
-        await deleteDriveFiles(extractDriveFileIds(allUrls))
-        if (job.data) {
-            await markFolderDeleted(['Cantieri', `${job.data.code} ${job.data.name}`]).catch(() => {})
+        cleanup = async () => {
+            await deleteStorageFiles(admin, extractStoragePaths(allUrls))
+            await deleteDriveFiles(extractDriveFileIds(allUrls))
+            if (job.data) {
+                await markFolderDeleted(['Cantieri', `${job.data.code} ${job.data.name}`]).catch(() => {})
+            }
         }
     } else if (section === "proposals") {
         // Stesso ragionamento, speculare: non cancella il file se la riga è ancora
@@ -121,9 +132,11 @@ export async function POST(req: NextRequest) {
             ...onlyProposalOwned(sharedSiteDocs.data).map(r => r.file_url),
             ...onlyProposalOwned(supplierOffers.data).map(r => r.file_url),
         ]
-        await deleteStorageFiles(admin, extractStoragePaths(allUrls))
-        await deleteDriveFiles(extractDriveFileIds(allUrls))
-        await markFolderDeleted(['Proposte', id]).catch(() => {})
+        cleanup = async () => {
+            await deleteStorageFiles(admin, extractStoragePaths(allUrls))
+            await deleteDriveFiles(extractDriveFileIds(allUrls))
+            await markFolderDeleted(['Proposte', id]).catch(() => {})
+        }
     } else if (section === "clients") {
         // Le proposte del cliente muoiono in cascata con lui: pulisce i loro file
         // (solo quelli non ancora collegati a una commessa, che continua a usarli)
@@ -141,9 +154,11 @@ export async function POST(req: NextRequest) {
                 ...onlyProposalOwned(sharedSiteDocs.data).map(r => r.file_url),
                 ...onlyProposalOwned(supplierOffers.data).map(r => r.file_url),
             ]
-            await deleteStorageFiles(admin, extractStoragePaths(allUrls))
-            await deleteDriveFiles(extractDriveFileIds(allUrls))
-            await Promise.allSettled(proposalIds.map(pid => markFolderDeleted(['Proposte', pid])))
+            cleanup = async () => {
+                await deleteStorageFiles(admin, extractStoragePaths(allUrls))
+                await deleteDriveFiles(extractDriveFileIds(allUrls))
+                await Promise.allSettled(proposalIds.map(pid => markFolderDeleted(['Proposte', pid])))
+            }
         }
     }
 
@@ -172,5 +187,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    await cleanup().catch(() => {})
     return NextResponse.json({ ok: true })
 }

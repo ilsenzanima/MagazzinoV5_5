@@ -11,6 +11,8 @@ export interface SectionDef {
   icon: ReactNode
   render: () => ReactNode
   hidden?: boolean
+  // Pallino rosso sulla scheda
+  dot?: boolean
 }
 
 function Inner({ title, sections, merge }: { title: string; sections: SectionDef[]; merge?: boolean }) {
@@ -26,7 +28,7 @@ function Inner({ title, sections, merge }: { title: string; sections: SectionDef
         <NotchTabs
           title={title}
           compact={!merge}
-          items={visible.length > 1 ? visible.map(s => ({ value: s.key, label: s.label, icon: s.icon })) : []}
+          items={visible.length > 1 ? visible.map(s => ({ value: s.key, label: s.label, icon: s.icon, dot: s.dot })) : []}
           value={current?.key ?? ""}
           onValueChange={key => router.replace(`${pathname}?v=${key}`)}
         >

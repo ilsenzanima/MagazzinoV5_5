@@ -13,6 +13,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { useAuth } from "@/components/auth-provider"
 import { NotificationBell } from "./NotificationBell"
 import { inventoryApi } from "@/lib/services/inventory"
+import { countExpiredTrash } from "@/lib/services/trash"
+import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 
 // Geometria del menu (px)
@@ -342,8 +344,8 @@ function TopBar() {
     if (userRole !== "admin") return
     let cancelled = false
     const check = () => {
-      Promise.all([inventoryApi.getUnverifiedCount(), inventoryApi.getNegativeLotMovements(), inventoryApi.getOrphanedJobReferences()])
-        .then(([unverified, negative, orphaned]) => { if (!cancelled) setAlerts(unverified + negative.length + orphaned.length) })
+      Promise.all([inventoryApi.getUnverifiedCount(), inventoryApi.getNegativeLotMovements(), inventoryApi.getOrphanedJobReferences(), countExpiredTrash(supabase)])
+        .then(([unverified, negative, orphaned, expired]) => { if (!cancelled) setAlerts(unverified + negative.length + orphaned.length + expired) })
         .catch(err => console.error("Failed to load alerts", err))
     }
     check()
