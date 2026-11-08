@@ -375,7 +375,7 @@ function TopBar() {
         <div className="relative shrink-0" style={{ width: CAP_R + 1, height: LINE_H }}>
           <svg width={CAP_R + 1} height={LINE_H} className="fill-slate-800" aria-hidden="true"><path d={cap} /></svg>
           {/* La punta continua come un filo sopra il menu, verso il bordo sinistro della pagina */}
-          <div className="absolute right-full top-0 bg-slate-800" style={{ width: "100vw", height: capTop + 0.5 }} />
+          <div className="absolute top-0 bg-slate-800" style={{ right: "calc(100% - 1px)", width: "100vw", height: capTop }} />
         </div>
         <div className="flex-1 bg-slate-800" style={{ height: LINE_H }} />
         <svg width={sw} height={BAND_H} className="shrink-0 fill-slate-800" style={{ marginLeft: -1, marginRight: -1 }} aria-hidden="true"><path d={curve} /></svg>
