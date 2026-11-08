@@ -18,6 +18,9 @@ export default async function DashboardPage() {
     monthPurchasesResult,
     lowStockResult,
     activeJobsCountResult,
+    onSiteJobsResult,
+    draftsCountResult,
+    pendingProposalsResult,
   ] = await Promise.allSettled([
     // Commesse attive (top 8 più recenti)
     supabase
@@ -71,6 +74,24 @@ export default async function DashboardPage() {
       .select("id", { count: "exact", head: true })
       .eq("status", "active")
       .is("deleted_at", null),
+
+    // Commesse segnate «in cantiere» (elmetto)
+    supabase
+      .from("jobs")
+      .select("id, code, name, clients(name)")
+      .eq("on_site", true)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(12),
+
+    // Bozze di DDT da completare
+    supabase.from("delivery_note_drafts").select("id", { count: "exact", head: true }),
+
+    // Offerte inviate o in attesa di risposta
+    supabase
+      .from("client_proposals")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["sent", "pending"]),
   ]);
 
   // Commesse attive
@@ -127,6 +148,15 @@ export default async function DashboardPage() {
       ? Number(lowStockResult.value.data?.lowStockCount ?? 0)
       : 0;
 
+  const onSiteJobs =
+    onSiteJobsResult.status === "fulfilled" ? (onSiteJobsResult.value.data ?? []) : [];
+  const todo = {
+    draftDDTCount:
+      draftsCountResult.status === "fulfilled" ? (draftsCountResult.value.count ?? 0) : 0,
+    pendingProposalsCount:
+      pendingProposalsResult.status === "fulfilled" ? (pendingProposalsResult.value.count ?? 0) : 0,
+  };
+
   const stats = {
     activeJobsCount:
       activeJobsCountResult.status === "fulfilled" && activeJobsCountResult.value.count != null
@@ -141,9 +171,8 @@ export default async function DashboardPage() {
   return (
     <DashboardClient
       stats={stats}
-      activeJobs={activeJobs}
-      recentDDT={recentDDT}
-      recentPurchases={recentPurchases}
+      onSiteJobs={onSiteJobs as any[]}
+      todo={todo}
     />
   );
 }
