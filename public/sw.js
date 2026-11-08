@@ -4,7 +4,7 @@
 // Bumped on every meaningful change to this file so the browser installs a
 // new worker and (via activate below) drops any cache left by a previous
 // version, instead of accumulating entries under the same name forever.
-const CACHE_NAME = 'magazzino-v5-cache-v2';
+const CACHE_NAME = 'magazzino-v5-cache-v3';
 
 // Files to cache for offline access (minimal for now)
 const urlsToCache = [
@@ -44,6 +44,38 @@ self.addEventListener('activate', (event) => {
         }).then(() => {
             // Take control of all pages immediately
             return self.clients.claim();
+        })
+    );
+});
+
+// Notifiche push: mostra l'avviso anche con l'app chiusa
+self.addEventListener('push', (event) => {
+    let data = {};
+    try { data = event.data ? event.data.json() : {}; } catch (e) { data = { body: event.data ? event.data.text() : '' }; }
+    event.waitUntil(
+        self.registration.showNotification(data.title || 'Magazzino', {
+            body: data.body || '',
+            icon: '/icons/icon-192x192.png',
+            badge: '/icons/icon-192x192.png',
+            tag: data.tag || undefined,
+            data: { url: data.url || '/' },
+        })
+    );
+});
+
+// Tocco sulla notifica: porta in primo piano l'app (o la apre) sulla pagina giusta
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const target = (event.notification.data && event.notification.data.url) || '/';
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+            for (const client of list) {
+                if ('focus' in client) {
+                    if ('navigate' in client) client.navigate(target);
+                    return client.focus();
+                }
+            }
+            return self.clients.openWindow(target);
         })
     );
 });

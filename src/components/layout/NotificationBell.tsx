@@ -28,22 +28,31 @@ const KIND_ICON: Record<AlertKind, typeof Bell> = {
 
 // Etichette del riepilogo, con la preferenza che le attiva
 const SUMMARY: { kind: AlertKind; label: string; pref?: keyof NotificationPreferences }[] = [
+  { kind: "agenda", label: "Agenda" },
   { kind: "out_of_stock", label: "Esauriti", pref: "outOfStock" },
   { kind: "low_stock", label: "Scorta bassa", pref: "lowStock" },
   { kind: "course", label: "Corsi", pref: "expiringCourses" },
   { kind: "medical_exam", label: "Visite mediche", pref: "expiringMedicalExams" },
   { kind: "job_price_missing", label: "Prezzi commesse", pref: "jobPriceMissing" },
-  { kind: "agenda", label: "Agenda" },
   { kind: "backup", label: "Backup" },
 ];
 
 const SECTIONS: { title: string; kinds: AlertKind[] }[] = [
+  { title: "Agenda", kinds: ["agenda"] },
   { title: "Magazzino", kinds: ["out_of_stock", "low_stock"] },
   { title: "Scadenze personale", kinds: ["course", "medical_exam"] },
   { title: "Prezzi commesse da definire", kinds: ["job_price_missing"] },
-  { title: "Agenda", kinds: ["agenda"] },
   { title: "Backup", kinds: ["backup"] },
 ];
+
+// Porta in vista il gruppo di avvisi che contiene il tipo scelto (scorre solo la lista della campanella)
+function scrollToKind(kind: AlertKind) {
+  const section = SECTIONS.find((s) => s.kinds.includes(kind));
+  if (!section) return;
+  const el = document.getElementById(`bell-sec-${section.title}`);
+  const box = el?.closest<HTMLElement>("[data-bell-list]");
+  if (el && box) box.scrollTo({ top: el.offsetTop, behavior: "smooth" });
+}
 
 interface NotificationBellProps {
   onNavigate?: () => void;
@@ -189,15 +198,18 @@ export function NotificationBell({ onNavigate }: NotificationBellProps) {
         {!loading && !failed && (
           <div className="flex flex-wrap gap-1.5 px-3 py-2 border-b">
             {SUMMARY.filter((s) => !s.pref || prefs[s.pref]).map((s) => (
-              <span
+              <button
+                type="button"
                 key={s.kind}
+                disabled={counts[s.kind] === 0}
+                onClick={() => scrollToKind(s.kind)}
                 className={cn(
                   "text-xs rounded-full border px-2 py-0.5",
-                  counts[s.kind] > 0 ? "bg-accent font-medium" : "text-muted-foreground"
+                  counts[s.kind] > 0 ? "bg-accent font-medium hover:bg-accent/70 cursor-pointer" : "text-muted-foreground cursor-default"
                 )}
               >
                 {s.label}: {counts[s.kind]}
-              </span>
+              </button>
             ))}
             {SUMMARY.every((s) => s.pref && !prefs[s.pref]) && (
               <span className="text-xs text-muted-foreground">Tutti gli avvisi sono disattivati nelle impostazioni.</span>
@@ -205,7 +217,7 @@ export function NotificationBell({ onNavigate }: NotificationBellProps) {
           </div>
         )}
 
-        <div className="max-h-[60vh] overflow-y-auto">
+        <div data-bell-list className="relative max-h-[60vh] overflow-y-auto">
           {loading && (
             <div className="flex items-center justify-center py-8 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -227,7 +239,7 @@ export function NotificationBell({ onNavigate }: NotificationBellProps) {
               const items = alerts.filter((a) => section.kinds.includes(a.kind));
               if (items.length === 0) return null;
               return (
-                <div key={section.title}>
+                <div key={section.title} id={`bell-sec-${section.title}`}>
                   <p className="px-3 pt-3 pb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {section.title} ({items.length})
                   </p>

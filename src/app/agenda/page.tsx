@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { CalendarDays, CheckCircle2, Loader2, MapPin, Pencil, Trash2 } from "lucide-react"
+import Link from "next/link"
+import { CalendarDays, CheckCircle2, ExternalLink, Loader2, MapPin, Pencil, Trash2 } from "lucide-react"
 import DashboardLayout from "@/components/layout/DashboardLayout"
 import { NotchTabs, NotchActions, NotchHelp, NotchSearch } from "@/components/ui/notch-tabs"
 import { FloatingAddButton } from "@/components/ui/floating-add-button"
@@ -17,7 +18,7 @@ import { useAuth } from "@/components/auth-provider"
 import { confirmDialog } from "@/components/ui/confirm-host"
 import { notify } from "@/lib/notify"
 import { supabase } from "@/lib/supabase"
-import { AGENDA_KINDS, AgendaInput, AgendaItem, AgendaKind, agendaApi, kindInfo, todayIso } from "@/lib/services/agenda"
+import { AGENDA_KINDS, AgendaInput, AgendaItem, AgendaKind, agendaApi, getAutoItems, kindInfo, todayIso } from "@/lib/services/agenda"
 
 const headCls = "text-xs font-semibold uppercase tracking-wide text-slate-600"
 
@@ -70,7 +71,8 @@ function AgendaContent() {
 
   const load = useCallback(async () => {
     try {
-      setItems(await agendaApi.getAll())
+      const [own, auto] = await Promise.all([agendaApi.getAll(), getAutoItems(supabase).catch(() => [] as AgendaItem[])])
+      setItems([...own, ...auto].sort((a, b) => a.date.localeCompare(b.date) || (a.time ?? "").localeCompare(b.time ?? "")))
     } catch (e) {
       console.error(e)
       notify.error("Errore nel caricamento dell'agenda")
@@ -94,7 +96,7 @@ function AgendaContent() {
   const done = items.filter(i => i.done)
 
   const rows = useMemo(() => {
-    const base = tab === "open" ? open : [...done].reverse()
+    const base = tab === "open" ? open : [...done].sort((a, b) => b.date.localeCompare(a.date))
     return base.filter(i =>
       (kindFilter === "all" || i.kind === kindFilter) &&
       (!q || [i.title, i.location, i.notes, i.workerName, i.jobLabel, kindInfo(i.kind).label].some(v => (v ?? "").toLowerCase().includes(q)))
@@ -198,7 +200,7 @@ function AgendaContent() {
               const info = kindInfo(i.kind)
               return (
                 <TableRow key={i.id} className={i.done ? "opacity-60" : undefined}>
-                  <TableCell className="py-2"><Checkbox checked={i.done} onCheckedChange={() => toggleDone(i)} className="h-5 w-5" aria-label="Fatto" /></TableCell>
+                  <TableCell className="py-2">{!i.auto && <Checkbox checked={i.done} onCheckedChange={() => toggleDone(i)} className="h-5 w-5" aria-label="Fatto" />}</TableCell>
                   <TableCell className="py-2">
                     <div className="text-sm font-medium capitalize">{fmtDate(i.date)}{i.endDate ? ` → ${fmtDate(i.endDate)}` : ""}</div>
                     <div className="text-xs text-slate-500">{i.time ? `ore ${i.time}` : "tutto il giorno"} {label.text && <span className={label.cls}>· {label.text}</span>}</div>
@@ -209,6 +211,7 @@ function AgendaContent() {
                   <TableCell className="py-2">
                     <div className="truncate text-sm font-medium">{i.title}</div>
                     {i.notes && <div className="truncate text-xs text-slate-500">{i.notes}</div>}
+                    {i.auto && <div className="text-xs text-slate-400">Importato in automatico</div>}
                   </TableCell>
                   <TableCell className="hidden truncate py-2 text-sm text-slate-600 lg:table-cell">
                     {i.location && <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5 text-slate-400" />{i.location}</span>}
@@ -216,8 +219,14 @@ function AgendaContent() {
                   <TableCell className="hidden truncate py-2 text-sm text-slate-600 lg:table-cell">{[i.workerName, i.jobLabel].filter(Boolean).join(" · ")}</TableCell>
                   <TableCell className="py-2">
                     <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(i)} title="Modifica"><Pencil className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-700" onClick={() => remove(i)} title="Elimina"><Trash2 className="h-4 w-4" /></Button>
+                      {i.auto ? (
+                        <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="Apri"><Link href={i.href ?? "/agenda"}><ExternalLink className="h-4 w-4" /></Link></Button>
+                      ) : (
+                        <>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(i)} title="Modifica"><Pencil className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-700" onClick={() => remove(i)} title="Elimina"><Trash2 className="h-4 w-4" /></Button>
+                        </>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

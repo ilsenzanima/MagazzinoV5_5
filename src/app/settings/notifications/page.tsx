@@ -5,6 +5,8 @@ import { Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { PushState, disablePush, enablePush, getPushState, sendTestPush } from "@/lib/push-client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/components/auth-provider";
 import { notify } from "@/lib/notify";
@@ -32,6 +34,71 @@ function PreferenceRow({ id, title, description, checked, disabled, onChange }: 
       </Label>
       <Switch id={id} checked={checked} disabled={disabled} onCheckedChange={(value) => onChange(id, value)} />
     </div>
+  );
+}
+
+const PUSH_MESSAGES: Record<string, string> = {
+  unsupported: "Questo browser non supporta le notifiche sul telefono.",
+  "needs-install": "Su iPhone e iPad le notifiche funzionano solo dall'app installata: apri il sito in Safari, tocca Condividi e scegli «Aggiungi a Home», poi apri l'app dalla Home e torna qui.",
+  denied: "Le notifiche sono bloccate per questo sito: riattivale dalle impostazioni del browser o del telefono.",
+  "not-configured": "Le notifiche sul telefono non sono ancora attivate sul server.",
+};
+
+function PushCard() {
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { getPushState().then(setState); }, []);
+
+  const toggle = async (on: boolean) => {
+    setBusy(true);
+    try {
+      if (on) await enablePush(); else await disablePush();
+      setState(await getPushState());
+    } catch (e) {
+      notify.error(e instanceof Error ? e.message : "Operazione non riuscita");
+      setState(await getPushState());
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const test = async () => {
+    setBusy(true);
+    try { await sendTestPush(); notify.success("Notifica di prova inviata"); }
+    catch (e) { notify.error(e instanceof Error ? e.message : "Invio non riuscito"); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Notifiche sul telefono</CardTitle>
+        <CardDescription>
+          Ogni mattina ricevi un riepilogo dell&apos;Agenda (voci da ricordare, corsi e visite mediche in scadenza) anche con l&apos;app chiusa. Vale solo per questo dispositivo.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {state === null ? (
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        ) : state === "on" || state === "off" ? (
+          <>
+            <div className="flex items-center justify-between space-x-2">
+              <Label htmlFor="push-toggle" className="flex flex-col space-y-1">
+                <span>Ricevi le notifiche su questo dispositivo</span>
+                <span className="font-normal text-xs text-muted-foreground">{state === "on" ? "Attive" : "Disattivate"}</span>
+              </Label>
+              <Switch id="push-toggle" checked={state === "on"} disabled={busy} onCheckedChange={toggle} />
+            </div>
+            {state === "on" && (
+              <Button variant="outline" size="sm" onClick={test} disabled={busy}>Invia una notifica di prova</Button>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">{PUSH_MESSAGES[state]}</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -86,6 +153,8 @@ export default function SettingsNotificationsPage() {
         </p>
       </div>
       <Separator />
+
+      {canSeeJobPrices && <PushCard />}
 
       <Card>
         <CardHeader>
