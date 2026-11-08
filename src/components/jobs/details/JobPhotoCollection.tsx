@@ -90,7 +90,7 @@ export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack
               <CheckSquare className="mr-2 h-4 w-4" />Seleziona
             </Button>
           )}
-          <Button className="bg-blue-600 hover:bg-blue-700" onClick={onAdd}>
+          <Button variant="outline" onClick={onAdd}>
             <Upload className="mr-2 h-4 w-4" />Aggiungi foto
           </Button>
         </div>

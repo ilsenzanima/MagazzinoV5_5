@@ -17,6 +17,7 @@ export default async function DashboardPage() {
     recentPurchasesResult,
     monthPurchasesResult,
     lowStockResult,
+    activeJobsCountResult,
   ] = await Promise.allSettled([
     // Commesse attive (top 8 più recenti)
     supabase
@@ -63,6 +64,13 @@ export default async function DashboardPage() {
 
     // Articoli in scorta minima (via RPC già esistente)
     supabase.rpc("get_dashboard_stats"),
+
+    // Numero reale delle commesse attive (la lista sopra e' limitata a 8)
+    supabase
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "active")
+      .is("deleted_at", null),
   ]);
 
   // Commesse attive
@@ -120,7 +128,10 @@ export default async function DashboardPage() {
       : 0;
 
   const stats = {
-    activeJobsCount: activeJobs.length,
+    activeJobsCount:
+      activeJobsCountResult.status === "fulfilled" && activeJobsCountResult.value.count != null
+        ? activeJobsCountResult.value.count
+        : activeJobs.length,
     monthDDTCount,
     monthPurchasesCount,
     monthPurchasesTotal,
