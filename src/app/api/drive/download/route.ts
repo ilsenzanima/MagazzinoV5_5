@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
-import { downloadFile, getFileMetadata, isOfficeMimeType, ensureFileLinkShareable, officeNativePreviewUrl } from "@/lib/google-drive"
+import { downloadFile, getDriveThumbnail, getFileMetadata, isOfficeMimeType, ensureFileLinkShareable, officeNativePreviewUrl } from "@/lib/google-drive"
 
 export async function GET(req: NextRequest) {
     const cookieStore = await cookies()
@@ -33,6 +33,17 @@ export async function GET(req: NextRequest) {
         }
 
         const { buffer, mimeType, name } = await downloadFile(fileId)
+
+        // HEIC/HEIF non si vedono nei browser (tranne Safari): per la visualizzazione si serve
+        // la versione grande (JPEG) generata da Drive. Il download diretto resta l'originale.
+        if (!forceDownload && /^image\/hei[cf]/i.test(mimeType)) {
+            const big = await getDriveThumbnail(fileId, 2048).catch(() => null)
+            if (big) {
+                return new NextResponse(new Uint8Array(big), {
+                    headers: { 'Content-Type': 'image/jpeg', 'Content-Disposition': 'inline' },
+                })
+            }
+        }
         const hasExtension = !!requestedName && /\.[a-zA-Z0-9]{2,5}$/.test(requestedName)
         const fileName = hasExtension ? requestedName! : name
         const disposition = forceDownload ? 'attachment' : 'inline'
