@@ -317,6 +317,7 @@ const BAND_W = 250
 const CURVE_W = 150
 const BAND_H = 54
 const LINE_H = 15
+const TAIL_W = 3 // spessore del filo che scende lungo il menu
 const CAP_R = CR + 5 // raggio dell'incavo che segue l'angolo del menu
 
 function TopBar() {
@@ -367,12 +368,22 @@ function TopBar() {
   const capDx = Math.sqrt(CAP_R ** 2 - (capCy - LINE_H) ** 2)
   const capTop = capCy - CAP_R
   const cap = `M0,0 H${CAP_R + 1} V${LINE_H} H${capDx} A${CAP_R},${CAP_R} 0 0 0 0,${capTop} Z`
+  // Il filo: parte dalla punta (sotto il bordo della barra) e segue la curva fino alla parete dritta del menu
+  const tail = `M0,${capTop - 0.5} A${CAP_R},${CAP_R} 0 0 1 ${CAP_R},${capCy} H${CAP_R - TAIL_W} A${CAP_R - TAIL_W},${CAP_R - TAIL_W} 0 0 0 0,${capTop + TAIL_W} Z`
   const curve = `M0,0 H${sw} V${BAND_H} C${sw * 0.55},${BAND_H} ${sw * 0.45},${LINE_H} 0,${LINE_H} Z`
 
   return (
     <div ref={barRef} className="pointer-events-none absolute left-0 right-0 z-40 hidden lg:block" style={{ top: simulatedRole ? 40 : 0, paddingLeft: railW + 8 - CR }}>
       <div className="flex items-start">
-        <svg width={CAP_R + 1} height={LINE_H} className="shrink-0 fill-slate-800" aria-hidden="true"><path d={cap} /></svg>
+        <div className="relative shrink-0" style={{ width: CAP_R + 1, height: LINE_H }}>
+          <svg width={CAP_R + 1} height={LINE_H} className="fill-slate-800" aria-hidden="true"><path d={cap} /></svg>
+          {/* La punta continua come un filo di 3px: segue la curva del menu e poi scende dritta fino in fondo */}
+          <svg width={CAP_R + 1} height={capCy + 1} className="absolute left-0 top-0 overflow-visible fill-slate-800" aria-hidden="true"><path d={tail} /></svg>
+          <div
+            className="absolute rounded-b-full bg-slate-800"
+            style={{ left: CAP_R - TAIL_W, top: capCy - 1, width: TAIL_W, height: `calc(100vh - ${capCy + 8 + (simulatedRole ? 40 : 0)}px)` }}
+          />
+        </div>
         <div className="flex-1 bg-slate-800" style={{ height: LINE_H }} />
         <svg width={sw} height={BAND_H} className="shrink-0 fill-slate-800" style={{ marginLeft: -1, marginRight: -1 }} aria-hidden="true"><path d={curve} /></svg>
         <div className="pointer-events-auto flex shrink-0 items-center justify-end gap-4 bg-slate-800 pr-5 text-white" style={{ width: BAND_W, height: BAND_H }}>
