@@ -1,14 +1,13 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Loader2, Package, RefreshCw, ShieldAlert, Users } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { PageStrip, NotchHelp } from "@/components/ui/notch-tabs";
+import { PageStrip, NotchHelp, NotchActions, NotchSearch, NotchButton } from "@/components/ui/notch-tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,6 +18,9 @@ import { auditPurchases, AuditLot } from "@/lib/utils/purchase-price-audit";
 import { formatCurrency, formatNumber } from "@/lib/utils/format";
 
 type Mode = 'any' | 'price' | 'pack' | 'authors';
+
+const TH = "text-xs font-semibold uppercase tracking-wide text-slate-600";
+const STRIP_SELECT = "h-8 border-slate-600 bg-slate-700 text-xs text-slate-100";
 
 export function ControlloAcquistiContent({ embedded = false }: { embedded?: boolean }) {
     const { userRole, realRole } = useAuth();
@@ -119,11 +121,10 @@ export function ControlloAcquistiContent({ embedded = false }: { embedded?: bool
                 <div className="space-y-4">
                     <PageStrip embedded={embedded} title="Controllo acquisti">
                         <NotchHelp wide title="Controllo acquisti" lines={["Per ogni articolo confronta i prezzi unitari dei lotti d'acquisto (solo acquisti veri, non ordini). Un lotto è anomalo se il prezzo si discosta dalla mediana degli altri lotti oltre la soglia. Spunta \"Controllato\" quando le differenze sono accettabili: verranno segnalati di nuovo solo i lotti inseriti dopo."]} />
-                    </PageStrip>
-                    <Card>
-                        <CardContent className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+                        <NotchActions>
+                            <NotchSearch value={search} onChange={setSearch} placeholder="Cerca articolo..." />
                             <Select value={mode} onValueChange={(v: Mode) => setMode(v)}>
-                                <SelectTrigger className="lg:w-64"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className={`${STRIP_SELECT} w-52`}><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="any">Tutte le segnalazioni</SelectItem>
                                     <SelectItem value="price">Solo prezzi anomali</SelectItem>
@@ -132,29 +133,24 @@ export function ControlloAcquistiContent({ embedded = false }: { embedded?: bool
                                 </SelectContent>
                             </Select>
                             <Select value={threshold} onValueChange={setThreshold}>
-                                <SelectTrigger className="lg:w-44"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className={`${STRIP_SELECT} w-36`}><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="0.3">Soglia +30%</SelectItem>
                                     <SelectItem value="0.5">Soglia +50%</SelectItem>
                                     <SelectItem value="1">Soglia +100%</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <Input
-                                className="lg:w-60"
-                                placeholder="Cerca articolo..."
-                                value={search}
-                                onChange={e => setSearch(e.target.value)}
-                            />
-                            <label className="flex items-center gap-2 text-sm">
-                                <Checkbox checked={showReviewed} onCheckedChange={v => setShowReviewed(v === true)} />
+                            <NotchButton type="button" onClick={() => setShowReviewed(v => !v)} className={showReviewed ? "ring-2 ring-blue-400" : undefined}>
                                 Mostra anche i controllati
-                            </label>
-                            <Button variant="outline" onClick={load} disabled={loading}>
-                                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                                Ricarica
-                            </Button>
-                        </CardContent>
-                    </Card>
+                            </NotchButton>
+                            <NotchButton type="button" onClick={load} disabled={loading}>
+                                {loading ? <Loader2 className="animate-spin" /> : <RefreshCw />} Ricarica
+                            </NotchButton>
+                            {!loading && !error && (
+                                <span className="text-xs text-slate-300">{visible.length} da vedere su {items.length} articoli ({lots.length} righe)</span>
+                            )}
+                        </NotchActions>
+                    </PageStrip>
 
                     {error && (
                         <Alert variant="destructive">
@@ -163,113 +159,101 @@ export function ControlloAcquistiContent({ embedded = false }: { embedded?: bool
                         </Alert>
                     )}
 
-                    {!loading && !error && (
-                        <p className="text-sm text-muted-foreground">
-                            {visible.length} articoli da vedere su {items.length} con acquisti ({lots.length} righe).
-                        </p>
-                    )}
-
-                    {visible.map(item => (
-                        <Card key={item.itemId} className={item.reviewedAt && !hasFlags(item) ? "opacity-70" : ""}>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-                                    {item.itemName}
-                                    {item.itemUnit && <span className="text-xs font-normal text-muted-foreground">({item.itemUnit})</span>}
-                                    {item.hasPriceAnomaly && (
-                                        <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" />Prezzo anomalo</Badge>
-                                    )}
-                                    {item.hasPackIssue && (
-                                        <Badge variant="destructive" className="gap-1"><Package className="h-3 w-3" />Confezione</Badge>
-                                    )}
-                                    {item.hasMultipleAuthors && (
-                                        <Badge variant="secondary" className="gap-1"><Users className="h-3 w-3" />Autori diversi</Badge>
-                                    )}
-                                </CardTitle>
-                                <CardDescription>
-                                    Mediana {item.medianPrice !== null ? formatCurrency(item.medianPrice) : "-"} · inserito da{" "}
-                                    {item.authors.map(a => `${a.name} (${a.count})`).join(", ")}
-                                </CardDescription>
-                                <div className="flex flex-wrap items-center gap-4 pt-2 text-sm">
-                                    <label className="flex items-center gap-2">
-                                        <Checkbox
-                                            checked={!!item.reviewedAt}
-                                            onCheckedChange={v => toggleReviewed(item.itemId, v === true)}
-                                        />
-                                        Controllato
-                                        {item.reviewedAt && (
-                                            <span className="text-xs text-muted-foreground">
-                                                il {new Date(item.reviewedAt).toLocaleDateString("it-IT")}
-                                            </span>
-                                        )}
-                                    </label>
-                                    <label className="flex items-center gap-2">
-                                        Quantità per confezione
-                                        <Input
-                                            className="h-8 w-24"
-                                            inputMode="decimal"
-                                            placeholder="es. 18"
-                                            value={packDrafts[item.itemId] ?? (item.packQuantity !== null ? String(item.packQuantity) : "")}
-                                            onChange={e => setPackDrafts(p => ({ ...p, [item.itemId]: e.target.value }))}
-                                            onBlur={() => savePack(item.itemId, item.packQuantity)}
-                                        />
-                                        <span className="text-xs text-muted-foreground">{item.itemUnit ?? ""}</span>
-                                    </label>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="text-left text-xs text-muted-foreground">
-                                            <th className="py-1 pr-3">Data</th>
-                                            <th className="py-1 pr-3">Bolla</th>
-                                            <th className="py-1 pr-3">Fornitore</th>
-                                            <th className="py-1 pr-3">Inserito da</th>
-                                            <th className="py-1 pr-3 text-right">Quantità</th>
-                                            <th className="py-1 pr-3 text-right">Prezzo</th>
-                                            <th className="py-1 pr-3 text-right">Scarto</th>
-                                            <th className="py-1 pr-3">Non calcolare</th>
-                                            <th className="py-1">Note</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
+                    <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
+                        <Table className="min-w-[860px] border-collapse [&_td]:px-2 [&_th]:px-2">
+                            <TableHeader>
+                                <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                    <TableHead className={`w-28 ${TH}`}>Data</TableHead>
+                                    <TableHead className={`w-28 ${TH}`}>Bolla</TableHead>
+                                    <TableHead className={TH}>Fornitore</TableHead>
+                                    <TableHead className={`w-36 ${TH}`}>Inserito da</TableHead>
+                                    <TableHead className={`w-24 text-right ${TH}`}>Quantità</TableHead>
+                                    <TableHead className={`w-24 text-right ${TH}`}>Prezzo</TableHead>
+                                    <TableHead className={`w-20 text-right ${TH}`}>Scarto</TableHead>
+                                    <TableHead className={`w-24 ${TH}`}>Non calcolare</TableHead>
+                                    <TableHead className={`w-56 ${TH}`}>Note</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {visible.map(item => (
+                                    <Fragment key={item.itemId}>
+                                        <TableRow className={`border-t-2 bg-slate-50 hover:bg-slate-50 dark:bg-muted/40 ${item.reviewedAt && !hasFlags(item) ? "opacity-70" : ""}`}>
+                                            <TableCell colSpan={9} className="py-2">
+                                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                                                    <span className="font-semibold">{item.itemName}</span>
+                                                    {item.itemUnit && <span className="text-xs text-muted-foreground">({item.itemUnit})</span>}
+                                                    {item.hasPriceAnomaly && (
+                                                        <Badge variant="destructive" className="gap-1"><AlertTriangle className="h-3 w-3" />Prezzo anomalo</Badge>
+                                                    )}
+                                                    {item.hasPackIssue && (
+                                                        <Badge variant="destructive" className="gap-1"><Package className="h-3 w-3" />Confezione</Badge>
+                                                    )}
+                                                    {item.hasMultipleAuthors && (
+                                                        <Badge variant="secondary" className="gap-1"><Users className="h-3 w-3" />Autori diversi</Badge>
+                                                    )}
+                                                    <span className="text-xs text-muted-foreground">
+                                                        Mediana {item.medianPrice !== null ? formatCurrency(item.medianPrice) : "-"} · inserito da {item.authors.map(a => `${a.name} (${a.count})`).join(", ")}
+                                                    </span>
+                                                    <label className="flex items-center gap-2 text-sm">
+                                                        <Checkbox checked={!!item.reviewedAt} onCheckedChange={v => toggleReviewed(item.itemId, v === true)} />
+                                                        Controllato
+                                                        {item.reviewedAt && <span className="text-xs text-muted-foreground">il {new Date(item.reviewedAt).toLocaleDateString("it-IT")}</span>}
+                                                    </label>
+                                                    <label className="flex items-center gap-2 text-sm">
+                                                        Q.tà per confezione
+                                                        <Input
+                                                            className="h-7 w-20 bg-white"
+                                                            inputMode="decimal"
+                                                            placeholder="es. 18"
+                                                            value={packDrafts[item.itemId] ?? (item.packQuantity !== null ? String(item.packQuantity) : "")}
+                                                            onChange={e => setPackDrafts(p => ({ ...p, [item.itemId]: e.target.value }))}
+                                                            onBlur={() => savePack(item.itemId, item.packQuantity)}
+                                                            onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                                                        />
+                                                        <span className="text-xs text-muted-foreground">{item.itemUnit ?? ""}</span>
+                                                    </label>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
                                         {item.lots.map((l, i) => (
-                                            <tr key={`${l.purchaseId}-${i}`} className={l.ignored ? "opacity-60" : l.isNew && (l.priceAnomaly || l.packPriceSuspect) ? "bg-red-50 dark:bg-red-950/30" : ""}>
-                                                <td className="py-1 pr-3 whitespace-nowrap">{l.date ?? "-"}</td>
-                                                <td className="py-1 pr-3">
+                                            <TableRow key={`${l.purchaseId}-${i}`} className={l.ignored ? "opacity-60" : l.isNew && (l.priceAnomaly || l.packPriceSuspect) ? "bg-red-50 hover:bg-red-50 dark:bg-red-950/30" : ""}>
+                                                <TableCell className="whitespace-nowrap py-1.5">{l.date ?? "-"}</TableCell>
+                                                <TableCell className="py-1.5">
                                                     <Link href={`/purchases/${l.purchaseId}`} className="text-blue-600 hover:underline">
                                                         {l.deliveryNoteNumber || "apri"}
                                                     </Link>
-                                                </td>
-                                                <td className="py-1 pr-3">{l.supplierName ?? "-"}</td>
-                                                <td className={`py-1 pr-3 ${l.differentAuthor ? "font-semibold text-amber-700" : ""}`}>
-                                                    {l.createdByName ?? "Sconosciuto"}
-                                                </td>
-                                                <td className="py-1 pr-3 text-right">{l.quantity !== null ? formatNumber(l.quantity) : "-"}</td>
-                                                <td className="py-1 pr-3 text-right">{formatCurrency(l.price)}</td>
-                                                <td className="py-1 pr-3 text-right">
+                                                </TableCell>
+                                                <TableCell className="truncate py-1.5">{l.supplierName ?? "-"}</TableCell>
+                                                <TableCell className={`truncate py-1.5 ${l.differentAuthor ? "font-semibold text-amber-700" : ""}`}>{l.createdByName ?? "Sconosciuto"}</TableCell>
+                                                <TableCell className="py-1.5 text-right">{l.quantity !== null ? formatNumber(l.quantity) : "-"}</TableCell>
+                                                <TableCell className="py-1.5 text-right">{formatCurrency(l.price)}</TableCell>
+                                                <TableCell className="py-1.5 text-right">
                                                     {l.deviation === null ? "-" : `${l.deviation > 0 ? "+" : ""}${formatNumber(l.deviation * 100, { maximumFractionDigits: 0 })}%`}
-                                                </td>
-                                                <td className="py-1 pr-3">
+                                                </TableCell>
+                                                <TableCell className="py-1.5">
                                                     <Checkbox
                                                         checked={l.excluded}
                                                         onCheckedChange={v => toggleExcluded(l.purchaseItemId, v === true)}
                                                         aria-label="Non calcolare questo lotto nel prezzo di riferimento"
                                                     />
-                                                </td>
-                                                <td className="py-1 text-xs text-muted-foreground">
+                                                </TableCell>
+                                                <TableCell className="py-1.5 text-xs text-muted-foreground">
                                                     {l.ignored === 'excluded' && "escluso dal prezzo di riferimento"}
                                                     {l.ignored === 'zero' && "quantità 0: non conteggiato"}
                                                     {l.packPriceSuspect && "sembra il prezzo della confezione"}
                                                     {l.qtyNotMultiple && !l.packPriceSuspect && "quantità non multipla della confezione"}
                                                     {!l.isNew && !l.ignored && " già controllato"}
-                                                </td>
-                                            </tr>
+                                                </TableCell>
+                                            </TableRow>
                                         ))}
-                                    </tbody>
-                                </table>
-                            </CardContent>
-                        </Card>
-                    ))}
+                                    </Fragment>
+                                ))}
+                                {!loading && visible.length === 0 && (
+                                    <TableRow><TableCell colSpan={9} className="py-8 text-center text-muted-foreground">Nessuna segnalazione</TableCell></TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </div>
             )}
         </DashboardLayout>

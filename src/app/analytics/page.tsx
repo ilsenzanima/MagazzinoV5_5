@@ -15,7 +15,7 @@ import {
   YAxis,
 } from "recharts";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { PageStrip, NotchHelp } from "@/components/ui/notch-tabs";
+import { PageStrip, NotchHelp, NotchActions, NotchSearch, NotchButton } from "@/components/ui/notch-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,8 @@ import {
 
 // Un colore per commessa, nello stesso ordine in tabella, riepilogo e grafici
 const JOB_COLORS = ["#2563eb", "#ea580c", "#16a34a", "#9333ea", "#0891b2", "#e11d48"];
+
+const TH = "text-xs font-semibold uppercase tracking-wide text-slate-600";
 
 const STATUS_LABEL: Record<string, string> = { active: "Attiva", completed: "Completata" };
 
@@ -152,18 +154,13 @@ export function AnalyticsContent({ embedded = false }: { embedded?: boolean }) {
             title="Analisi spostamenti"
             lines={["Scegli una o più commesse: vedi quali materiali sono andati e quali sono rientrati, la quantità reale rimasta in commessa e come cambia nel tempo."]}
           />
-        </PageStrip>
-
-        {/* Scelta commesse */}
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
+          <NotchActions>
               <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" disabled={jobsLoading || jobsError} className="justify-between min-w-64">
+                  <NotchButton type="button" disabled={jobsLoading || jobsError}>
                     {jobsLoading ? "Carico le commesse…" : "Scegli le commesse"}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                  </Button>
+                    <ChevronsUpDown />
+                  </NotchButton>
                 </PopoverTrigger>
                 <PopoverContent align="start" className="w-[26rem] max-w-[90vw] p-0">
                   <div className="p-2 border-b relative">
@@ -210,35 +207,41 @@ export function AnalyticsContent({ embedded = false }: { embedded?: boolean }) {
                 </PopoverContent>
               </Popover>
 
-              {loading && <Loader2 className="h-4 w-4 animate-spin text-blue-600" />}
-            </div>
+              {loading && <Loader2 className="h-4 w-4 animate-spin text-blue-300" />}
+              {selectedAnalyses.length > 0 && <NotchSearch value={itemSearch} onChange={setItemSearch} placeholder="Cerca articolo o codice" />}
+              {selectedAnalyses.length > 0 && (
+                <NotchButton type="button" onClick={() => setHideZero(v => !v)} className={hideZero ? "ring-2 ring-blue-400" : undefined}>
+                  Nascondi i rientrati del tutto
+                </NotchButton>
+              )}
+              {selectedAnalyses.length > 0 && <span className="text-xs text-slate-300">{rows.length} articoli</span>}
+          </NotchActions>
+        </PageStrip>
 
-            {selectedIds.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {selectedIds.map((id) => (
-                  <span
-                    key={id}
-                    className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm"
-                    style={{ borderColor: colorOf(id) }}
-                  >
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: colorOf(id) }} />
-                    {jobById.get(id)?.code || id}
-                    <button type="button" aria-label="Togli la commessa" onClick={() => toggleJob(id)} className="text-muted-foreground hover:text-foreground">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
+        {selectedIds.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {selectedIds.map((id) => (
+              <span
+                key={id}
+                className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-sm"
+                style={{ borderColor: colorOf(id) }}
+              >
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: colorOf(id) }} />
+                {jobById.get(id)?.code || id}
+                <button type="button" aria-label="Togli la commessa" onClick={() => toggleJob(id)} className="text-muted-foreground hover:text-foreground">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
 
-            {(jobsError || loadError) && (
-              <p className="flex items-center gap-2 text-sm text-red-500">
-                <AlertTriangle className="h-4 w-4" />
-                {jobsError ? "Impossibile caricare l'elenco delle commesse." : "Impossibile caricare i movimenti di una commessa. Riprova."}
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        {(jobsError || loadError) && (
+          <p className="flex items-center gap-2 text-sm text-red-500">
+            <AlertTriangle className="h-4 w-4" />
+            {jobsError ? "Impossibile caricare l'elenco delle commesse." : "Impossibile caricare i movimenti di una commessa. Riprova."}
+          </p>
+        )}
 
         {selectedIds.length === 0 && !jobsLoading && !jobsError && (
           <p className="py-10 text-center text-slate-500">Scegli almeno una commessa per iniziare.</p>
@@ -247,34 +250,50 @@ export function AnalyticsContent({ embedded = false }: { embedded?: boolean }) {
         {selectedAnalyses.length > 0 && (
           <>
             {/* Riepilogo per commessa */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {selectedAnalyses.map((analysis) => {
-                const job = jobById.get(analysis.jobId);
-                const inJob = analysis.items.filter((i) => Math.abs(i.net) >= 0.001).length;
-                const withReturns = analysis.items.filter((i) => i.returned > 0).length;
-                return (
-                  <Card key={analysis.jobId} style={{ borderTopColor: colorOf(analysis.jobId), borderTopWidth: 3 }}>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base flex items-center justify-between gap-2">
-                        <span className="truncate">{job ? jobLabel(job) : analysis.jobId}</span>
-                        {job && STATUS_LABEL[job.status] && <Badge variant="outline">{STATUS_LABEL[job.status]}</Badge>}
-                      </CardTitle>
-                      <CardDescription>{job?.clientName}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="text-sm space-y-1">
-                      {analysis.movementCount === 0 ? (
-                        <p className="text-muted-foreground">Nessun movimento di magazzino su questa commessa.</p>
-                      ) : (
-                        <>
-                          <p><span className="font-medium">{inJob}</span> articoli con quantità in commessa su {analysis.items.length} movimentati</p>
-                          <p><span className="font-medium">{withReturns}</span> articoli con rientri · {analysis.movementCount} movimenti</p>
-                          <p className="text-muted-foreground">Dal {formatDate(analysis.firstDate)} al {formatDate(analysis.lastDate)}</p>
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+            <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
+              <Table className="min-w-[760px] border-collapse [&_td]:px-2 [&_th]:px-2">
+                <TableHeader>
+                  <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                    <TableHead className={TH}>Commessa</TableHead>
+                    <TableHead className={`w-48 ${TH}`}>Committente</TableHead>
+                    <TableHead className={`w-28 ${TH}`}>Stato</TableHead>
+                    <TableHead className={`w-32 text-right ${TH}`}>In commessa</TableHead>
+                    <TableHead className={`w-28 text-right ${TH}`}>Con rientri</TableHead>
+                    <TableHead className={`w-28 text-right ${TH}`}>Movimenti</TableHead>
+                    <TableHead className={`w-48 ${TH}`}>Periodo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {selectedAnalyses.map((analysis) => {
+                    const job = jobById.get(analysis.jobId);
+                    const inJob = analysis.items.filter((i) => Math.abs(i.net) >= 0.001).length;
+                    const withReturns = analysis.items.filter((i) => i.returned > 0).length;
+                    const empty = analysis.movementCount === 0;
+                    return (
+                      <TableRow key={analysis.jobId}>
+                        <TableCell className="py-1.5 font-medium">
+                          <span className="inline-flex items-center gap-2">
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: colorOf(analysis.jobId) }} />
+                            {job ? jobLabel(job) : analysis.jobId}
+                          </span>
+                        </TableCell>
+                        <TableCell className="truncate py-1.5">{job?.clientName || "—"}</TableCell>
+                        <TableCell className="py-1.5">{job && STATUS_LABEL[job.status] ? <Badge variant="outline">{STATUS_LABEL[job.status]}</Badge> : "—"}</TableCell>
+                        {empty ? (
+                          <TableCell colSpan={4} className="py-1.5 text-muted-foreground">Nessun movimento di magazzino su questa commessa.</TableCell>
+                        ) : (
+                          <>
+                            <TableCell className="py-1.5 text-right">{inJob} su {analysis.items.length}</TableCell>
+                            <TableCell className="py-1.5 text-right">{withReturns}</TableCell>
+                            <TableCell className="py-1.5 text-right">{analysis.movementCount}</TableCell>
+                            <TableCell className="whitespace-nowrap py-1.5 text-muted-foreground">{formatDate(analysis.firstDate)} – {formatDate(analysis.lastDate)}</TableCell>
+                          </>
+                        )}
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
 
             {/* Andamento nel tempo */}
@@ -349,38 +368,22 @@ export function AnalyticsContent({ embedded = false }: { embedded?: boolean }) {
             </Card>
 
             {/* Materiali e confronto */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Materiali in commessa</CardTitle>
-                <CardDescription>
-                  Per ogni articolo: quantità reale in commessa (andata meno rientrata). Gli acquisti fatti direttamente sulla commessa contano come andati.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="relative w-full sm:w-72">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input value={itemSearch} onChange={(e) => setItemSearch(e.target.value)} placeholder="Cerca articolo o codice" className="pl-9" />
-                  </div>
-                  <label className="flex items-center gap-2 text-sm cursor-pointer">
-                    <Checkbox checked={hideZero} onCheckedChange={(v) => setHideZero(v === true)} />
-                    Nascondi gli articoli già rientrati del tutto
-                  </label>
-                  <span className="text-sm text-muted-foreground">{rows.length} articoli</span>
-                </div>
-
+            <div className="space-y-1">
+              <p className="px-1 text-xs text-muted-foreground">
+                Materiali in commessa: quantità reale (andata meno rientrata). Gli acquisti fatti direttamente sulla commessa contano come andati.
+              </p>
                 {rows.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-slate-500">
+                  <p className="rounded-xl border bg-card py-8 text-center text-sm text-slate-500 shadow-sm">
                     {allRows.length === 0 ? "Nessun movimento sulle commesse scelte." : "Nessun articolo corrisponde ai filtri."}
                   </p>
                 ) : (
-                  <div className="max-h-[600px] overflow-auto rounded-md border">
-                    <Table>
-                      <TableHeader className="sticky top-0 bg-background z-10">
-                        <TableRow>
-                          <TableHead className="min-w-56">Articolo</TableHead>
+                  <div className="max-h-[600px] overflow-auto rounded-xl border bg-card shadow-sm">
+                    <Table className="border-collapse [&_td]:px-2 [&_th]:px-2">
+                      <TableHeader className="sticky top-0 z-10">
+                        <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                          <TableHead className={`min-w-56 ${TH}`}>Articolo</TableHead>
                           {selectedAnalyses.map((a) => (
-                            <TableHead key={a.jobId} className="text-right min-w-40">
+                            <TableHead key={a.jobId} className={`min-w-40 text-right ${TH}`}>
                               <span className="inline-flex items-center gap-2">
                                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: colorOf(a.jobId) }} />
                                 {jobById.get(a.jobId)?.code || a.jobId}
@@ -427,8 +430,7 @@ export function AnalyticsContent({ embedded = false }: { embedded?: boolean }) {
                     </Table>
                   </div>
                 )}
-              </CardContent>
-            </Card>
+            </div>
           </>
         )}
       </div>

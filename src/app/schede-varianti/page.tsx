@@ -1,10 +1,11 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { confirmDialog } from "@/components/ui/confirm-host";
 import { ArrowDown, ArrowUp, Check, Loader2, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import { PageStrip, NotchHelp } from "@/components/ui/notch-tabs";
+import { PageStrip, NotchHelp, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +24,9 @@ import {
 
 const EMPTY_TEMPLATE: VariantTemplate = { version: 2, pattern: "", fields: [] };
 
-const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+const TH = "text-xs font-semibold uppercase tracking-wide text-slate-600";
+
+const clone =<T,>(value: T): T => JSON.parse(JSON.stringify(value));
 
 export function SchedeVariantiContent({ embedded = false }: { embedded?: boolean }) {
     const { userRole, realRole } = useAuth();
@@ -193,30 +196,44 @@ export function SchedeVariantiContent({ embedded = false }: { embedded?: boolean
                             "I sottotipi non sono nuove tipologie: servono solo a scegliere quali campi chiedere (es. nelle Porte: porta, telaio, maniglione).",
                         ]}
                     />
+                    {selected && (
+                        <NotchActions>
+                            <NotchButton type="button" onClick={() => save(false)} disabled={saving || !dirty}>
+                                {saving ? <Loader2 className="animate-spin" /> : <Check />} Salva scheda
+                            </NotchButton>
+                            {selected.variantTemplate && (
+                                <NotchButton type="button" onClick={async () => { if (await confirmDialog("Rimuovere la scheda di questa tipologia? La variante tornerà a testo libero.")) save(true); }} disabled={saving}>
+                                    Rimuovi scheda
+                                </NotchButton>
+                            )}
+                            {dirty && <span className="text-xs text-amber-300">Modifiche non salvate</span>}
+                        </NotchActions>
+                    )}
                 </PageStrip>
 
                 <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
                     {/* Elenco tipologie */}
-                    <Card className="h-fit">
-                        <CardHeader className="pb-2"><CardTitle className="text-base">Tipologie</CardTitle></CardHeader>
-                        <CardContent className="p-2">
-                            {loading ? (
-                                <div className="p-4 text-center"><Loader2 className="mx-auto h-4 w-4 animate-spin" /></div>
-                            ) : (
-                                <ul className="max-h-[70vh] space-y-1 overflow-y-auto">
-                                    {types.map(t => (
-                                        <li key={t.id}>
-                                            <button type="button" onClick={() => select(t)}
-                                                className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm ${selectedId === t.id ? "bg-blue-50 font-medium text-blue-700 dark:bg-blue-950/30" : "hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
-                                                <span>{t.name}</span>
-                                                {t.variantTemplate && <Check className="h-4 w-4 text-emerald-600" />}
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                        </CardContent>
-                    </Card>
+                    <div className="h-fit max-h-[75vh] overflow-y-auto rounded-xl border bg-card shadow-sm">
+                        <Table className="border-collapse [&_td]:px-2 [&_th]:px-2">
+                            <TableHeader className="sticky top-0 z-10">
+                                <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                    <TableHead className={TH}>Tipologia</TableHead>
+                                    <TableHead className={`w-16 ${TH}`}>Scheda</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {loading ? (
+                                    <TableRow><TableCell colSpan={2} className="py-6 text-center"><Loader2 className="mx-auto h-4 w-4 animate-spin" /></TableCell></TableRow>
+                                ) : types.map(t => (
+                                    <TableRow key={t.id} onClick={() => select(t)}
+                                        className={`cursor-pointer ${selectedId === t.id ? "bg-blue-50 font-medium text-blue-700 hover:bg-blue-50 dark:bg-blue-950/30" : ""}`}>
+                                        <TableCell className="truncate py-1.5">{t.name}</TableCell>
+                                        <TableCell className="py-1.5">{t.variantTemplate ? <Check className="h-4 w-4 text-emerald-600" /> : <span className="text-slate-300">—</span>}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
 
                     {/* Editor */}
                     {!selected ? (
@@ -339,46 +356,59 @@ export function SchedeVariantiContent({ embedded = false }: { embedded?: boolean
                                 </CardContent>
                             </Card>
 
-                            <div className="space-y-3">
+                            <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
+                                <Table className="min-w-[640px] border-collapse [&_td]:px-2 [&_th]:px-2">
+                                    <TableHeader>
+                                        <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                            <TableHead className={TH}>Nome del campo</TableHead>
+                                            <TableHead className={`w-36 ${TH}`}>Tipo</TableHead>
+                                            <TableHead className={`w-24 ${TH}`}>Unità</TableHead>
+                                            <TableHead className={`w-36 ${TH}`}>Valore standard</TableHead>
+                                            <TableHead className={`w-32 ${TH}`}>Azioni</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
                                 {section.fields.map((f, i) => (
-                                    <Card key={`${subIndex}-${i}`}>
-                                        <CardContent className="space-y-3 p-4">
-                                            <div className="flex flex-wrap items-end gap-3">
-                                                <div className="min-w-[180px] flex-1 space-y-1">
-                                                    <Label className="text-xs">Nome del campo</Label>
-                                                    <Input value={f.label} onChange={e => {
-                                                        const label = e.target.value;
-                                                        // finché la chiave è quella automatica la si aggiorna col nome
-                                                        const auto = f.key === keyFromLabel(f.label) || /^campo_\d+$/.test(f.key);
-                                                        updateField(i, { label, ...(auto ? { key: keyFromLabel(label) } : {}) });
-                                                    }} />
-                                                </div>
-                                                <div className="w-40 space-y-1">
-                                                    <Label className="text-xs">Tipo</Label>
-                                                    <Select value={f.kind} onValueChange={(v: VariantField["kind"]) => updateField(i, { kind: v })}>
-                                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="number">Numero</SelectItem>
-                                                            <SelectItem value="choice">Scelta</SelectItem>
-                                                            <SelectItem value="text">Testo</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <div className="w-28 space-y-1">
-                                                    <Label className="text-xs">Unità</Label>
-                                                    <Input placeholder="mm" value={f.unit ?? ""} onChange={e => updateField(i, { unit: e.target.value || undefined })} />
-                                                </div>
+                                    <Fragment key={`${subIndex}-${i}`}>
+                                        <TableRow className="border-t-2 hover:bg-transparent">
+                                            <TableCell className="py-1.5">
+                                                <Input className="h-8" value={f.label} onChange={e => {
+                                                    const label = e.target.value;
+                                                    // finché la chiave è quella automatica la si aggiorna col nome
+                                                    const auto = f.key === keyFromLabel(f.label) || /^campo_\d+$/.test(f.key);
+                                                    updateField(i, { label, ...(auto ? { key: keyFromLabel(label) } : {}) });
+                                                }} />
+                                            </TableCell>
+                                            <TableCell className="py-1.5">
+                                                <Select value={f.kind} onValueChange={(v: VariantField["kind"]) => updateField(i, { kind: v })}>
+                                                    <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="number">Numero</SelectItem>
+                                                        <SelectItem value="choice">Scelta</SelectItem>
+                                                        <SelectItem value="text">Testo</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </TableCell>
+                                            <TableCell className="py-1.5">
+                                                <Input className="h-8" placeholder="mm" value={f.unit ?? ""} onChange={e => updateField(i, { unit: e.target.value || undefined })} />
+                                            </TableCell>
+                                            <TableCell className="py-1.5">
+                                                <Input className="h-8" value={f.default ?? ""} onChange={e => updateField(i, { default: e.target.value || undefined })} />
+                                            </TableCell>
+                                            <TableCell className="py-1.5">
                                                 <div className="flex gap-1">
-                                                    <Button variant="outline" size="icon" onClick={() => moveField(i, -1)} disabled={i === 0}><ArrowUp className="h-4 w-4" /></Button>
-                                                    <Button variant="outline" size="icon" onClick={() => moveField(i, 1)} disabled={i === section.fields.length - 1}><ArrowDown className="h-4 w-4" /></Button>
-                                                    <Button variant="outline" size="icon" onClick={() => removeField(i)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                                                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => moveField(i, -1)} disabled={i === 0}><ArrowUp className="h-4 w-4" /></Button>
+                                                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => moveField(i, 1)} disabled={i === section.fields.length - 1}><ArrowDown className="h-4 w-4" /></Button>
+                                                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => removeField(i)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                                                 </div>
-                                            </div>
-
+                                            </TableCell>
+                                        </TableRow>
+                                        <TableRow className="bg-slate-50/60 hover:bg-slate-50/60 dark:bg-muted/20">
+                                        <TableCell colSpan={5} className="space-y-3 py-2">
                                             {f.kind === "choice" && (
                                                 <div className="space-y-1">
                                                     <Label className="text-xs">Scelte (separate da virgola)</Label>
-                                                    <Input value={(f.options ?? []).join(", ")}
+                                                    <Input className="h-8" value={(f.options ?? []).join(", ")}
                                                         onChange={e => updateField(i, { options: e.target.value.split(",").map(s => s.trim()).filter(Boolean) })} />
                                                 </div>
                                             )}
@@ -398,11 +428,7 @@ export function SchedeVariantiContent({ embedded = false }: { embedded?: boolean
                                                 )}
                                             </div>
 
-                                            <div className="grid gap-3 sm:grid-cols-3">
-                                                <div className="space-y-1">
-                                                    <Label className="text-xs">Valore standard</Label>
-                                                    <Input value={f.default ?? ""} onChange={e => updateField(i, { default: e.target.value || undefined })} />
-                                                </div>
+                                            <div className="grid gap-3 sm:grid-cols-2">
                                                 <div className="space-y-1">
                                                     <Label className="text-xs">Compare solo se il campo…</Label>
                                                     <Select value={f.showIf?.key ?? "__none"}
@@ -424,11 +450,17 @@ export function SchedeVariantiContent({ embedded = false }: { embedded?: boolean
                                                 )}
                                             </div>
                                             <p className="text-[11px] text-slate-400">Chiave nel modello: <code>{`{${f.key}}`}</code></p>
-                                        </CardContent>
-                                    </Card>
+                                        </TableCell>
+                                        </TableRow>
+                                    </Fragment>
                                 ))}
-                                <Button variant="outline" onClick={addField}><Plus className="mr-2 h-4 w-4" />Aggiungi campo</Button>
+                                {section.fields.length === 0 && (
+                                    <TableRow><TableCell colSpan={5} className="py-6 text-center text-muted-foreground">Nessun campo: aggiungine uno</TableCell></TableRow>
+                                )}
+                                    </TableBody>
+                                </Table>
                             </div>
+                            <Button variant="outline" onClick={addField}><Plus className="mr-2 h-4 w-4" />Aggiungi campo</Button>
 
                             {/* Anteprima */}
                             {section.fields.length > 0 && (
@@ -452,17 +484,6 @@ export function SchedeVariantiContent({ embedded = false }: { embedded?: boolean
                                 </Card>
                             )}
 
-                            <div className="flex flex-wrap gap-2">
-                                <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => save(false)} disabled={saving || !dirty}>
-                                    {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                                    Salva scheda
-                                </Button>
-                                {selected.variantTemplate && (
-                                    <Button variant="outline" onClick={async () => { if (await confirmDialog("Rimuovere la scheda di questa tipologia? La variante tornerà a testo libero.")) save(true); }} disabled={saving}>
-                                        Rimuovi scheda
-                                    </Button>
-                                )}
-                            </div>
                         </div>
                     )}
                 </div>
