@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, Suspense } from "react";
+import { confirmDialog } from "@/components/ui/confirm-host";
 import { useRouter, useSearchParams } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -164,7 +165,7 @@ function LoadNotesContent() {
     const handleDelete = async (id: string, e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!confirm("Sei sicuro di voler eliminare questa nota?")) return;
+        if (!await confirmDialog("Sei sicuro di voler eliminare questa nota?")) return;
         try {
             await loadNotesService.delete(id);
             toast.success("Nota eliminata");
@@ -188,7 +189,7 @@ function LoadNotesContent() {
 
     const handleBulkDelete = async () => {
         if (selectedIds.size === 0) return;
-        if (!confirm(`Sei sicuro di voler eliminare ${selectedIds.size} nota${selectedIds.size > 1 ? "e" : ""}?`)) return;
+        if (!await confirmDialog(`Sei sicuro di voler eliminare ${selectedIds.size} nota${selectedIds.size > 1 ? "e" : ""}?`)) return;
         try {
             await Promise.all([...selectedIds].map(id => loadNotesService.delete(id)));
             toast.success(`${selectedIds.size} nota${selectedIds.size > 1 ? "e eliminate" : " eliminata"}`);

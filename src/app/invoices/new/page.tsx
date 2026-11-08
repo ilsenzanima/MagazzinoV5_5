@@ -1,6 +1,7 @@
 "use client";
 
 import { notify } from "@/lib/notify";
+import { confirmDialog } from "@/components/ui/confirm-host";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 import { Button } from "@/components/ui/button";
@@ -174,7 +175,7 @@ export default function NewInvoicePage() {
         // Importo stampato sulla fattura: se non coincide con le bolle si chiede conferma
         const printed = parseFloat(printedTotal.replace(",", "."));
         if (!isNaN(printed) && Math.abs(printed - totalAmount) > 0.01) {
-            if (!confirm(`Il totale delle bolle (${formatCurrency(totalAmount)}) è diverso dall'importo in fattura (${formatCurrency(printed)}). Salvare comunque?`)) return;
+            if (!await confirmDialog(`Il totale delle bolle (${formatCurrency(totalAmount)}) è diverso dall'importo in fattura (${formatCurrency(printed)}). Salvare comunque?`)) return;
         }
 
         // Tutto o niente: se un passo fallisce si annulla quanto già fatto

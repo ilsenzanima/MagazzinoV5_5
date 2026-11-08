@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { confirmDialog } from "@/components/ui/confirm-host";
 import { useParams, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -370,7 +371,7 @@ export default function InventoryDetailPage() {
   };
 
   const handleDeleteSupplierCode = async (codeId: string) => {
-    if (!confirm("Eliminare questo codice?")) return;
+    if (!await confirmDialog("Eliminare questo codice?")) return;
     try {
       await inventorySupplierCodesApi.delete(codeId);
       setSupplierCodes(supplierCodes.filter(c => c.id !== codeId));
@@ -413,7 +414,7 @@ export default function InventoryDetailPage() {
 
   const handleRemoveImage = async () => {
     if (!item || !item.image) return;
-    if (!confirm("Sei sicuro di voler rimuovere l'immagine dell'articolo?")) return;
+    if (!await confirmDialog("Sei sicuro di voler rimuovere l'immagine dell'articolo?")) return;
 
     try {
       await inventoryApi.update(item.id, { image: "" });
@@ -442,7 +443,7 @@ export default function InventoryDetailPage() {
   // Handle Reset Real Quantity
   const handleResetRealQty = async () => {
     if (!item) return;
-    if (!confirm("Vuoi resettare la verifica inventario?")) return;
+    if (!await confirmDialog("Vuoi resettare la verifica inventario?")) return;
 
     try {
       await inventoryApi.update(item.id, { realQuantity: null });

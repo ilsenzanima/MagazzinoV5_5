@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react";
+import { confirmDialog } from "@/components/ui/confirm-host";
 import { ArrowDown, ArrowUp, Check, Loader2, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { NotchTabs, NotchHelp } from "@/components/ui/notch-tabs";
@@ -56,8 +57,8 @@ export default function SchedeVariantiPage() {
     // La sezione in modifica: un sottotipo oppure la scheda stessa
     const section: VariantSection = activeSub ?? template;
 
-    const select = (t: ItemType) => {
-        if (dirty && !confirm("Ci sono modifiche non salvate. Cambiare tipologia?")) return;
+    const select = async (t: ItemType) => {
+        if (dirty && !await confirmDialog("Ci sono modifiche non salvate. Cambiare tipologia?")) return;
         setSelectedId(t.id);
         setTemplate(t.variantTemplate ? clone(t.variantTemplate) : clone(EMPTY_TEMPLATE));
         setSubIndex(0);
@@ -88,14 +89,14 @@ export default function SchedeVariantiPage() {
     };
 
     // ── Sottotipi ───────────────────────────────────────────────────────────
-    const toggleSubtypes = (on: boolean) => {
+    const toggleSubtypes = async (on: boolean) => {
         if (on) {
             const first: VariantSubtype = { key: "sottotipo_1", label: "Sottotipo 1", pattern: template.pattern, fields: template.fields, coefficient: template.coefficient, packFromSheets: template.packFromSheets };
             update({ ...template, pattern: "", fields: [], coefficient: undefined, packFromSheets: undefined, subtypeLabel: template.subtypeLabel ?? "Tipo", subtypes: [first] });
             setSubIndex(0);
         } else {
             if (template.subtypes && template.subtypes.length > 1 &&
-                !confirm("Disattivando i sottotipi resta solo il primo. Continuare?")) return;
+                !await confirmDialog("Disattivando i sottotipi resta solo il primo. Continuare?")) return;
             const first = template.subtypes?.[0];
             const { subtypes: _s, subtypeLabel: _l, ...rest } = template;
             update({ ...rest, pattern: first?.pattern ?? "", fields: first?.fields ?? [], coefficient: first?.coefficient, packFromSheets: first?.packFromSheets });
@@ -110,8 +111,8 @@ export default function SchedeVariantiPage() {
         update({ ...template, subtypes: [...template.subtypes!, { key: `sottotipo_${n}`, label: `Sottotipo ${n}`, pattern: "", fields: [] }] });
         setSubIndex(template.subtypes!.length);
     };
-    const removeSubtype = () => {
-        if (!confirm(`Eliminare il sottotipo "${activeSub?.label}"?`)) return;
+    const removeSubtype = async () => {
+        if (!await confirmDialog(`Eliminare il sottotipo "${activeSub?.label}"?`)) return;
         update({ ...template, subtypes: template.subtypes!.filter((_, i) => i !== subIndex) });
         setSubIndex(0);
     };
@@ -457,7 +458,7 @@ export default function SchedeVariantiPage() {
                                     Salva scheda
                                 </Button>
                                 {selected.variantTemplate && (
-                                    <Button variant="outline" onClick={() => { if (confirm("Rimuovere la scheda di questa tipologia? La variante tornerà a testo libero.")) save(true); }} disabled={saving}>
+                                    <Button variant="outline" onClick={async () => { if (await confirmDialog("Rimuovere la scheda di questa tipologia? La variante tornerà a testo libero.")) save(true); }} disabled={saving}>
                                         Rimuovi scheda
                                     </Button>
                                 )}

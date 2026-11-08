@@ -1,6 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { confirmDialog } from "@/components/ui/confirm-host";
 import { Button } from "@/components/ui/button"
 import { FileText, Upload, Trash2, ExternalLink, Loader2, Camera } from "lucide-react"
 import { purchasesApi } from "@/lib/api"
@@ -103,7 +104,7 @@ export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isO
   };
 
   const handleDelete = async (index: number) => {
-    if (!confirm("Sei sicuro di voler eliminare questo documento?")) return;
+    if (!await confirmDialog("Sei sicuro di voler eliminare questo documento?")) return;
     try {
       setDeletingIndex(index);
       const removedUrl = documentUrls[index];

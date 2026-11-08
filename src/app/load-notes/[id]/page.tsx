@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react";
+import { confirmDialog } from "@/components/ui/confirm-host";
 import { useParams, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
@@ -64,7 +65,7 @@ export default function LoadNoteDetailPage() {
     };
 
     const handleDelete = async () => {
-        if (!confirm("Sei sicuro di voler eliminare questa nota?")) return;
+        if (!await confirmDialog("Sei sicuro di voler eliminare questa nota?")) return;
         try {
             await loadNotesService.delete(noteId);
             toast.success("Nota eliminata");

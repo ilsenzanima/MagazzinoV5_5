@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/components/auth-provider";
 import { ConnectionManager } from "@/components/ConnectionManager";
 import { Toaster } from "@/components/ui/toaster";
+import { ConfirmHost } from "@/components/ui/confirm-host";
 import { Toaster as SonnerToaster } from "sonner";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { RailHost } from "@/components/layout/RailSidebar";
@@ -68,6 +69,7 @@ export default function RootLayout({
             {children}
             <RailHost />
             <Toaster />
+            <ConfirmHost />
             <SonnerToaster richColors position="top-center" />
           </AuthProvider>
         </ThemeProvider>

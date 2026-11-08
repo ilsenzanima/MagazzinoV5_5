@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo } from "react"
+import { confirmDialog } from "@/components/ui/confirm-host";
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -317,7 +318,7 @@ export function ProposalDocuments({ proposalId }: Props) {
             notify.error("La cartella non e' vuota: sposta o elimina prima le foto")
             return
         }
-        if (!confirm(`Eliminare la cartella "${folder.name}"?`)) return
+        if (!await confirmDialog(`Eliminare la cartella "${folder.name}"?`)) return
         try {
             await proposalDocumentFoldersApi.delete(folder.id)
             await load()

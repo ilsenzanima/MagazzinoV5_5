@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react";
+import { confirmDialog } from "@/components/ui/confirm-host";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
@@ -184,7 +185,7 @@ export default function SupplierDetailPage() {
   };
 
   const handleDeleteContact = async (c: SupplierContact) => {
-    if (!confirm(`Eliminare il contatto ${c.name}?`)) return;
+    if (!await confirmDialog(`Eliminare il contatto ${c.name}?`)) return;
     try {
       await suppliersApi.deleteContact(c.id);
       setContacts(prev => prev.filter(x => x.id !== c.id));

@@ -255,7 +255,7 @@ function RailSidebar() {
         {/* Bolla della voce evidenziata */}
         <div
           ref={bubbleRef}
-          className="pointer-events-none absolute left-0 top-0 z-20 flex items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground shadow-[0_0_0_6px_var(--background)]"
+          className="pointer-events-none absolute left-0 top-0 z-20 flex items-center justify-center rounded-full bg-sidebar-accent text-sidebar-accent-foreground shadow-[0_0_0_6px_var(--background),0_6px_10px_rgba(0,0,0,0.4),inset_0_2px_3px_rgba(255,255,255,0.5),inset_0_-6px_9px_rgba(0,0,0,0.32)] [background-image:radial-gradient(circle_at_32%_24%,rgba(255,255,255,0.45),rgba(255,255,255,0)_58%)] [&_svg]:drop-shadow-[0_2px_2px_rgba(0,0,0,0.35)]"
           style={{ width: BUB, height: BUB }}
           aria-hidden="true"
         >

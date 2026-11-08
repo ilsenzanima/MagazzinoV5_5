@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { confirmDialog } from "@/components/ui/confirm-host";
 import { NotchTabs, NotchActions, NotchButton, NotchHelp } from "@/components/ui/notch-tabs";
 import {
     ArrowLeft,
@@ -101,8 +102,8 @@ export default function NewMovementContent({
                             type="button"
                             title="Elimina bozza"
                             aria-label="Elimina bozza"
-                            onClick={() => {
-                                if (window.confirm("Eliminare questa bozza? Non è ancora una bolla e il magazzino non cambia.")) form.handleDeleteDraft();
+                            onClick={async () => {
+                                if (await confirmDialog("Eliminare questa bozza? Non è ancora una bolla e il magazzino non cambia.")) form.handleDeleteDraft();
                             }}
                             disabled={form.loading || form.savingDraft}
                             className="px-2 text-red-600 [&_svg]:text-red-600"

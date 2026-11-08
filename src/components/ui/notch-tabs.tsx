@@ -241,7 +241,7 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
                 <path d={d} className="fill-slate-800 dark:fill-slate-700" />
               </svg>
               <div
-                className={cn("pointer-events-none absolute top-1 -ml-7 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition-colors [&_svg]:size-6", items[idx]?.bubbleClass ?? "bg-blue-600")}
+                className={cn("pointer-events-none absolute top-1 -ml-7 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-[0_6px_10px_rgba(0,0,0,0.4),inset_0_2px_3px_rgba(255,255,255,0.5),inset_0_-6px_9px_rgba(0,0,0,0.32)] [background-image:radial-gradient(circle_at_32%_24%,rgba(255,255,255,0.45),rgba(255,255,255,0)_58%)] transition-colors [&_svg]:size-6 [&_svg]:drop-shadow-[0_2px_2px_rgba(0,0,0,0.35)]", items[idx]?.bubbleClass ?? "bg-blue-600")}
                 style={{ left: cx }}
                 aria-hidden="true"
               >

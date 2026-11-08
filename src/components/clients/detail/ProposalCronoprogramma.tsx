@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { confirmDialog } from "@/components/ui/confirm-host";
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -80,7 +81,7 @@ export function ProposalCronoprogramma({ proposalId }: ProposalCronoprogrammaPro
     }
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Eliminare questa fase del cronoprogramma?")) return
+        if (!await confirmDialog("Eliminare questa fase del cronoprogramma?")) return
         try {
             await proposalTasksApi.delete(id)
             setIsFormOpen(false)

@@ -1,6 +1,7 @@
 "use client"
 
 import { notify } from "@/lib/notify";;
+import { confirmDialog } from "@/components/ui/confirm-host";
 
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -106,7 +107,7 @@ export function UsersAdmin() {
     };
 
     const handleDeleteUser = async (userId: string) => {
-        if (!confirm("Sei sicuro di voler eliminare questo utente?")) return;
+        if (!await confirmDialog("Sei sicuro di voler eliminare questo utente?")) return;
 
         try {
             await usersApi.delete(userId);
@@ -118,7 +119,7 @@ export function UsersAdmin() {
     };
 
     const handleRecoverPassword = async (email: string) => {
-        if (!confirm(`Inviare email di recupero password a ${email}?`)) return;
+        if (!await confirmDialog(`Inviare email di recupero password a ${email}?`)) return;
 
         try {
             const { error } = await supabase.auth.resetPasswordForEmail(email, {

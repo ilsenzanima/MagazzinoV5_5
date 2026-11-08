@@ -1,6 +1,7 @@
 "use client";
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { confirmDialog } from "@/components/ui/confirm-host";
 import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -277,7 +278,7 @@ export default function PurchaseDetailPage() {
             setIsHeaderJob(false);
             return;
         }
-        if (!confirm("Rimuovere la commessa dall'intestazione?")) return;
+        if (!await confirmDialog("Rimuovere la commessa dall'intestazione?")) return;
         await clearHeaderJob();
     };
 
@@ -800,7 +801,7 @@ export default function PurchaseDetailPage() {
     };
 
     const handleResetTransport = async () => {
-        if (!confirm("Rimuovere il trasporto applicato dalle righe per poter inserire un nuovo importo?")) return;
+        if (!await confirmDialog("Rimuovere il trasporto applicato dalle righe per poter inserire un nuovo importo?")) return;
         try {
             setApplyingTransport(true);
             await purchasesApi.reverseTransportOnItems(items);
@@ -1029,7 +1030,7 @@ export default function PurchaseDetailPage() {
                                                     type="button"
                                                     title="Annulla associazione con questo acquisto"
                                                     onClick={async () => {
-                                                        if (!confirm(`Annullare l'associazione con l'acquisto ${purchase.convertedPurchaseNumber}?`)) return;
+                                                        if (!await confirmDialog(`Annullare l'associazione con l'acquisto ${purchase.convertedPurchaseNumber}?`)) return;
                                                         try {
                                                             await purchasesApi.unlinkSourceOrder(purchase.id);
                                                             setPurchase(prev => prev ? { ...prev, convertedPurchaseId: null, convertedPurchaseNumber: null } : prev);
@@ -1066,7 +1067,7 @@ export default function PurchaseDetailPage() {
                                                     type="button"
                                                     title="Annulla associazione con questo ordine"
                                                     onClick={async () => {
-                                                        if (!confirm(`Annullare l'associazione con l'ordine ${order.deliveryNoteNumber}?`)) return;
+                                                        if (!await confirmDialog(`Annullare l'associazione con l'ordine ${order.deliveryNoteNumber}?`)) return;
                                                         try {
                                                             await purchasesApi.unlinkSourceOrder(order.id);
                                                             setSourceOrders(prev => prev.filter(o => o.id !== order.id));

@@ -1,6 +1,7 @@
 "use client"
 
 import { notify } from "@/lib/notify";;
+import { confirmDialog } from "@/components/ui/confirm-host";
 
 import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -201,7 +202,7 @@ export default function SettingsInventoryPage() {
     };
 
     const handleDeleteGroup = async (id: string) => {
-        if (!confirm("Sei sicuro di voler eliminare questo gruppo di fatturazione condivisa?")) return;
+        if (!await confirmDialog("Sei sicuro di voler eliminare questo gruppo di fatturazione condivisa?")) return;
         try {
             await supplierGroupsApi.delete(id);
             setSupplierGroups(prev => prev.filter(g => g.id !== id));
@@ -351,7 +352,7 @@ export default function SettingsInventoryPage() {
     };
 
     const handleDeleteBrand = async (id: string) => {
-        if (!confirm("Sei sicuro di voler eliminare questa marca?")) return;
+        if (!await confirmDialog("Sei sicuro di voler eliminare questa marca?")) return;
         try {
             await brandsApi.delete(id);
             setBrands(brands.filter(b => b.id !== id));
@@ -362,7 +363,7 @@ export default function SettingsInventoryPage() {
     };
 
     const handleDeleteType = async (id: string) => {
-        if (!confirm("Sei sicuro di voler eliminare questa tipologia?")) return;
+        if (!await confirmDialog("Sei sicuro di voler eliminare questa tipologia?")) return;
         try {
             await itemTypesApi.delete(id);
             setTypes(types.filter(t => t.id !== id));
@@ -388,7 +389,7 @@ export default function SettingsInventoryPage() {
     };
 
     const handleDeleteUnit = async (id: string) => {
-        if (!confirm("Sei sicuro di voler eliminare questa unità?")) return;
+        if (!await confirmDialog("Sei sicuro di voler eliminare questa unità?")) return;
         try {
             await unitsApi.delete(id);
             setUnits(units.filter(u => u.id !== id));
@@ -433,7 +434,7 @@ export default function SettingsInventoryPage() {
     };
 
     const handleDeleteWarehouse = async (id: string) => {
-        if (!confirm("Sei sicuro di voler eliminare questo magazzino?")) return;
+        if (!await confirmDialog("Sei sicuro di voler eliminare questo magazzino?")) return;
         try {
             await warehousesApi.delete(id);
             setWarehouses(warehouses.filter(w => w.id !== id));
@@ -485,7 +486,7 @@ export default function SettingsInventoryPage() {
     };
 
     const handleDeleteDocType = async (id: string) => {
-        if (!confirm("Sei sicuro di voler eliminare questo tipo di documento?")) return;
+        if (!await confirmDialog("Sei sicuro di voler eliminare questo tipo di documento?")) return;
         try {
             await proposalDocumentTypesApi.delete(id);
             setDocTypes(docTypes.filter(t => t.id !== id));
@@ -516,7 +517,7 @@ export default function SettingsInventoryPage() {
     };
 
     const handleDeleteComplianceDocType = async (id: string) => {
-        if (!confirm("Sei sicuro di voler eliminare questo tipo di documento?")) return;
+        if (!await confirmDialog("Sei sicuro di voler eliminare questo tipo di documento?")) return;
         try {
             await complianceDocumentTypesApi.delete(id);
             setComplianceDocTypes(complianceDocTypes.filter(t => t.id !== id));
@@ -568,7 +569,7 @@ export default function SettingsInventoryPage() {
     };
 
     const handleDeleteJobDocType = async (id: string) => {
-        if (!confirm("Sei sicuro di voler eliminare questo tipo di documento?")) return;
+        if (!await confirmDialog("Sei sicuro di voler eliminare questo tipo di documento?")) return;
         try {
             await jobSiteDocumentTypesApi.delete(id);
             setJobDocTypes(jobDocTypes.filter(t => t.id !== id));
@@ -620,7 +621,7 @@ export default function SettingsInventoryPage() {
     };
 
     const handleDeleteJobConformitaDocType = async (id: string) => {
-        if (!confirm("Sei sicuro di voler eliminare questo tipo di documento?")) return;
+        if (!await confirmDialog("Sei sicuro di voler eliminare questo tipo di documento?")) return;
         try {
             await jobConformitaDocumentTypesApi.delete(id);
             setJobConformitaDocTypes(jobConformitaDocTypes.filter(t => t.id !== id));

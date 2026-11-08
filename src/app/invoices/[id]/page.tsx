@@ -1,6 +1,7 @@
 "use client";
 
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import { confirmDialog } from "@/components/ui/confirm-host";
 import { Button } from "@/components/ui/button";
 import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -410,7 +411,7 @@ export default function InvoiceDetailPage() {
     const handleResetTransport = async (purchaseId: string) => {
         const purchase = invoice?.purchases?.find(p => p.id === purchaseId);
         if (!purchase?.items) return;
-        if (!confirm("Rimuovere il trasporto applicato dalle righe per poter inserire un nuovo importo?")) return;
+        if (!await confirmDialog("Rimuovere il trasporto applicato dalle righe per poter inserire un nuovo importo?")) return;
         try {
             setApplyingTransport(prev => ({ ...prev, [purchaseId]: true }));
             const items = purchase.items.map(i => ({
@@ -761,8 +762,8 @@ export default function InvoiceDetailPage() {
                                                                 <button
                                                                     title="Rimuovi collegamento bolla"
                                                                     className="text-red-400 hover:text-red-600"
-                                                                    onClick={() => {
-                                                                        if (!confirm(`Rimuovere il collegamento alla bolla "${p.deliveryNoteNumber || 'senza numero'}"?\nLa bolla non verrà eliminata, verrà solo scollegata da questa fattura.`)) return;
+                                                                    onClick={async () => {
+                                                                        if (!await confirmDialog(`Rimuovere il collegamento alla bolla "${p.deliveryNoteNumber || 'senza numero'}"?\nLa bolla non verrà eliminata, verrà solo scollegata da questa fattura.`)) return;
                                                                         setToRemove(prev => { const n = new Set(prev); n.add(p.id); return n; });
                                                                     }}
                                                                 >
