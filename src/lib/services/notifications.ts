@@ -2,8 +2,9 @@ import { supabase } from '@/lib/supabase';
 import { addYears, differenceInCalendarDays, format } from 'date-fns';
 import { NotificationPreferences } from './notification-preferences';
 import { costAnalysisApi, JobPriceAlertReason } from './cost-analysis';
+import { getAgendaDue, kindInfo, todayIso } from './agenda';
 
-export type AlertKind = 'out_of_stock' | 'low_stock' | 'course' | 'medical_exam' | 'job_price_missing' | 'backup';
+export type AlertKind = 'out_of_stock' | 'low_stock' | 'course' | 'medical_exam' | 'job_price_missing' | 'backup' | 'agenda';
 
 export interface AppAlert {
     id: string;
@@ -213,13 +214,33 @@ const getBackupAlerts = async (): Promise<AppAlert[]> => {
     }];
 };
 
+// Voci dell'agenda da ricordare: scadute, di oggi o dentro i giorni di preavviso scelti
+const getAgendaAlerts = async (): Promise<AppAlert[]> => {
+    const { reminders } = await getAgendaDue(supabase);
+    const today = todayIso();
+    return reminders.map(i => {
+        const last = i.endDate ?? i.date;
+        const overdue = last < today;
+        const days = differenceInCalendarDays(new Date(`${i.date}T12:00:00`), new Date(`${today}T12:00:00`));
+        const when = overdue ? 'scaduto' : i.date <= today ? 'oggi' : days === 1 ? 'domani' : `tra ${days} giorni`;
+        return {
+            id: `agenda-${i.id}`,
+            kind: 'agenda' as const,
+            title: i.title,
+            detail: `${kindInfo(i.kind).label} · ${when} (${format(new Date(`${i.date}T12:00:00`), 'dd/MM/yyyy')})${i.time ? ` ore ${i.time}` : ''}${i.location ? ` · ${i.location}` : ''}`,
+            href: '/agenda',
+            critical: overdue || i.date <= today,
+        };
+    });
+};
+
 export const notificationsApi = {
     // Calcola gli avvisi attivi in base alle preferenze dell'utente.
     // Se una sorgente fallisce le altre vengono comunque mostrate, ma `complete`
     // è false: in quel caso l'elenco non va usato per dedurre che un avviso è risolto.
     getAlerts: async (
         prefs: NotificationPreferences,
-        options: { includeJobPrices?: boolean; includeBackup?: boolean } = {}
+        options: { includeJobPrices?: boolean; includeBackup?: boolean; includeAgenda?: boolean } = {}
     ): Promise<{ alerts: AppAlert[]; complete: boolean }> => {
         const results = await Promise.allSettled([
             getStockAlerts(prefs),
@@ -227,6 +248,7 @@ export const notificationsApi = {
             prefs.expiringMedicalExams ? getMedicalExamAlerts() : Promise.resolve([]),
             options.includeJobPrices && prefs.jobPriceMissing ? getJobPriceAlerts() : Promise.resolve([]),
             options.includeBackup ? getBackupAlerts() : Promise.resolve([]),
+            options.includeAgenda ? getAgendaAlerts() : Promise.resolve([]),
         ]);
         return {
             alerts: results.flatMap(r => (r.status === 'fulfilled' ? r.value : [])),

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation"
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ComponentType } from "react"
 import {
   LayoutDashboard, Package, ClipboardList, BarChart3, Settings, ShoppingCart, Truck, Users, Building2, HardHat,
-  Calendar, FileText, ShieldCheck, GanttChartSquare, UserCircle, LogOut, Wrench, Briefcase,
+  Calendar, CalendarDays, FileText, ShieldCheck, GanttChartSquare, UserCircle, LogOut, Wrench, Briefcase,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -113,6 +113,7 @@ function RailSidebar() {
       { key: "cronoprogramma", label: "Cronoprogramma", icon: GanttChartSquare, href: "/cronoprogramma", active: is("/cronoprogramma") },
     ],
     ...(staff ? [[
+      { key: "agenda", label: "Agenda", icon: CalendarDays, href: "/agenda", active: is("/agenda") },
       { key: "compliance", label: "Gestione conformità", icon: ShieldCheck, href: "/compliance", active: is("/compliance") },
       { key: "guest-sites", label: "Cantieri ospiti", icon: Building2, href: "/guest-sites", active: is("/guest-sites") },
     ]] : []),

@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getMissingDays } from "@/lib/services/attendance-check";
+import { getAgendaDue } from "@/lib/services/agenda";
 import { DashboardClient } from "@/components/dashboard/DashboardClient";
 
 type PurchaseRow = { purchase_items: { price: number | null; quantity: number | null }[] | null };
@@ -98,8 +99,17 @@ export default async function DashboardPage() {
     missingAttendanceDays = 0;
   }
 
+  let agendaDue = 0;
+  try {
+    const due = await getAgendaDue(supabase);
+    agendaDue = due.reminders.length;
+  } catch {
+    agendaDue = 0;
+  }
+
   const todo = {
     missingAttendanceDays,
+    agendaDue,
     pendingLoadNotesCount: countOf(loadNotesResult),
     draftDDTCount: countOf(draftsCountResult),
     pendingProposalsCount: countOf(pendingProposalsResult),

@@ -38,6 +38,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Store,
+  CalendarDays,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -166,6 +167,12 @@ export function Sidebar({ className, onLinkClick, collapsed = false, onToggleCol
     },
     ...(userRole === "admin" || userRole === "operativo" ? [{
       items: [
+        {
+          label: "Agenda",
+          icon: CalendarDays,
+          href: "/agenda",
+          active: pathname === "/agenda",
+        },
         {
           label: "Gestione conformità",
           icon: ShieldCheck,

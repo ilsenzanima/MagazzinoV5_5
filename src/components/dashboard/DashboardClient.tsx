@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/components/auth-provider";
 import { formatCurrency } from "@/lib/utils/format";
 import {
-  Search, Loader2, Truck, ShoppingCart, Briefcase, FileText, AlertTriangle, FileEdit, Hourglass, ClipboardList, ChevronRight, CalendarX, type LucideIcon,
+  Search, Loader2, Truck, ShoppingCart, Briefcase, FileText, AlertTriangle, FileEdit, Hourglass, ClipboardList, ChevronRight, CalendarX, CalendarDays, type LucideIcon,
 } from "lucide-react";
 
 interface DashboardStats {
@@ -24,7 +24,7 @@ interface DashboardStats {
 
 interface DashboardClientProps {
   stats: DashboardStats;
-  todo: { draftDDTCount: number; pendingProposalsCount: number; pendingLoadNotesCount: number; missingAttendanceDays: number };
+  todo: { draftDDTCount: number; pendingProposalsCount: number; pendingLoadNotesCount: number; missingAttendanceDays: number; agendaDue: number };
 }
 
 // Saluto in base all'ora del giorno; di sera e di notte con una battuta
@@ -258,6 +258,9 @@ export const DashboardClient = memo(function DashboardClient({ stats, todo }: Da
                 <TodoRow href="/load-notes" icon={ClipboardList} text="Note di carico da processare" count={todo.pendingLoadNotesCount} alert />
                 <TodoRow href="/inventory?tab=low_stock" icon={AlertTriangle} text="Articoli sotto scorta minima" count={stats.lowStockCount} alert />
                 <TodoRow href="/movements" icon={FileEdit} text="Bozze di DDT da completare" count={todo.draftDDTCount} alert />
+                {(userRole === "admin" || userRole === "operativo") && (
+                  <TodoRow href="/agenda" icon={CalendarDays} text="Agenda: voci di oggi o da ricordare" count={todo.agendaDue} alert />
+                )}
                 {(userRole === "admin" || userRole === "operativo") && (
                   <TodoRow href="/attendance" icon={CalendarX} text="Giorni con presenze da segnare" count={todo.missingAttendanceDays} alert />
                 )}
