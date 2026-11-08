@@ -3,6 +3,7 @@
 import { notify } from "@/lib/notify";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ListPageHeader } from "@/components/ui/list-page-header";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { Loader2, FileText, Calendar, User, Paperclip } from "lucide-react";
@@ -89,7 +90,41 @@ function InvoicesContent() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {invoices.length > 0 && (
+            <div className="hidden overflow-hidden rounded-xl border bg-card shadow-sm md:block">
+              <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+                <TableHeader>
+                  <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                    <TableHead className="w-40 text-xs font-semibold uppercase tracking-wide text-slate-600">Fattura</TableHead>
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-slate-600">Fornitore</TableHead>
+                    <TableHead className="w-28 text-xs font-semibold uppercase tracking-wide text-slate-600">Data</TableHead>
+                    <TableHead className="w-32 text-xs font-semibold uppercase tracking-wide text-slate-600">Bolle collegate</TableHead>
+                    <TableHead className="w-32 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Importo</TableHead>
+                    <TableHead className="w-16 text-xs font-semibold uppercase tracking-wide text-slate-600">Allegato</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoices.map((invoice) => (
+                    <TableRow key={invoice.id} className="cursor-pointer" onClick={() => router.push(`/invoices/${invoice.id}`)}>
+                      <TableCell className="truncate py-1.5 font-medium">{invoice.invoiceNumber}</TableCell>
+                      <TableCell className="truncate py-1.5">{invoice.supplierName || 'Fornitore sconosciuto'}</TableCell>
+                      <TableCell className="whitespace-nowrap py-1.5">{new Date(invoice.invoiceDate).toLocaleDateString('it-IT')}</TableCell>
+                      <TableCell className="py-1.5">{invoice.purchases && invoice.purchases.length > 0 ? invoice.purchases.length : '—'}</TableCell>
+                      <TableCell className="py-1.5 text-right">
+                        {(userRole === 'admin' || userRole === 'operativo')
+                          ? (invoice.totalAmount !== undefined && invoice.totalAmount !== null ? formatCurrency(Number(invoice.totalAmount)) : '—')
+                          : <span className="text-xs italic text-slate-400">Riservato</span>}
+                      </TableCell>
+                      <TableCell className="py-1.5">
+                        {invoice.documentUrls && invoice.documentUrls.length > 0 ? <Paperclip className="h-4 w-4 text-violet-500" aria-label="Documento allegato" /> : <span className="text-slate-300">—</span>}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          <div className={`grid grid-cols-1 gap-4 ${invoices.length > 0 ? "md:hidden" : ""}`}>
             {invoices.length === 0 ? (
               <div className="col-span-full text-center py-10 text-slate-400 dark:text-slate-500">
                 <FileText className="h-12 w-12 mx-auto mb-2 opacity-20" />
