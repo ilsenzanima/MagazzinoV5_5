@@ -247,11 +247,11 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
 
   return (
     <SlotsCtx.Provider value={slots}>
-      <div ref={wrapRef} role="tablist" className={cn("relative w-full select-none max-md:overflow-hidden max-md:rounded-2xl max-md:bg-slate-800 max-md:shadow-md dark:max-md:bg-slate-700", className)}>
+      <div ref={wrapRef} role="tablist" className={cn("relative w-full select-none", className)}>
         <div
           className={cn(
             "flex items-center justify-between gap-2",
-            inline ? "pointer-events-none absolute inset-x-4 top-7 z-20 text-white" : "mb-1 text-slate-800 dark:text-slate-100 max-md:mb-0 max-md:px-4 max-md:pt-3 max-md:text-white"
+            inline ? "pointer-events-none absolute inset-x-4 top-7 z-20 text-white" : "mb-1 text-slate-800 dark:text-slate-100"
           )}
           style={inline ? { height: H } : undefined}
         >
@@ -262,7 +262,7 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
         <div className="relative mx-auto" style={{ height: H + 28, width: barW || undefined }}>
           {width > 0 && (
             <>
-              <svg className="absolute left-0 top-7 drop-shadow-md max-md:hidden" width={barW} height={H} aria-hidden="true">
+              <svg className="absolute left-0 top-7 drop-shadow-md" width={barW} height={H} aria-hidden="true">
                 <path d={d} className="fill-slate-800 dark:fill-slate-700" />
               </svg>
               <div
