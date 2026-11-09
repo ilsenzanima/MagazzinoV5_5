@@ -20,6 +20,9 @@ export interface NavSectionItem { key: string; label: string; icon?: ReactNode; 
 export interface NavSection { title: string; groups: { key: string; label: string; items: NavSectionItem[] }[] }
 
 interface Registry {
+  // Spazio nel menu delle azioni dove la pagina mette i pulsanti della sua fascia (sempre presente su telefono)
+  actionsSlot: HTMLElement | null
+  setActionsSlot: (el: HTMLElement | null) => void
   navSection: NavSection | null
   registerNavSection: (section: NavSection) => () => void
   actions: MobileAction[]
@@ -39,6 +42,7 @@ export function MobileActionsProvider({ children }: { children: ReactNode }) {
     setActions(prev => [...prev.filter(a => a.id !== action.id), action])
     return () => setActions(prev => prev.filter(a => a.id !== action.id))
   }, [])
+  const [actionsSlot, setActionsSlot] = useState<HTMLElement | null>(null)
   const [navSection, setNavSection] = useState<NavSection | null>(null)
   const registerNavSection = useCallback((section: NavSection) => {
     setNavSection(section)
@@ -51,8 +55,8 @@ export function MobileActionsProvider({ children }: { children: ReactNode }) {
     return () => setSearchInfo(null)
   }, [])
   const value = useMemo(
-    () => ({ actions, register, searchInfo, registerSearch, searchSlot, setSearchSlot, navSection, registerNavSection }),
-    [actions, register, searchInfo, registerSearch, searchSlot, navSection, registerNavSection]
+    () => ({ actions, register, searchInfo, registerSearch, searchSlot, setSearchSlot, navSection, registerNavSection, actionsSlot, setActionsSlot }),
+    [actions, register, searchInfo, registerSearch, searchSlot, navSection, registerNavSection, actionsSlot]
   )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

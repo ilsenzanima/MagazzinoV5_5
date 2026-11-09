@@ -9,7 +9,7 @@ import {
     Package, QrCode, Search, Settings, ShieldCheck, ShoppingCart, Store, Truck, Users, Wrench, X, Zap, HardHat, LayoutGrid,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
-import { useRegisteredActions, useRegisteredNavSection } from "./mobile-actions";
+import { useMobileSearch, useRegisteredActions, useRegisteredNavSection } from "./mobile-actions";
 import { MobileSearchSheet } from "./MobileSearchSheet";
 import { NotificationBell } from "./NotificationBell";
 
@@ -54,6 +54,26 @@ export function MobileNavBar() {
     const { user, signOut, userRole, fullName } = useAuth();
     const pageActions = useRegisteredActions();
     const navSection = useRegisteredNavSection();
+    const mobile = useMobileSearch();
+    const actionsSlot = mobile?.actionsSlot ?? null;
+    const [slotCount, setSlotCount] = useState(0);
+
+    // Pulsanti della fascia della pagina: contati per il badge, e il menu si chiude dopo aver premuto un pulsante semplice
+    useEffect(() => {
+        if (!actionsSlot) return;
+        const count = () => setSlotCount(actionsSlot.children.length);
+        count();
+        const mo = new MutationObserver(count);
+        mo.observe(actionsSlot, { childList: true });
+        const onClick = (e: Event) => {
+            const t = e.target as HTMLElement | null;
+            if (!t?.closest("button,a")) return;
+            if (t.closest("[aria-haspopup],[role=combobox],input,select,label")) return;
+            setDialOpen(false);
+        };
+        actionsSlot.addEventListener("click", onClick);
+        return () => { mo.disconnect(); actionsSlot.removeEventListener("click", onClick); };
+    }, [actionsSlot]);
     const [navOpen, setNavOpen] = useState(false);
     const [dialOpen, setDialOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
@@ -101,33 +121,37 @@ export function MobileNavBar() {
                 <>
                     <button type="button" aria-label="Chiudi" onClick={() => { setDialOpen(false); setNavOpen(false); setSearchOpen(false); }}
                         className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-[1px] animate-in fade-in duration-200 lg:hidden" />
-                    {dialOpen && <div className="fixed inset-x-0 z-50 max-h-[calc(100dvh-13rem)] overflow-y-auto px-4 py-1 scrollbar-hide lg:hidden"
-                        style={{ bottom: "calc(6.5rem + env(safe-area-inset-bottom))" }}>
-                        <ul className="mx-auto flex max-w-sm flex-col-reverse gap-3">
-                            {dial.map((a, i) => {
-                                const inner = (
-                                    <span className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3">
-                                        <span className="justify-self-end rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-800 shadow-md">{a.label}</span>
-                                        <span className={cn("grid h-12 w-12 place-items-center rounded-full text-white shadow-lg [&_svg]:h-5 [&_svg]:w-5", a.page ? "bg-blue-600" : "bg-slate-700")}>{a.icon}</span>
-                                        <span />
-                                    </span>
-                                );
-                                const cls = "block w-full animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards duration-200";
-                                const style = { animationDelay: `${i * 35}ms` };
-                                return (
-                                    <li key={a.key}>
-                                        {a.href ? (
-                                            <Link href={a.href} prefetch={false} onClick={() => setDialOpen(false)} className={cls} style={style}>{inner}</Link>
-                                        ) : (
-                                            <button type="button" className={cls} style={style} onClick={() => { setDialOpen(false); a.onClick?.(); }}>{inner}</button>
-                                        )}
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    </div>}
                 </>
             )}
+
+            {/* Menu flottante: sempre montato, cosi' i pulsanti della pagina restano al loro posto */}
+            <div className={cn("fixed inset-x-0 z-50 max-h-[calc(100dvh-13rem)] overflow-y-auto px-4 py-1 scrollbar-hide lg:hidden", !dialOpen && "hidden")}
+                style={{ bottom: "calc(6.5rem + env(safe-area-inset-bottom))" }}>
+                <div className="mx-auto flex max-w-sm flex-col-reverse gap-3">
+                    <div ref={mobile?.setActionsSlot} className="flex flex-col items-center gap-2 empty:hidden" />
+                    <ul className="flex flex-col-reverse gap-3">
+                        {dial.map((a, i) => {
+                            const inner = (
+                                <span className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3">
+                                    <span className="justify-self-end rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-800 shadow-md">{a.label}</span>
+                                    <span className={cn("grid h-12 w-12 place-items-center rounded-full text-white shadow-lg [&_svg]:h-5 [&_svg]:w-5", a.page ? "bg-blue-600" : "bg-slate-700")}>{a.icon}</span>
+                                    <span />
+                                </span>
+                            );
+                            const cls = "block w-full";
+                            return (
+                                <li key={a.key}>
+                                    {a.href ? (
+                                        <Link href={a.href} prefetch={false} onClick={() => setDialOpen(false)} className={cls}>{inner}</Link>
+                                    ) : (
+                                        <button type="button" className={cls} onClick={() => { setDialOpen(false); a.onClick?.(); }}>{inner}</button>
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+            </div>
 
             {/* Barra: fascia scura con incavo al centro che accoglie il cerchio */}
             <div className="fixed inset-x-0 bottom-0 z-50 lg:hidden">
@@ -220,9 +244,9 @@ export function MobileNavBar() {
                         <span className={cn("transition-transform duration-200", dialOpen && "rotate-90")}>
                             {dialOpen ? <X className="h-6 w-6" /> : <Zap className="h-6 w-6" />}
                         </span>
-                        {!dialOpen && pageActions.length > 0 && (
+                        {!dialOpen && pageActions.length + slotCount > 0 && (
                             <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                                {pageActions.length}
+                                {pageActions.length + slotCount}
                             </span>
                         )}
                     </button>

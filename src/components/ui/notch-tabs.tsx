@@ -7,7 +7,7 @@ import { Search, Menu, Check } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { HelpTip } from "@/components/ui/help-tip"
-import { PhoneSearchPortal, usePhone } from "@/components/layout/mobile-actions"
+import { PhoneSearchPortal, usePhone, useMobileSearch } from "@/components/layout/mobile-actions"
 
 export interface NotchTabItem {
   value: string
@@ -218,7 +218,10 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
 
   const sideMax = inline ? Math.max(0, sideRoom - 24) : undefined
   const { d, cx } = barGeometry(barW, x)
-  const slots: Slots = { actions: actionsEl, help: helpEl, title: typeof title === "string" ? title : undefined }
+  const phone = usePhone()
+  const mobile = useMobileSearch()
+  // Telefono: i pulsanti della fascia stanno nel tasto centrale della barra in basso
+  const slots: Slots = { actions: phone && mobile?.actionsSlot ? mobile.actionsSlot : actionsEl, help: helpEl, title: typeof title === "string" ? title : undefined }
   const titleBlock = (
     <div className="pointer-events-auto flex min-w-0 items-center gap-1" style={{ maxWidth: items.length ? sideMax : undefined }}>
       <span className="truncate text-sm font-semibold uppercase tracking-wide">{title}</span>
