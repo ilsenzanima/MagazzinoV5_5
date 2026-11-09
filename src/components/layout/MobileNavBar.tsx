@@ -9,7 +9,7 @@ import {
     Package, QrCode, Search, Settings, ShieldCheck, ShoppingCart, Store, Truck, Users, Wrench, X, Zap, HardHat, LayoutGrid,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
-import { useRegisteredActions } from "./mobile-actions";
+import { useRegisteredActions, useRegisteredNavSection } from "./mobile-actions";
 import { MobileSearchSheet } from "./MobileSearchSheet";
 import { NotificationBell } from "./NotificationBell";
 
@@ -53,6 +53,7 @@ export function MobileNavBar() {
     const pathname = usePathname();
     const { user, signOut, userRole, fullName } = useAuth();
     const pageActions = useRegisteredActions();
+    const navSection = useRegisteredNavSection();
     const [navOpen, setNavOpen] = useState(false);
     const [dialOpen, setDialOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
@@ -100,8 +101,8 @@ export function MobileNavBar() {
                 <>
                     <button type="button" aria-label="Chiudi" onClick={() => { setDialOpen(false); setNavOpen(false); setSearchOpen(false); }}
                         className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-[1px] animate-in fade-in duration-200 lg:hidden" />
-                    {dialOpen && <div className="fixed inset-x-0 z-50 max-h-[calc(100dvh-14rem)] overflow-y-auto px-4 py-1 scrollbar-hide lg:hidden"
-                        style={{ bottom: "calc(7.5rem + env(safe-area-inset-bottom))" }}>
+                    {dialOpen && <div className="fixed inset-x-0 z-50 max-h-[calc(100dvh-13rem)] overflow-y-auto px-4 py-1 scrollbar-hide lg:hidden"
+                        style={{ bottom: "calc(6.5rem + env(safe-area-inset-bottom))" }}>
                         <ul className="mx-auto flex max-w-sm flex-col-reverse gap-3">
                             {dial.map((a, i) => {
                                 const inner = (
@@ -132,7 +133,30 @@ export function MobileNavBar() {
             <div className="fixed inset-x-0 bottom-0 z-50 lg:hidden">
                 {/* Menu Naviga: la fascia stessa che sale, stessa tinta della barra */}
                 {navOpen && (
-                    <div className="relative -mb-[22px] max-h-[calc(100dvh-9rem)] overflow-y-auto overscroll-contain rounded-t-3xl bg-slate-800 px-4 pb-[34px] pt-5 text-slate-100 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] animate-in slide-in-from-bottom-6 fade-in duration-200">
+                    <div className="relative -mb-[38px] max-h-[calc(100dvh-9rem)] overflow-y-auto overscroll-contain rounded-t-3xl bg-slate-800 px-4 pb-[50px] pt-5 text-slate-100 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] animate-in slide-in-from-bottom-6 fade-in duration-200">
+                        {navSection && (
+                            <div className="mb-4 space-y-3">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{navSection.title}</p>
+                                {navSection.groups.map(group => (
+                                    <div key={group.key}>
+                                        <p className="mb-1.5 text-[11px] font-medium text-slate-400">{group.label}</p>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {group.items.map(item => (
+                                                <button key={item.key} type="button" onClick={() => { item.onSelect(); setNavOpen(false); }}
+                                                    className={cn(
+                                                        "flex min-h-[64px] flex-col items-center justify-center gap-1.5 rounded-lg border px-1 py-2 text-center text-[11px] font-medium leading-tight active:scale-[0.97] [&_svg]:h-5 [&_svg]:w-5",
+                                                        item.active ? "border-blue-500 bg-blue-600 text-white" : "border-slate-600 bg-slate-700/60 text-slate-100 [&_svg]:text-blue-400"
+                                                    )}>
+                                                    {item.icon}
+                                                    <span>{item.label}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                                <div className="border-t border-slate-700 pt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Pagine</div>
+                            </div>
+                        )}
                         {shownRecents.length > 0 && (
                             <div className="mb-4">
                                 <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -188,11 +212,11 @@ export function MobileNavBar() {
                     </button>
 
                     <svg width="96" height="64" viewBox="0 0 96 64" className="-mx-px shrink-0 fill-slate-800" aria-hidden="true">
-                        <path d="M0,0 C16,0 20,22 48,22 C76,22 80,0 96,0 V64 H0 Z" />
+                        <path d="M0,0 C13,0 16,38 48,38 C80,38 83,0 96,0 V64 H0 Z" />
                     </svg>
 
                     <button type="button" onClick={() => { setNavOpen(false); setSearchOpen(false); setDialOpen(o => !o); }} aria-label={dialOpen ? "Chiudi le azioni" : "Azioni"} aria-expanded={dialOpen}
-                        className={cn("absolute left-1/2 top-0 grid h-14 w-14 -translate-x-1/2 -translate-y-[38px] place-items-center rounded-full bg-blue-600 text-white shadow-lg ring-4 ring-slate-800/10 transition-all active:scale-95", (navOpen || searchOpen) && "pointer-events-none scale-50 opacity-0")}>
+                        className={cn("absolute left-1/2 top-0 grid h-14 w-14 -translate-x-1/2 -translate-y-[22px] place-items-center rounded-full bg-blue-600 text-white shadow-lg ring-4 ring-slate-800/10 transition-all active:scale-95", (navOpen || searchOpen) && "pointer-events-none scale-50 opacity-0")}>
                         <span className={cn("transition-transform duration-200", dialOpen && "rotate-90")}>
                             {dialOpen ? <X className="h-6 w-6" /> : <Zap className="h-6 w-6" />}
                         </span>

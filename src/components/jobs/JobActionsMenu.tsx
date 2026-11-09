@@ -16,6 +16,7 @@ import { useAuth } from "@/components/auth-provider"
 import { notify } from "@/lib/notify"
 import { JobPortalDialog } from "@/components/guest-sites/JobPortalDialog"
 import { JobCategorySelector } from "@/components/jobs/JobCategorySelector"
+import { useMobileActions } from "@/components/layout/mobile-actions"
 
 const todayIso = () => {
   const d = new Date()
@@ -107,10 +108,22 @@ export function JobActionsMenu({ job, onJobUpdated, onDownloadDocumentation, dow
     }
   }
 
-  if (userRole !== 'admin' && userRole !== 'operativo') return null
+  const canAct = userRole === 'admin' || userRole === 'operativo'
+
+  // Telefono: le azioni della commessa stanno nel tasto centrale della barra in basso
+  useMobileActions(canAct ? [
+    { label: "Modifica", icon: <Pencil />, onClick: handleEditClick },
+    { label: "Portale ospiti", icon: <QrCode />, onClick: () => { setPortalReason("manual"); setPortalOpen(true) } },
+    { label: "Nuovo inizio cantiere", icon: <RefreshCcw />, onClick: () => router.push(`/jobs/new?clone=${job.id}`) },
+    { label: downloading ? (downloadLabel || "Preparazione...") : "Scarica documentazione", icon: <Archive />, onClick: () => { if (!downloading) onDownloadDocumentation() } },
+    { label: "Elimina commessa", icon: <Trash2 />, onClick: () => setIsDeleteDialogOpen(true) },
+  ] : [])
+
+  if (!canAct) return null
 
   return (
     <>
+      <div className="hidden lg:block">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="gap-2 px-2 md:px-3" aria-label="Azioni della commessa">
@@ -145,6 +158,7 @@ export function JobActionsMenu({ job, onJobUpdated, onDownloadDocumentation, dow
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      </div>
 
       {/* Edit Dialog */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>

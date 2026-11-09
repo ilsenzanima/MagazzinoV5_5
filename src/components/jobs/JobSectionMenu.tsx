@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react"
 import { ChevronDown, Menu } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { HelpTip } from "@/components/ui/help-tip"
+import { useMobileNavSection } from "@/components/layout/mobile-actions"
 
 export interface SectionMenuItem {
     key: string
@@ -37,7 +38,18 @@ export function JobSectionMenu({ groups, activeKey, onSelect }: JobSectionMenuPr
     const activeGroup = groups.find(g => g.items.some(i => i.key === activeKey))
     const activeItem = activeGroup?.items.find(i => i.key === activeKey)
 
+    // Telefono: le pagine della commessa stanno in cima al menu «Naviga» della barra in basso
+    useMobileNavSection({
+        title: "In questa pagina",
+        groups: groups.map(g => ({
+            key: g.key,
+            label: g.label,
+            items: g.items.map(i => ({ key: i.key, label: i.label, icon: i.icon, active: i.key === activeKey, onSelect: () => onSelect(g.key, i.key) })),
+        })),
+    })
+
     return (
+        <div className="hidden lg:block">
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
                 <button
@@ -99,5 +111,6 @@ export function JobSectionMenu({ groups, activeKey, onSelect }: JobSectionMenuPr
                 </div>
             </PopoverContent>
         </Popover>
+        </div>
     )
 }

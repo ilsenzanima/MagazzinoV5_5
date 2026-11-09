@@ -89,7 +89,7 @@ export function MobileSearchSheet({ onClose }: { onClose: () => void }) {
 
   // Pannello che sale dalla barra: stessa tinta scura, il tasto Cerca diventa Chiudi
   return (
-    <div className="relative -mb-[22px] flex max-h-[calc(100dvh-9rem)] flex-col gap-3 rounded-t-3xl bg-slate-800 px-3 pb-[34px] pt-4 text-slate-100 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] animate-in slide-in-from-bottom-6 fade-in duration-200">
+    <div className="relative -mb-[38px] flex max-h-[calc(100dvh-9rem)] flex-col gap-3 rounded-t-3xl bg-slate-800 px-3 pb-[50px] pt-4 text-slate-100 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] animate-in slide-in-from-bottom-6 fade-in duration-200">
       {pageSearch && (
         <div className="flex gap-2">
           <button type="button" className={chip(tab === "page")} onClick={() => setTab("page")}>{pageSearch.title}</button>
