@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { ChevronLeft, Search } from "lucide-react";
-import { useNotchSlots, NestedStripCtx, NotchTabs } from "@/components/ui/notch-tabs";
+import { useNotchSlots, NestedStripCtx, NotchTabs, NotchSearch, NotchActions } from "@/components/ui/notch-tabs";
 import { useContext, useEffect } from "react";
 import { useMobileSearch, usePhone } from "@/components/layout/mobile-actions";
 import { Button } from "@/components/ui/button";
@@ -85,6 +85,16 @@ export function ListPageHeader({ title, actions, search, searchActions, children
         ) : null;
         // Ogni pagina ha in alto la fascia scura con il titolo (se non sta già dentro una fascia)
         return <>{slot ? null : <NotchTabs title={title} />}{searchBody}</>;
+    }
+    // Pagina con fascia (non unita a un'altra): stessa fascia di tutte le pagine, con ricerca e filtri a destra
+    if (strip && !merged) {
+        return (
+            <NotchTabs title={title}>
+                {search && <NotchSearch value={search.value} onChange={search.onChange} placeholder={search.placeholder} />}
+                {searchActions && <NotchActions>{searchActions}</NotchActions>}
+                {children}
+            </NotchTabs>
+        );
     }
     return (
         <>
