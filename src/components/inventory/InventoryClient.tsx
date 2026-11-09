@@ -404,7 +404,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         searchActions={
           <>
         {anyFilterActive && (
-          <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-200 hover:bg-slate-700 hover:text-white md:inline-flex" onClick={() => { setSelectedBrand("all"); setSelectedType("all"); setSelectedWarehouse("all"); setActiveTab("all"); setPage(1); }}>
+          <Button variant="ghost" className="shrink-0 text-xs text-slate-600 hover:bg-slate-700 hover:text-white md:text-slate-200" onClick={() => { setSelectedBrand("all"); setSelectedType("all"); setSelectedWarehouse("all"); setActiveTab("all"); setPage(1); }}>
             Azzera filtri
           </Button>
         )}

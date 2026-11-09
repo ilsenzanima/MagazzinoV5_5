@@ -283,7 +283,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
         )}
         search={{ id: "jobs-search", label: "Cerca commessa", value: searchTerm, onChange: setSearchTerm, placeholder: "Cerca Commessa (Codice, Nome, CIG, CUP, Indirizzo...)" }}
         searchActions={anyFilterActive && (
-          <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex md:text-slate-200 md:hover:bg-slate-700 md:hover:text-white" onClick={resetFilters}>
+          <Button variant="ghost" className="shrink-0 text-xs text-slate-600 md:text-slate-200 md:hover:bg-slate-700 md:hover:text-white" onClick={resetFilters}>
             Azzera filtri
           </Button>
         )}

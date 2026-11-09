@@ -321,7 +321,7 @@ function ProposalsPageContent() {
         )}
         search={{ id: "proposals-search", label: "Cerca offerte", value: search, onChange: (v) => { setSearch(v); setPage(1); }, placeholder: "Cerca per titolo, committente, città, descrizione..." }}
         searchActions={anyFilterActive && (
-          <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex md:text-slate-200 md:hover:bg-slate-700 md:hover:text-white" onClick={resetFilters}>
+          <Button variant="ghost" className="shrink-0 text-xs text-slate-600 md:text-slate-200 md:hover:bg-slate-700 md:hover:text-white" onClick={resetFilters}>
             Azzera filtri
           </Button>
         )}

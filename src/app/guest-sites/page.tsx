@@ -294,7 +294,7 @@ function GuestSitesContent() {
                     <>
                         {checkSelect("hidden w-56 shrink-0 border-none bg-slate-100 dark:bg-muted md:flex md:rounded-full md:bg-white md:dark:bg-white md:text-slate-800")}
                         {anyFilterActive && (
-                            <Button variant="ghost" className="hidden shrink-0 text-xs text-slate-600 md:inline-flex md:text-slate-200 md:hover:bg-slate-700 md:hover:text-white" onClick={resetFilters}>
+                            <Button variant="ghost" className="shrink-0 text-xs text-slate-600 md:text-slate-200 md:hover:bg-slate-700 md:hover:text-white" onClick={resetFilters}>
                                 Azzera filtri
                             </Button>
                         )}

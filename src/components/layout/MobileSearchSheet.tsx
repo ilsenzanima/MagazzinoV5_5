@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { ChevronRight, Loader2, Search } from "lucide-react"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
+import { useMobileSearch } from "./mobile-actions"
 
 interface Hit { cat: string; id: string; title: string; subtitle?: string; href: string }
 interface Category { key: string; label: string }
@@ -12,12 +13,24 @@ interface Category { key: string; label: string }
 // Ricerca unica da telefono: scrivi e i risultati compaiono divisi per categoria, i chip restringono a una sola
 export function MobileSearchSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const router = useRouter()
+  const mobile = useMobileSearch()
+  const pageSearch = mobile?.searchInfo ?? null
+  // Se la pagina ha una sua ricerca si parte da quella, altrimenti dalla ricerca su tutto
+  const [tab, setTab] = useState<"page" | "all">("all")
   const [query, setQuery] = useState("")
   const [cat, setCat] = useState<string | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [results, setResults] = useState<Hit[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
+
+  // Ogni apertura parte dalla ricerca della pagina, se c'e'
+  useEffect(() => {
+    if (open) setTab(pageSearch ? "page" : "all")
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!pageSearch) setTab("all")
+  }, [pageSearch])
 
   // Ogni apertura riparte pulita
   useEffect(() => {
@@ -81,6 +94,26 @@ export function MobileSearchSheet({ open, onOpenChange }: { open: boolean; onOpe
           <SheetDescription>Cerca articoli, commesse, operai, committenti e altro</SheetDescription>
         </SheetHeader>
 
+        {pageSearch && (
+          <div className="flex gap-2 border-b p-4 pb-3 pr-12">
+            <button type="button" className={chip(tab === "page")} onClick={() => setTab("page")}>{pageSearch.title}</button>
+            <button type="button" className={chip(tab === "all")} onClick={() => setTab("all")}>Cerca ovunque</button>
+          </div>
+        )}
+
+        {tab === "page" && pageSearch ? (
+          <>
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4">
+              <div ref={mobile?.setSearchSlot} />
+            </div>
+            <div className="border-t p-3">
+              <button type="button" onClick={() => onOpenChange(false)} className="h-11 w-full rounded-full bg-blue-600 text-sm font-semibold text-white active:bg-blue-700">
+                Mostra i risultati
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
         <div className="space-y-3 border-b p-4 pr-12">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -145,6 +178,8 @@ export function MobileSearchSheet({ open, onOpenChange }: { open: boolean; onOpe
             </section>
           ))}
         </div>
+          </>
+        )}
       </SheetContent>
     </Sheet>
   )

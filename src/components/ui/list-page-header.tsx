@@ -4,7 +4,8 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { ChevronLeft, Search } from "lucide-react";
 import { useNotchSlots, NestedStripCtx } from "@/components/ui/notch-tabs";
-import { useContext } from "react";
+import { useContext, useEffect, useSyncExternalStore } from "react";
+import { useMobileSearch } from "@/components/layout/mobile-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,12 +30,36 @@ interface ListPageHeaderProps {
     strip?: boolean;
 }
 
+// Telefono: sotto i 768 px
+const PHONE_QUERY = "(max-width: 767px)";
+function usePhone() {
+    return useSyncExternalStore(
+        (cb) => {
+            const mq = window.matchMedia(PHONE_QUERY);
+            mq.addEventListener("change", cb);
+            return () => mq.removeEventListener("change", cb);
+        },
+        () => window.matchMedia(PHONE_QUERY).matches,
+        () => false
+    );
+}
+
 // Intestazione standard delle pagine con un elenco: riquadro fisso in alto con titolo e barra di ricerca
 export function ListPageHeader({ title, actions, search, searchActions, children, strip }: ListPageHeaderProps) {
     const { actions: slot } = useNotchSlots();
     const nested = useContext(NestedStripCtx);
     // Dentro una pagina unita da PC: niente seconda striscia, ricerca e filtri vanno nella striscia di sopra
     const merged = !!(strip && slot);
+    // Telefono: niente intestazione in pagina. Ricerca e filtri passano nel pannello «Cerca» della barra in basso
+    // (i pulsanti «nuovo» sono gia' nel pannello «Azioni»)
+    const phone = usePhone();
+    const mobile = useMobileSearch();
+    const registerSearch = mobile?.registerSearch;
+    const hasSearchBody = !!(search || searchActions || children);
+    useEffect(() => {
+        if (!phone || !registerSearch || !hasSearchBody) return;
+        return registerSearch({ title });
+    }, [phone, registerSearch, hasSearchBody, title]);
     const mergedSearch = merged && (search || searchActions) ? createPortal(
         <div className="hidden items-center gap-2 md:flex">
             {search && (
@@ -48,6 +73,31 @@ export function ListPageHeader({ title, actions, search, searchActions, children
         </div>,
         slot!
     ) : null;
+    if (phone && mobile) {
+        return mobile.searchSlot ? createPortal(
+            <div className="space-y-3">
+                {search && (
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Label htmlFor={search.id} className="sr-only">{search.label}</Label>
+                        <Input
+                            id={search.id}
+                            name="search"
+                            type="search"
+                            autoComplete="off"
+                            placeholder={search.placeholder}
+                            className="h-11 rounded-full border-slate-300 bg-white pl-9 text-base dark:bg-slate-800"
+                            value={search.value}
+                            onChange={(e) => search.onChange(e.target.value)}
+                        />
+                    </div>
+                )}
+                {searchActions && <div className="flex flex-wrap gap-2">{searchActions}</div>}
+                {children}
+            </div>,
+            mobile.searchSlot
+        ) : null;
+    }
     return (
         <>
         {mergedSearch}
