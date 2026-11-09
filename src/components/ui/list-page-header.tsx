@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { ChevronLeft, Search } from "lucide-react";
-import { useNotchSlots, NestedStripCtx } from "@/components/ui/notch-tabs";
+import { useNotchSlots, NestedStripCtx, NotchTabs } from "@/components/ui/notch-tabs";
 import { useContext, useEffect, useSyncExternalStore } from "react";
 import { useMobileSearch } from "@/components/layout/mobile-actions";
 import { Button } from "@/components/ui/button";
@@ -74,7 +74,7 @@ export function ListPageHeader({ title, actions, search, searchActions, children
         slot!
     ) : null;
     if (phone && mobile) {
-        return mobile.searchSlot ? createPortal(
+        const searchBody = mobile.searchSlot ? createPortal(
             <div className="space-y-3">
                 {search && (
                     <div className="relative">
@@ -97,6 +97,8 @@ export function ListPageHeader({ title, actions, search, searchActions, children
             </div>,
             mobile.searchSlot
         ) : null;
+        // Ogni pagina ha in alto la fascia scura con il titolo (se non sta già dentro una fascia)
+        return <>{slot ? null : <NotchTabs title={title} />}{searchBody}</>;
     }
     return (
         <>

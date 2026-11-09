@@ -476,7 +476,7 @@ export default function DashboardLayout({
           {children}
         </main>
 
-        <MobileNavBar renderNavigation={(close) => <Sidebar onLinkClick={close} />} />
+        <MobileNavBar />
       </div>
     </div>
     </MobileActionsProvider>

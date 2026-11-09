@@ -1,168 +1,220 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ComponentType, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { History, Menu, Package, QrCode, FileText, Search, Zap } from "lucide-react";
+import {
+    Building2, CalendarDays, Calendar, ClipboardList, FileText, History, LayoutDashboard, LogOut,
+    Package, QrCode, Search, Settings, ShieldCheck, ShoppingCart, Store, Truck, Users, Wrench, X, Zap, HardHat, LayoutGrid,
+} from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useAuth } from "@/components/auth-provider";
 import { useRegisteredActions } from "./mobile-actions";
 import { MobileSearchSheet } from "./MobileSearchSheet";
+import { NotificationBell } from "./NotificationBell";
 
-interface MobileNavBarProps {
-    // Contenuto del pannello «Naviga» (l'elenco delle pagine); riceve la funzione per chiuderlo
-    renderNavigation: (close: () => void) => ReactNode;
+interface NavItem {
+    label: string;
+    href: string;
+    icon: ComponentType<{ className?: string }>;
+    staff?: boolean;  // solo admin e operativo
+    admin?: boolean;  // solo admin
 }
 
-// Pagine che compaiono tra le ultime aperte (prima parte dell'indirizzo → nome)
-const RECENT_LABELS: Record<string, string> = {
-    "/inventory": "Inventario",
-    "/purchases": "Acquisti",
-    "/movements": "Movimentazione",
-    "/load-notes": "Note di Carico",
-    "/workers": "Operai",
-    "/attendance": "Presenze",
-    "/cronoprogramma": "Cronoprogramma",
-    "/agenda": "Agenda",
-    "/jobs": "Commesse",
-    "/clients": "Committenti",
-    "/suppliers": "Fornitori",
-    "/proposals": "Offerte generali",
-    "/invoices": "Fatture",
-    "/reports": "Report",
-    "/compliance": "Conformità",
-    "/guest-sites": "Cantieri Ospiti",
-};
+// Pagine del pannello «Naviga» da telefono
+const NAV_ITEMS: NavItem[] = [
+    { label: "Home", href: "/dashboard", icon: LayoutDashboard },
+    { label: "Inventario", href: "/inventory", icon: Package },
+    { label: "Acquisti", href: "/purchases", icon: ShoppingCart },
+    { label: "Movimentazione", href: "/movements", icon: Truck },
+    { label: "Note di Carico", href: "/load-notes", icon: ClipboardList },
+    { label: "Presenze", href: "/attendance", icon: Calendar },
+    { label: "Agenda", href: "/agenda", icon: CalendarDays, staff: true },
+    { label: "Conformità", href: "/compliance", icon: ShieldCheck, staff: true },
+    { label: "Cantieri Ospiti", href: "/guest-sites", icon: Building2, staff: true },
+    { label: "Commesse", href: "/jobs", icon: HardHat },
+    { label: "Committenti", href: "/clients", icon: Users },
+    { label: "Fornitori", href: "/suppliers", icon: Store, staff: true },
+    { label: "Impostazioni", href: "/settings", icon: Settings },
+    { label: "Strumenti admin", href: "/strumenti", icon: Wrench, admin: true },
+];
 const RECENT_KEY = "mobile-recent-pages";
 
+// Azioni sempre disponibili dal tasto centrale
 const GLOBAL_ACTIONS = [
-    { label: "Nuovo movimento", href: "/movements/new", icon: <Package className="h-5 w-5" /> },
+    { label: "Nuovo movimento", href: "/movements/new", icon: <Truck className="h-5 w-5" /> },
     { label: "Scansiona / Inventario", href: "/inventory", icon: <QrCode className="h-5 w-5" /> },
     { label: "Nuova nota di carico", href: "/load-notes/new", icon: <FileText className="h-5 w-5" /> },
 ];
 
-function readRecents(): string[] {
-    try {
-        const parsed = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
-        return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === "string" && p in RECENT_LABELS) : [];
-    } catch {
-        return [];
-    }
-}
+const baseOf = (path: string | null) => "/" + (path?.split("/")[1] ?? "");
 
-export function MobileNavBar({ renderNavigation }: MobileNavBarProps) {
+export function MobileNavBar() {
     const pathname = usePathname();
+    const { user, signOut, userRole, fullName } = useAuth();
     const pageActions = useRegisteredActions();
     const [navOpen, setNavOpen] = useState(false);
-    const [actionsOpen, setActionsOpen] = useState(false);
+    const [dialOpen, setDialOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
     const [recents, setRecents] = useState<string[]>([]);
 
-    // Ricorda le ultime pagine aperte (solo quelle principali)
+    const staff = userRole === "admin" || userRole === "operativo";
+    const items = NAV_ITEMS.filter(i => (!i.staff || staff) && (!i.admin || userRole === "admin"));
+    const labelOf = (base: string) => NAV_ITEMS.find(i => i.href === base)?.label;
+
+    const readRecents = (): string[] => {
+        try {
+            const parsed = JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
+            return Array.isArray(parsed) ? parsed.filter((p): p is string => typeof p === "string" && !!labelOf(p)) : [];
+        } catch {
+            return [];
+        }
+    };
+
+    // Ricorda le ultime pagine aperte (solo quelle del menu) e chiude il menu flottante
     useEffect(() => {
-        const base = "/" + (pathname?.split("/")[1] ?? "");
-        if (!(base in RECENT_LABELS)) return;
+        setDialOpen(false);
+        const base = baseOf(pathname);
+        if (!labelOf(base)) return;
         const next = [base, ...readRecents().filter(p => p !== base)].slice(0, 6);
         try { localStorage.setItem(RECENT_KEY, JSON.stringify(next)); } catch { /* spazio non disponibile */ }
-    }, [pathname]);
+    }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    useEffect(() => { if (navOpen) setRecents(readRecents()); }, [navOpen]);
+    useEffect(() => { if (navOpen) setRecents(readRecents()); }, [navOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const current = "/" + (pathname?.split("/")[1] ?? "");
-    const shownRecents = recents.filter(p => p !== current).slice(0, 4);
+    const current = baseOf(pathname);
+    const shownRecents = recents.filter(p => p !== current && items.some(i => i.href === p)).slice(0, 4);
 
-    const barButton = "flex h-full w-full flex-col items-center justify-center space-y-1 text-slate-500 transition-colors hover:text-slate-700 active:text-blue-600 dark:text-slate-400 dark:hover:text-slate-300";
-    const rowCls = "flex w-full items-center gap-3 rounded-xl border bg-card px-4 py-3 text-left text-sm font-medium shadow-sm active:bg-slate-100 dark:active:bg-slate-800 [&_svg]:h-5 [&_svg]:w-5 [&_svg]:shrink-0 [&_svg]:text-blue-600";
+    // Menu flottante: prima le azioni della pagina, poi quelle sempre disponibili (senza doppioni)
+    const dial: { key: string; label: string; href?: string; onClick?: () => void; icon: ReactNode; page: boolean }[] = [
+        ...pageActions.map(a => ({ key: a.id, label: a.label, href: a.href, onClick: a.onClick, icon: a.icon ?? <Zap className="h-5 w-5" />, page: true })),
+        ...GLOBAL_ACTIONS.filter(g => !pageActions.some(a => a.href === g.href)).map(g => ({ key: g.href, label: g.label, href: g.href, onClick: undefined, icon: g.icon, page: false })),
+    ];
+
+    const sideButton = "flex h-full flex-1 flex-col items-center justify-center gap-1 text-slate-300 transition-colors active:text-white";
 
     return (
         <>
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-white dark:bg-slate-900 border-t dark:border-slate-800 z-50 flex items-center justify-around px-2 pb-safe-area-bottom shadow-[0_-1px_3px_rgba(0,0,0,0.05)]">
-                {/* Naviga */}
-                <button type="button" onClick={() => setNavOpen(true)} className={barButton} aria-label="Naviga tra le pagine">
-                    <Menu className="h-5 w-5" />
-                    <span className="text-[10px] font-medium">Naviga</span>
-                </button>
+            {/* Menu flottante delle azioni */}
+            {dialOpen && (
+                <>
+                    <button type="button" aria-label="Chiudi le azioni" onClick={() => setDialOpen(false)}
+                        className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-[1px] animate-in fade-in duration-200 lg:hidden" />
+                    <div className="fixed inset-x-0 z-50 max-h-[calc(100dvh-14rem)] overflow-y-auto px-4 py-1 scrollbar-hide lg:hidden"
+                        style={{ bottom: "calc(7.5rem + env(safe-area-inset-bottom))" }}>
+                        <ul className="mx-auto flex max-w-sm flex-col-reverse gap-3">
+                            {dial.map((a, i) => {
+                                const inner = (
+                                    <span className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3">
+                                        <span className="justify-self-end rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-800 shadow-md">{a.label}</span>
+                                        <span className={cn("grid h-12 w-12 place-items-center rounded-full text-white shadow-lg [&_svg]:h-5 [&_svg]:w-5", a.page ? "bg-blue-600" : "bg-slate-700")}>{a.icon}</span>
+                                        <span />
+                                    </span>
+                                );
+                                const cls = "block w-full animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards duration-200";
+                                const style = { animationDelay: `${i * 35}ms` };
+                                return (
+                                    <li key={a.key}>
+                                        {a.href ? (
+                                            <Link href={a.href} prefetch={false} onClick={() => setDialOpen(false)} className={cls} style={style}>{inner}</Link>
+                                        ) : (
+                                            <button type="button" className={cls} style={style} onClick={() => { setDialOpen(false); a.onClick?.(); }}>{inner}</button>
+                                        )}
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </div>
+                </>
+            )}
 
-                {/* Azioni (centrale) */}
-                <div className="relative -top-5">
-                    <button
-                        type="button"
-                        onClick={() => setActionsOpen(true)}
-                        aria-label="Azioni"
-                        className="relative grid h-14 w-14 place-items-center rounded-full border-4 border-slate-50 bg-blue-600 text-white shadow-lg active:bg-blue-700 dark:border-background"
-                    >
-                        <Zap className="h-6 w-6" />
-                        {pageActions.length > 0 && (
-                            <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+            {/* Barra: fascia scura con incavo al centro che accoglie il cerchio */}
+            <div className="fixed inset-x-0 bottom-0 z-50 lg:hidden">
+                <div className="relative flex h-16 items-stretch">
+                    <button type="button" onClick={() => { setDialOpen(false); setNavOpen(true); }} className={cn(sideButton, "bg-slate-800")} aria-label="Naviga tra le pagine">
+                        <LayoutGrid className="h-5 w-5" />
+                        <span className="text-[10px] font-medium">Naviga</span>
+                    </button>
+
+                    <svg width="96" height="64" viewBox="0 0 96 64" className="-mx-px shrink-0 fill-slate-800" aria-hidden="true">
+                        <path d="M0,0 C16,0 20,22 48,22 C76,22 80,0 96,0 V64 H0 Z" />
+                    </svg>
+
+                    <button type="button" onClick={() => { setDialOpen(o => !o); }} aria-label={dialOpen ? "Chiudi le azioni" : "Azioni"} aria-expanded={dialOpen}
+                        className="absolute left-1/2 top-0 grid h-14 w-14 -translate-x-1/2 -translate-y-[38px] place-items-center rounded-full bg-blue-600 text-white shadow-lg ring-4 ring-slate-800/10 transition-transform active:scale-95">
+                        <span className={cn("transition-transform duration-200", dialOpen && "rotate-90")}>
+                            {dialOpen ? <X className="h-6 w-6" /> : <Zap className="h-6 w-6" />}
+                        </span>
+                        {!dialOpen && pageActions.length > 0 && (
+                            <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
                                 {pageActions.length}
                             </span>
                         )}
                     </button>
-                </div>
 
-                {/* Cerca */}
-                <button type="button" onClick={() => setSearchOpen(true)} className={barButton} aria-label="Cerca">
-                    <Search className="h-5 w-5" />
-                    <span className="text-[10px] font-medium">Cerca</span>
-                </button>
+                    <button type="button" onClick={() => { setDialOpen(false); setSearchOpen(true); }} className={cn(sideButton, "bg-slate-800")} aria-label="Cerca">
+                        <Search className="h-5 w-5" />
+                        <span className="text-[10px] font-medium">Cerca</span>
+                    </button>
+                </div>
+                <div className="bg-slate-800" style={{ height: "env(safe-area-inset-bottom)" }} />
             </div>
 
-            {/* Pannello Naviga */}
+            {/* Pannello Naviga: schede in griglia */}
             <Sheet open={navOpen} onOpenChange={setNavOpen}>
-                <SheetContent side="bottom" className="flex h-[85dvh] flex-col gap-0 rounded-t-2xl border-sidebar-border bg-sidebar p-0 text-sidebar-foreground">
+                <SheetContent side="bottom" className="flex max-h-[88dvh] flex-col gap-0 rounded-t-2xl border-sidebar-border bg-sidebar p-0 text-sidebar-foreground">
                     <SheetHeader className="sr-only">
                         <SheetTitle>Naviga</SheetTitle>
-                        <SheetDescription>Tutte le pagine dell&apos;applicazione</SheetDescription>
+                        <SheetDescription>Pagine dell&apos;applicazione</SheetDescription>
                     </SheetHeader>
-                    {shownRecents.length > 0 && (
-                        <div className="border-b border-sidebar-border px-4 pb-3 pt-4 pr-12">
-                            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/60">
-                                <History className="h-3.5 w-3.5" /> Ultime aperte
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                                {shownRecents.map(p => (
-                                    <Link key={p} href={p} prefetch={false} onClick={() => setNavOpen(false)}
-                                        className="rounded-full bg-sidebar-accent px-3 py-1.5 text-sm text-sidebar-accent-foreground">
-                                        {RECENT_LABELS[p]}
-                                    </Link>
-                                ))}
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pt-5">
+                        {shownRecents.length > 0 && (
+                            <div className="mb-4 pr-8">
+                                <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/60">
+                                    <History className="h-3.5 w-3.5" /> Ultime aperte
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                    {shownRecents.map(p => (
+                                        <Link key={p} href={p} prefetch={false} onClick={() => setNavOpen(false)}
+                                            className="rounded-full bg-sidebar-accent px-3 py-1.5 text-sm text-sidebar-accent-foreground">
+                                            {labelOf(p)}
+                                        </Link>
+                                    ))}
+                                </div>
                             </div>
+                        )}
+                        <div className="grid grid-cols-3 gap-2.5">
+                            {items.map(item => {
+                                const active = current === item.href;
+                                return (
+                                    <Link key={item.href} href={item.href} prefetch={false} onClick={() => setNavOpen(false)}
+                                        className={cn(
+                                            "flex min-h-[84px] flex-col items-center justify-center gap-2 rounded-xl border px-1.5 py-3 text-center text-xs font-medium leading-tight transition-colors active:scale-[0.97]",
+                                            active
+                                                ? "border-blue-400/60 bg-sidebar-accent text-sidebar-accent-foreground"
+                                                : "border-sidebar-border bg-sidebar-accent/30 text-sidebar-foreground/85 active:bg-sidebar-accent"
+                                        )}>
+                                        <item.icon className={cn("h-6 w-6", active ? "text-blue-400" : "text-sidebar-foreground/70")} />
+                                        <span>{item.label}</span>
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    {user && (
+                        <div className="flex items-center gap-2 border-t border-sidebar-border p-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
+                            <Link href="/settings/profile" prefetch={false} onClick={() => setNavOpen(false)} className="min-w-0 flex-1 rounded-md px-2 py-1">
+                                <p className="truncate text-sm font-medium">{fullName || user.email}</p>
+                                <p className="text-xs capitalize text-sidebar-foreground/60">{userRole || "User"}</p>
+                            </Link>
+                            <NotificationBell onNavigate={() => setNavOpen(false)} />
+                            <button type="button" onClick={() => signOut()} aria-label="Esci"
+                                className="grid h-9 w-9 place-items-center rounded-md text-sidebar-foreground/70 active:bg-sidebar-accent">
+                                <LogOut className="h-4 w-4" />
+                            </button>
                         </div>
                     )}
-                    <div className="min-h-0 flex-1">{renderNavigation(() => setNavOpen(false))}</div>
-                </SheetContent>
-            </Sheet>
-
-            {/* Pannello Azioni */}
-            <Sheet open={actionsOpen} onOpenChange={setActionsOpen}>
-                <SheetContent side="bottom" className="max-h-[85dvh] gap-0 overflow-y-auto rounded-t-2xl p-0">
-                    <SheetHeader className="border-b p-4 pr-12 text-left">
-                        <SheetTitle>Azioni</SheetTitle>
-                        <SheetDescription className="sr-only">Azioni della pagina e azioni rapide</SheetDescription>
-                    </SheetHeader>
-                    <div className="space-y-5 p-4 pb-8">
-                        {pageActions.length > 0 && (
-                            <section className="space-y-2">
-                                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">In questa pagina</h3>
-                                {pageActions.map(a => {
-                                    const content = <>{a.icon ?? <Zap />}<span className="min-w-0 flex-1 truncate">{a.label}</span></>;
-                                    return a.href ? (
-                                        <Link key={a.id} href={a.href} prefetch={false} onClick={() => setActionsOpen(false)} className={rowCls}>{content}</Link>
-                                    ) : (
-                                        <button key={a.id} type="button" className={rowCls} onClick={() => { setActionsOpen(false); a.onClick?.(); }}>{content}</button>
-                                    );
-                                })}
-                            </section>
-                        )}
-                        <section className="space-y-2">
-                            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sempre disponibili</h3>
-                            {GLOBAL_ACTIONS.map(a => (
-                                <Link key={a.href} href={a.href} prefetch={false} onClick={() => setActionsOpen(false)} className={rowCls}>
-                                    {a.icon}<span className="min-w-0 flex-1 truncate">{a.label}</span>
-                                </Link>
-                            ))}
-                        </section>
-                    </div>
                 </SheetContent>
             </Sheet>
 
