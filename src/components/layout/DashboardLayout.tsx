@@ -44,6 +44,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
 import { createContext, useContext, useEffect, useState } from "react";
 import { MobileNavBar } from "./MobileNavBar";
+import { MobileActionsProvider } from "./mobile-actions";
 import { NotificationBell } from "./NotificationBell";
 import { inventoryApi } from "@/lib/services/inventory";
 import { useRailRequest } from "./RailSidebar";
@@ -417,7 +418,6 @@ export default function DashboardLayout({
 }) {
   const { session, loading, userRole, realRole, simulatedRole, setSimulatedRole } = useAuth();
   const router = useRouter();
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const nested = useContext(LayoutContext);
   useRailRequest(!nested && !!session);
 
@@ -444,6 +444,7 @@ export default function DashboardLayout({
 
   return (
     <LayoutContext.Provider value={true}>
+    <MobileActionsProvider>
     <div className="page-texture flex min-h-screen bg-background">
       {/* Simulation Banner */}
       {simulatedRole && (
@@ -471,24 +472,14 @@ export default function DashboardLayout({
         simulatedRole ? "pt-10" : ""
       )}>
 
-        {/* Mobile Sidebar Sheet (Controlled by Bottom Nav Action) */}
-        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-          <SheetContent side="left" className="p-0 bg-sidebar border-r-sidebar-border text-sidebar-foreground w-64">
-            <SheetHeader className="sr-only">
-              <SheetTitle>Menu di Navigazione</SheetTitle>
-              <SheetDescription>Navigazione principale dell'applicazione</SheetDescription>
-            </SheetHeader>
-            <Sidebar onLinkClick={() => setIsSheetOpen(false)} />
-          </SheetContent>
-        </Sheet>
-
         <main className="flex-1 p-2 lg:p-8 lg:pt-[66px] overflow-y-auto overflow-x-hidden min-w-0 scrollbar-hide">
           {children}
         </main>
 
-        <MobileNavBar onOpenMenu={() => setIsSheetOpen(true)} />
+        <MobileNavBar renderNavigation={(close) => <Sidebar onLinkClick={close} />} />
       </div>
     </div>
+    </MobileActionsProvider>
     </LayoutContext.Provider>
   );
 }

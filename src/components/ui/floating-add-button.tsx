@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
+import { useMobileActions } from "@/components/layout/mobile-actions";
 
 interface FloatingAddAction {
     // Un link oppure, in alternativa, un'azione (es. apre una finestra)
@@ -20,14 +21,20 @@ interface FloatingAddButtonProps {
     actions?: FloatingAddAction[];
     // Icona al posto del +
     icon?: ReactNode;
-    // Visibile anche su telefono (in basso a destra, sopra la barra di navigazione)
+    // Non piu' usato: su telefono le azioni vanno nel pannello «Azioni»
     showOnMobile?: boolean;
 }
 
-// Pulsante «aggiungi» sempre visibile in basso a destra (solo da PC): tondo con il +,
+// Pulsante «aggiungi» sempre visibile in basso a destra (da PC; su telefono diventa una voce del pannello Azioni): tondo con il +,
 // passandoci sopra si allarga e compare la scritta per intero (o, con più azioni, si divide in tante voci)
-export function FloatingAddButton({ href, onClick, label, actions, icon, showOnMobile }: FloatingAddButtonProps) {
-    const vis = showOnMobile ? "flex max-md:bottom-24 max-md:right-4" : "hidden md:flex";
+export function FloatingAddButton({ href, onClick, label, actions, icon }: FloatingAddButtonProps) {
+    // Su telefono e tablet il pulsante non c'e': le sue azioni stanno nel pannello «Azioni» della barra in basso
+    useMobileActions(
+        actions && actions.length > 0
+            ? actions.map(a => ({ label: a.label, href: a.href, onClick: a.onClick, icon }))
+            : [{ label: label ?? "Nuovo", href, onClick, icon }]
+    );
+    const vis = "hidden lg:flex";
     if (actions && actions.length > 0) {
         return (
             <div
