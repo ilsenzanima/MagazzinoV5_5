@@ -3,10 +3,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 // Giorni lavorativi con presenze da segnare.
 // Un giorno e' «da segnare» se almeno un operaio controllato (attivo e con attendance_check) ha, in quel giorno,
 // un totale di ore segnate inferiore a 8 (qualsiasi stato conta: presenza, ferie, malattia, permesso...).
-// Si guardano i giorni lavorativi (lun-ven, senza festivita' nazionali) degli ultimi `daysBack` giorni, oggi escluso.
+// Si guardano i giorni lavorativi (lun-ven, senza festivita' nazionali) degli ultimi `daysBack` giorni; oggi conta solo dalle 17 in poi.
 
 export const REQUIRED_DAILY_HOURS = 8;
 export const DEFAULT_DAYS_BACK = 30;
+export const TODAY_CUTOFF_HOUR = 17; // dalle 17 (ora italiana) anche la giornata di oggi risulta «da segnare»
 
 export interface MissingDay {
     date: string; // yyyy-MM-dd
@@ -50,10 +51,13 @@ export async function getMissingDays(client: SupabaseClient, daysBack = DEFAULT_
     if (wErr) throw wErr;
     if (!workers || workers.length === 0) return [];
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Ora e data in Italia (il server gira in UTC): da CUTOFF_HOUR in poi conta anche oggi
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' }).formatToParts(new Date());
+    const get = (t: string) => Number(parts.find(p => p.type === t)?.value);
+    const today = new Date(get('year'), get('month') - 1, get('day'));
+    const startOffset = get('hour') >= TODAY_CUTOFF_HOUR ? 0 : 1;
     const days: Date[] = [];
-    for (let i = 1; i <= daysBack; i++) {
+    for (let i = startOffset; i <= daysBack; i++) {
         const d = new Date(today);
         d.setDate(d.getDate() - i);
         if (isWorkingDay(d)) days.push(d);
