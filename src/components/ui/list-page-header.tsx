@@ -4,8 +4,8 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { ChevronLeft, Search } from "lucide-react";
 import { useNotchSlots, NestedStripCtx, NotchTabs } from "@/components/ui/notch-tabs";
-import { useContext, useEffect, useSyncExternalStore } from "react";
-import { useMobileSearch } from "@/components/layout/mobile-actions";
+import { useContext, useEffect } from "react";
+import { useMobileSearch, usePhone } from "@/components/layout/mobile-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,20 +28,6 @@ interface ListPageHeaderProps {
     children?: React.ReactNode;
     // Da tablet in su: striscia scura con titolo a sinistra e ricerca a destra (come le pagine della commessa)
     strip?: boolean;
-}
-
-// Telefono: sotto i 768 px
-const PHONE_QUERY = "(max-width: 767px)";
-function usePhone() {
-    return useSyncExternalStore(
-        (cb) => {
-            const mq = window.matchMedia(PHONE_QUERY);
-            mq.addEventListener("change", cb);
-            return () => mq.removeEventListener("change", cb);
-        },
-        () => window.matchMedia(PHONE_QUERY).matches,
-        () => false
-    );
 }
 
 // Intestazione standard delle pagine con un elenco: riquadro fisso in alto con titolo e barra di ricerca

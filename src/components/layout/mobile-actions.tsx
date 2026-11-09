@@ -1,6 +1,7 @@
 "use client"
 
-import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 
 // Un'azione della pagina che su telefono compare nel pannello «Azioni» della barra in basso
 export interface MobileAction {
@@ -77,4 +78,32 @@ export function useMobileActions(list: Omit<MobileAction, "id">[]) {
     )
     return () => cleanups.forEach(c => c())
   }, [register, baseId, signature])
+}
+
+// Telefono: sotto i 768 px
+const PHONE_QUERY = "(max-width: 767px)"
+export function usePhone() {
+  return useSyncExternalStore(
+    (cb) => {
+      const mq = window.matchMedia(PHONE_QUERY)
+      mq.addEventListener("change", cb)
+      return () => mq.removeEventListener("change", cb)
+    },
+    () => window.matchMedia(PHONE_QUERY).matches,
+    () => false
+  )
+}
+
+// Su telefono porta il contenuto (ricerca, filtri) nel pannello «Cerca» della barra in basso e non lo mostra nella pagina.
+// Da tablet in su non mostra nulla: la pagina ha gia' la sua ricerca nella fascia.
+export function PhoneSearchPortal({ title, children }: { title: string; children: ReactNode }) {
+  const phone = usePhone()
+  const ctx = useContext(Ctx)
+  const registerSearch = ctx?.registerSearch
+  useEffect(() => {
+    if (!phone || !registerSearch) return
+    return registerSearch({ title })
+  }, [phone, registerSearch, title])
+  if (!phone || !ctx?.searchSlot) return null
+  return createPortal(<div className="space-y-3">{children}</div>, ctx.searchSlot)
 }

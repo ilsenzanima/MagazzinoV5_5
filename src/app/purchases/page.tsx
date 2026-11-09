@@ -1,5 +1,6 @@
 "use client";
 
+import { PhoneSearchPortal } from "@/components/layout/mobile-actions";
 import { notify } from "@/lib/notify";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -214,8 +215,8 @@ function PurchasesPageContent() {
       >
         <NotchSearch value={searchTerm} onChange={setSearchTerm} placeholder="Cerca per numero, fornitore, commessa, articolo... (virgola = OR)" />
 
-        {/* Telefono: fornitore */}
-        <div className="mb-4 md:hidden">
+        {/* Telefono: fornitore, nel pannello Cerca */}
+        <PhoneSearchPortal title="Acquisti">
           <SearchableSelect
             options={[{ value: "all", label: "Tutti i fornitori" }, ...suppliers.map(s => ({ value: s.id, label: s.name }))]}
             value={supplierId}
@@ -223,7 +224,7 @@ function PurchasesPageContent() {
             placeholder="Fornitore"
             searchPlaceholder="Scrivi per cercare fornitore..."
           />
-        </div>
+        </PhoneSearchPortal>
 
 
       {loading ? (

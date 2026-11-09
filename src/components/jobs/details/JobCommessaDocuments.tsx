@@ -1,5 +1,6 @@
 "use client"
 
+import { PhoneSearchPortal } from "@/components/layout/mobile-actions";
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -845,10 +846,12 @@ export function JobCommessaDocuments({ jobId, jobLabel }: JobCommessaDocumentsPr
               </div>
 
               {/* Telefono: filtri */}
-              <div className="grid grid-cols-2 gap-2 md:hidden">
-                {typeSelect()}
-                {folderSelect()}
-              </div>
+              <PhoneSearchPortal title="Documenti">
+                <div className="grid grid-cols-2 gap-2">
+                  {typeSelect()}
+                  {folderSelect()}
+                </div>
+              </PhoneSearchPortal>
 
               {/* Tabella (PC) */}
               <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">

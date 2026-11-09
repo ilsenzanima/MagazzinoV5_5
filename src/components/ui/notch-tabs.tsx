@@ -7,6 +7,7 @@ import { Search, Menu, Check } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { HelpTip } from "@/components/ui/help-tip"
+import { PhoneSearchPortal, usePhone } from "@/components/layout/mobile-actions"
 
 export interface NotchTabItem {
   value: string
@@ -61,7 +62,7 @@ function barGeometry(w: number, x: number) {
   return { d, cx }
 }
 
-interface Slots { actions: HTMLElement | null; help: HTMLElement | null }
+interface Slots { actions: HTMLElement | null; help: HTMLElement | null; title?: string }
 const SlotsCtx = createContext<Slots>({ actions: null, help: null })
 // Per le pagine che stanno dentro una pagina unita: leggono gli spazi della striscia (ricerca e pulsanti vanno lì)
 export const useNotchSlots = () => useContext(SlotsCtx)
@@ -87,7 +88,26 @@ export function NotchButton({ className, ...props }: React.ComponentProps<typeof
 
 // Barra di ricerca a destra nella striscia. Fuori da <NotchTabs> resta una normale casella di ricerca nella pagina.
 export function NotchSearch({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
-  const { actions } = useContext(SlotsCtx)
+  const { actions, title } = useContext(SlotsCtx)
+  const phone = usePhone()
+  // Telefono: la ricerca sta nel pannello «Cerca» della barra in basso, non nella pagina
+  if (phone) {
+    return (
+      <PhoneSearchPortal title={title ?? "Questa pagina"}>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="search"
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            placeholder={placeholder}
+            aria-label={placeholder}
+            className="h-11 w-full rounded-full border border-slate-300 bg-white pl-10 pr-4 text-base text-slate-800 outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
+      </PhoneSearchPortal>
+    )
+  }
   const field = (
     <div className={actions ? "relative w-52 max-w-full" : "relative min-w-[12rem] flex-1 sm:max-w-xs"}>
       <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
@@ -198,7 +218,7 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
 
   const sideMax = inline ? Math.max(0, sideRoom - 24) : undefined
   const { d, cx } = barGeometry(barW, x)
-  const slots: Slots = { actions: actionsEl, help: helpEl }
+  const slots: Slots = { actions: actionsEl, help: helpEl, title: typeof title === "string" ? title : undefined }
   const titleBlock = (
     <div className="pointer-events-auto flex min-w-0 items-center gap-1" style={{ maxWidth: items.length ? sideMax : undefined }}>
       <span className="truncate text-sm font-semibold uppercase tracking-wide">{title}</span>
@@ -227,11 +247,11 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
 
   return (
     <SlotsCtx.Provider value={slots}>
-      <div ref={wrapRef} role="tablist" className={cn("relative w-full select-none", className)}>
+      <div ref={wrapRef} role="tablist" className={cn("relative w-full select-none max-md:overflow-hidden max-md:rounded-2xl max-md:bg-slate-800 max-md:shadow-md dark:max-md:bg-slate-700", className)}>
         <div
           className={cn(
             "flex items-center justify-between gap-2",
-            inline ? "pointer-events-none absolute inset-x-4 top-7 z-20 text-white" : "mb-1 text-slate-800 dark:text-slate-100"
+            inline ? "pointer-events-none absolute inset-x-4 top-7 z-20 text-white" : "mb-1 text-slate-800 dark:text-slate-100 max-md:mb-0 max-md:px-4 max-md:pt-3 max-md:text-white"
           )}
           style={inline ? { height: H } : undefined}
         >
@@ -242,7 +262,7 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
         <div className="relative mx-auto" style={{ height: H + 28, width: barW || undefined }}>
           {width > 0 && (
             <>
-              <svg className="absolute left-0 top-7 drop-shadow-md" width={barW} height={H} aria-hidden="true">
+              <svg className="absolute left-0 top-7 drop-shadow-md max-md:hidden" width={barW} height={H} aria-hidden="true">
                 <path d={d} className="fill-slate-800 dark:fill-slate-700" />
               </svg>
               <div
