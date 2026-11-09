@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ChevronRight, Loader2, Search } from "lucide-react"
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import { useMobileSearch } from "./mobile-actions"
 
@@ -11,7 +10,9 @@ interface Hit { cat: string; id: string; title: string; subtitle?: string; href:
 interface Category { key: string; label: string }
 
 // Ricerca unica da telefono: scrivi e i risultati compaiono divisi per categoria, i chip restringono a una sola
-export function MobileSearchSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function MobileSearchSheet({ onClose }: { onClose: () => void }) {
+  const open = true
+  const onOpenChange = (_: boolean) => onClose()
   const router = useRouter()
   const mobile = useMobileSearch()
   const pageSearch = mobile?.searchInfo ?? null
@@ -83,39 +84,31 @@ export function MobileSearchSheet({ open, onOpenChange }: { open: boolean; onOpe
   }
 
   const chip = (active: boolean) =>
-    cn("shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-      active ? "border-blue-600 bg-blue-600 text-white" : "border-slate-300 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300")
+    cn("shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+      active ? "bg-blue-600 text-white" : "bg-slate-700 text-slate-200 active:bg-slate-600")
 
+  // Pannello che sale dalla barra: stessa tinta scura, il tasto Cerca diventa Chiudi
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="flex h-[85dvh] flex-col gap-0 rounded-t-2xl p-0">
-        <SheetHeader className="sr-only">
-          <SheetTitle>Cerca</SheetTitle>
-          <SheetDescription>Cerca articoli, commesse, operai, committenti e altro</SheetDescription>
-        </SheetHeader>
+    <div className="relative -mb-[22px] flex max-h-[calc(100dvh-9rem)] flex-col gap-3 rounded-t-3xl bg-slate-800 px-3 pb-[34px] pt-4 text-slate-100 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] animate-in slide-in-from-bottom-6 fade-in duration-200">
+      {pageSearch && (
+        <div className="flex gap-2">
+          <button type="button" className={chip(tab === "page")} onClick={() => setTab("page")}>{pageSearch.title}</button>
+          <button type="button" className={chip(tab === "all")} onClick={() => setTab("all")}>Cerca ovunque</button>
+        </div>
+      )}
 
-        {pageSearch && (
-          <div className="flex gap-2 border-b p-4 pb-3 pr-12">
-            <button type="button" className={chip(tab === "page")} onClick={() => setTab("page")}>{pageSearch.title}</button>
-            <button type="button" className={chip(tab === "all")} onClick={() => setTab("all")}>Cerca ovunque</button>
+      {tab === "page" && pageSearch ? (
+        <>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-2xl bg-card p-3 text-card-foreground">
+            <div ref={mobile?.setSearchSlot} />
           </div>
-        )}
-
-        {tab === "page" && pageSearch ? (
-          <>
-            <div className="flex-1 overflow-y-auto overscroll-contain p-4">
-              <div ref={mobile?.setSearchSlot} />
-            </div>
-            <div className="border-t p-3">
-              <button type="button" onClick={() => onOpenChange(false)} className="h-11 w-full rounded-full bg-blue-600 text-sm font-semibold text-white active:bg-blue-700">
-                Mostra i risultati
-              </button>
-            </div>
-          </>
-        ) : (
-          <>
-        <div className="space-y-3 border-b p-4 pr-12">
-          <div className="relative">
+          <button type="button" onClick={onClose} className="h-11 w-full shrink-0 rounded-full bg-blue-600 text-sm font-semibold text-white active:bg-blue-700">
+            Mostra i risultati
+          </button>
+        </>
+      ) : (
+        <>
+          <div className="relative shrink-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               autoFocus
@@ -127,60 +120,58 @@ export function MobileSearchSheet({ open, onOpenChange }: { open: boolean; onOpe
               onChange={e => setQuery(e.target.value)}
               placeholder="Cerca articoli, commesse, operai..."
               aria-label="Cerca"
-              className="h-11 w-full rounded-full border border-slate-300 bg-white pl-10 pr-4 text-base text-slate-800 outline-none focus:ring-2 focus:ring-blue-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+              className="h-11 w-full rounded-full border border-slate-300 bg-white pl-10 pr-4 text-base text-slate-800 outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>
           {categories.length > 0 && (
-            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 scrollbar-hide">
+            <div className="-mx-3 flex shrink-0 gap-2 overflow-x-auto px-3 scrollbar-hide">
               <button type="button" className={chip(cat === null)} onClick={() => setCat(null)}>Tutto</button>
               {categories.map(c => (
                 <button key={c.key} type="button" className={chip(cat === c.key)} onClick={() => setCat(c.key)}>{c.label}</button>
               ))}
             </div>
           )}
-        </div>
 
-        <div className="flex-1 overflow-y-auto overscroll-contain pb-6">
-          {loading && results.length === 0 && (
-            <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-blue-600" /></div>
-          )}
-          {!loading && !query.trim() && (
-            <p className="px-6 py-10 text-center text-sm text-muted-foreground">Scrivi il nome, il codice o il numero che cerchi.</p>
-          )}
-          {!loading && query.trim() && !error && results.length === 0 && (
-            <p className="px-6 py-10 text-center text-sm text-muted-foreground">Nessun risultato.</p>
-          )}
-          {error && <p className="px-6 py-10 text-center text-sm text-red-500">Ricerca non riuscita. Riprova.</p>}
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-2xl bg-card text-card-foreground">
+            {loading && results.length === 0 && (
+              <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-blue-600" /></div>
+            )}
+            {!loading && !query.trim() && (
+              <p className="px-6 py-8 text-center text-sm text-muted-foreground">Scrivi il nome, il codice o il numero che cerchi.</p>
+            )}
+            {!loading && query.trim() && !error && results.length === 0 && (
+              <p className="px-6 py-8 text-center text-sm text-muted-foreground">Nessun risultato.</p>
+            )}
+            {error && <p className="px-6 py-8 text-center text-sm text-red-500">Ricerca non riuscita. Riprova.</p>}
 
-          {groups.map(([key, hits]) => (
-            <section key={key}>
-              <h3 className="sticky top-0 z-10 bg-slate-100 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                {labelOf(key)}
-              </h3>
-              <ul className="divide-y">
-                {hits.map(h => (
-                  <li key={`${h.cat}-${h.id}`}>
-                    <button type="button" onClick={() => go(h.href)} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-100 dark:active:bg-slate-800">
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{h.title}</span>
-                        {h.subtitle && <span className="block truncate text-xs text-muted-foreground">{h.subtitle}</span>}
-                      </span>
-                      <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              {!cat && hits.length >= 5 && (
-                <button type="button" onClick={() => setCat(key)} className="w-full px-4 py-2 text-left text-xs font-medium text-blue-600">
-                  Mostra tutti in {labelOf(key)}
-                </button>
-              )}
-            </section>
-          ))}
-        </div>
-          </>
-        )}
-      </SheetContent>
-    </Sheet>
+            {groups.map(([key, hits]) => (
+              <section key={key}>
+                <h3 className="sticky top-0 z-10 bg-slate-100 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  {labelOf(key)}
+                </h3>
+                <ul className="divide-y">
+                  {hits.map(h => (
+                    <li key={`${h.cat}-${h.id}`}>
+                      <button type="button" onClick={() => go(h.href)} className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-slate-100 dark:active:bg-slate-800">
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{h.title}</span>
+                          {h.subtitle && <span className="block truncate text-xs text-muted-foreground">{h.subtitle}</span>}
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {!cat && hits.length >= 5 && (
+                  <button type="button" onClick={() => setCat(key)} className="w-full px-4 py-2 text-left text-xs font-medium text-blue-600">
+                    Mostra tutti in {labelOf(key)}
+                  </button>
+                )}
+              </section>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   )
 }

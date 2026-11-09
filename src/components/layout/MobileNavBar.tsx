@@ -96,9 +96,9 @@ export function MobileNavBar() {
     return (
         <>
             {/* Menu flottante delle azioni */}
-            {(dialOpen || navOpen) && (
+            {(dialOpen || navOpen || searchOpen) && (
                 <>
-                    <button type="button" aria-label="Chiudi" onClick={() => { setDialOpen(false); setNavOpen(false); }}
+                    <button type="button" aria-label="Chiudi" onClick={() => { setDialOpen(false); setNavOpen(false); setSearchOpen(false); }}
                         className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-[1px] animate-in fade-in duration-200 lg:hidden" />
                     {dialOpen && <div className="fixed inset-x-0 z-50 max-h-[calc(100dvh-14rem)] overflow-y-auto px-4 py-1 scrollbar-hide lg:hidden"
                         style={{ bottom: "calc(7.5rem + env(safe-area-inset-bottom))" }}>
@@ -180,8 +180,9 @@ export function MobileNavBar() {
                         )}
                     </div>
                 )}
+                {searchOpen && <MobileSearchSheet onClose={() => setSearchOpen(false)} />}
                 <div className="relative flex h-16 items-stretch">
-                    <button type="button" onClick={() => { setDialOpen(false); setNavOpen(o => !o); }} className={cn(sideButton, "bg-slate-800")} aria-label={navOpen ? "Chiudi il menu" : "Naviga tra le pagine"} aria-expanded={navOpen}>
+                    <button type="button" onClick={() => { setDialOpen(false); setSearchOpen(false); setNavOpen(o => !o); }} className={cn(sideButton, "bg-slate-800")} aria-label={navOpen ? "Chiudi il menu" : "Naviga tra le pagine"} aria-expanded={navOpen}>
                         {navOpen ? <X className="h-5 w-5" /> : <LayoutGrid className="h-5 w-5" />}
                         <span className="text-[10px] font-medium">{navOpen ? "Chiudi" : "Naviga"}</span>
                     </button>
@@ -190,8 +191,8 @@ export function MobileNavBar() {
                         <path d="M0,0 C16,0 20,22 48,22 C76,22 80,0 96,0 V64 H0 Z" />
                     </svg>
 
-                    <button type="button" onClick={() => { setNavOpen(false); setDialOpen(o => !o); }} aria-label={dialOpen ? "Chiudi le azioni" : "Azioni"} aria-expanded={dialOpen}
-                        className={cn("absolute left-1/2 top-0 grid h-14 w-14 -translate-x-1/2 -translate-y-[38px] place-items-center rounded-full bg-blue-600 text-white shadow-lg ring-4 ring-slate-800/10 transition-all active:scale-95", navOpen && "pointer-events-none scale-50 opacity-0")}>
+                    <button type="button" onClick={() => { setNavOpen(false); setSearchOpen(false); setDialOpen(o => !o); }} aria-label={dialOpen ? "Chiudi le azioni" : "Azioni"} aria-expanded={dialOpen}
+                        className={cn("absolute left-1/2 top-0 grid h-14 w-14 -translate-x-1/2 -translate-y-[38px] place-items-center rounded-full bg-blue-600 text-white shadow-lg ring-4 ring-slate-800/10 transition-all active:scale-95", (navOpen || searchOpen) && "pointer-events-none scale-50 opacity-0")}>
                         <span className={cn("transition-transform duration-200", dialOpen && "rotate-90")}>
                             {dialOpen ? <X className="h-6 w-6" /> : <Zap className="h-6 w-6" />}
                         </span>
@@ -202,16 +203,14 @@ export function MobileNavBar() {
                         )}
                     </button>
 
-                    <button type="button" onClick={() => { setDialOpen(false); setNavOpen(false); setSearchOpen(true); }} className={cn(sideButton, "bg-slate-800")} aria-label="Cerca">
-                        <Search className="h-5 w-5" />
-                        <span className="text-[10px] font-medium">Cerca</span>
+                    <button type="button" onClick={() => { setDialOpen(false); setNavOpen(false); setSearchOpen(o => !o); }} className={cn(sideButton, "bg-slate-800")} aria-label={searchOpen ? "Chiudi la ricerca" : "Cerca"} aria-expanded={searchOpen}>
+                        {searchOpen ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
+                        <span className="text-[10px] font-medium">{searchOpen ? "Chiudi" : "Cerca"}</span>
                     </button>
                 </div>
                 <div className="bg-slate-800" style={{ height: "env(safe-area-inset-bottom)" }} />
             </div>
 
-            {/* Pannello Cerca */}
-            <MobileSearchSheet open={searchOpen} onOpenChange={setSearchOpen} />
         </>
     );
 }
