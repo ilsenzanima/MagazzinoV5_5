@@ -43,7 +43,7 @@ function StripLink({ href, label, value, alert, light }: { href: string; label: 
     <Link
       href={href}
       className={light
-        ? "inline-flex shrink-0 items-baseline gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm active:bg-slate-100"
+        ? "inline-flex items-baseline gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm active:bg-slate-100"
         : "inline-flex items-baseline gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium normal-case tracking-normal text-slate-300 transition-colors hover:bg-white/20"}
     >
       {label}
@@ -55,10 +55,15 @@ function StripLink({ href, label, value, alert, light }: { href: string; label: 
 function QuickAction({ href, icon: Icon, label, color }: { href: string; icon: LucideIcon; label: string; color: string }) {
   return (
     <Link href={href}>
-      <Card className="h-full cursor-pointer transition-shadow hover:shadow-md">
-        <CardContent className="flex flex-col items-center gap-1.5 px-1.5 py-3 text-center md:gap-2 md:px-3 md:py-5">
-          <span className={`flex h-9 w-9 items-center justify-center rounded-xl md:h-11 md:w-11 ${color}`}><Icon className="h-5 w-5 md:h-6 md:w-6" /></span>
-          <span className="text-[11px] font-medium leading-tight text-slate-800 dark:text-slate-100 md:text-sm">{label}</span>
+      {/* Telefono: cerchio blu con bordo bianco come il pulsante flottante, scritta leggibile sullo sfondo */}
+      <span className="flex flex-col items-center gap-1.5 md:hidden">
+        <span className="grid h-14 w-14 place-items-center rounded-full bg-blue-600 text-white shadow-lg ring-4 ring-white active:scale-95"><Icon className="h-6 w-6" /></span>
+        <span className="text-center text-[11px] font-semibold leading-tight text-slate-900 [text-shadow:0_0_2px_#fff,0_0_3px_#fff,0_0_4px_#fff]">{label}</span>
+      </span>
+      <Card className="hidden h-full cursor-pointer transition-shadow hover:shadow-md md:block">
+        <CardContent className="flex flex-col items-center gap-2 px-3 py-5 text-center">
+          <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${color}`}><Icon className="h-6 w-6" /></span>
+          <span className="text-sm font-medium text-slate-800 dark:text-slate-100">{label}</span>
         </CardContent>
       </Card>
     </Link>
@@ -176,7 +181,7 @@ export const DashboardClient = memo(function DashboardClient({ stats, todo }: Da
 
         <NotchTabs title="Panoramica">
           {phone ? (
-            <div className="-mx-2 mt-3 flex gap-2 overflow-x-auto px-2 pb-1 scrollbar-hide">
+            <div className="mt-3 flex flex-wrap gap-2">
             <StripLink light href="/jobs" label="Commesse attive" value={stats.activeJobsCount} />
             <StripLink light href="/movements" label={`DDT di ${monthName}`} value={stats.monthDDTCount} />
             <StripLink light
@@ -258,7 +263,7 @@ export const DashboardClient = memo(function DashboardClient({ stats, todo }: Da
 
             {/* Destra: azioni rapide e cose da fare */}
             <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-2 md:gap-3 lg:grid-cols-2 xl:grid-cols-4">
+              <div className="grid grid-cols-4 gap-2 max-md:py-1 md:gap-3 lg:grid-cols-2 xl:grid-cols-4">
                 <QuickAction href="/movements/new" icon={Truck} label="Nuovo DDT" color="bg-blue-50 text-blue-600 dark:bg-blue-900/30" />
                 <QuickAction href="/purchases/new" icon={ShoppingCart} label="Nuovo acquisto" color="bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30" />
                 {(userRole === "admin" || userRole === "operativo") && (
