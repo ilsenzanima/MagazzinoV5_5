@@ -8,7 +8,6 @@ import {
     Building2, CalendarDays, Calendar, ClipboardList, FileText, History, LayoutDashboard, LogOut,
     Package, QrCode, Search, Settings, ShieldCheck, ShoppingCart, Store, Truck, Users, Wrench, X, Zap, HardHat, LayoutGrid,
 } from "lucide-react";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/components/auth-provider";
 import { useRegisteredActions } from "./mobile-actions";
 import { MobileSearchSheet } from "./MobileSearchSheet";
@@ -97,11 +96,11 @@ export function MobileNavBar() {
     return (
         <>
             {/* Menu flottante delle azioni */}
-            {dialOpen && (
+            {(dialOpen || navOpen) && (
                 <>
-                    <button type="button" aria-label="Chiudi le azioni" onClick={() => setDialOpen(false)}
+                    <button type="button" aria-label="Chiudi" onClick={() => { setDialOpen(false); setNavOpen(false); }}
                         className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-[1px] animate-in fade-in duration-200 lg:hidden" />
-                    <div className="fixed inset-x-0 z-50 max-h-[calc(100dvh-14rem)] overflow-y-auto px-4 py-1 scrollbar-hide lg:hidden"
+                    {dialOpen && <div className="fixed inset-x-0 z-50 max-h-[calc(100dvh-14rem)] overflow-y-auto px-4 py-1 scrollbar-hide lg:hidden"
                         style={{ bottom: "calc(7.5rem + env(safe-area-inset-bottom))" }}>
                         <ul className="mx-auto flex max-w-sm flex-col-reverse gap-3">
                             {dial.map((a, i) => {
@@ -125,59 +124,24 @@ export function MobileNavBar() {
                                 );
                             })}
                         </ul>
-                    </div>
+                    </div>}
                 </>
             )}
 
             {/* Barra: fascia scura con incavo al centro che accoglie il cerchio */}
             <div className="fixed inset-x-0 bottom-0 z-50 lg:hidden">
-                <div className="relative flex h-16 items-stretch">
-                    <button type="button" onClick={() => { setDialOpen(false); setNavOpen(true); }} className={cn(sideButton, "bg-slate-800")} aria-label="Naviga tra le pagine">
-                        <LayoutGrid className="h-5 w-5" />
-                        <span className="text-[10px] font-medium">Naviga</span>
-                    </button>
-
-                    <svg width="96" height="64" viewBox="0 0 96 64" className="-mx-px shrink-0 fill-slate-800" aria-hidden="true">
-                        <path d="M0,0 C16,0 20,22 48,22 C76,22 80,0 96,0 V64 H0 Z" />
-                    </svg>
-
-                    <button type="button" onClick={() => { setDialOpen(o => !o); }} aria-label={dialOpen ? "Chiudi le azioni" : "Azioni"} aria-expanded={dialOpen}
-                        className="absolute left-1/2 top-0 grid h-14 w-14 -translate-x-1/2 -translate-y-[38px] place-items-center rounded-full bg-blue-600 text-white shadow-lg ring-4 ring-slate-800/10 transition-transform active:scale-95">
-                        <span className={cn("transition-transform duration-200", dialOpen && "rotate-90")}>
-                            {dialOpen ? <X className="h-6 w-6" /> : <Zap className="h-6 w-6" />}
-                        </span>
-                        {!dialOpen && pageActions.length > 0 && (
-                            <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
-                                {pageActions.length}
-                            </span>
-                        )}
-                    </button>
-
-                    <button type="button" onClick={() => { setDialOpen(false); setSearchOpen(true); }} className={cn(sideButton, "bg-slate-800")} aria-label="Cerca">
-                        <Search className="h-5 w-5" />
-                        <span className="text-[10px] font-medium">Cerca</span>
-                    </button>
-                </div>
-                <div className="bg-slate-800" style={{ height: "env(safe-area-inset-bottom)" }} />
-            </div>
-
-            {/* Pannello Naviga: schede in griglia */}
-            <Sheet open={navOpen} onOpenChange={setNavOpen}>
-                <SheetContent side="bottom" className="flex max-h-[88dvh] flex-col gap-0 rounded-t-2xl border-sidebar-border bg-sidebar p-0 text-sidebar-foreground">
-                    <SheetHeader className="sr-only">
-                        <SheetTitle>Naviga</SheetTitle>
-                        <SheetDescription>Pagine dell&apos;applicazione</SheetDescription>
-                    </SheetHeader>
-                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pt-5">
+                {/* Menu Naviga: la fascia stessa che sale, stessa tinta della barra */}
+                {navOpen && (
+                    <div className="relative -mb-[22px] max-h-[calc(100dvh-9rem)] overflow-y-auto overscroll-contain rounded-t-3xl bg-slate-800 px-4 pb-[34px] pt-5 text-slate-100 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] animate-in slide-in-from-bottom-6 fade-in duration-200">
                         {shownRecents.length > 0 && (
-                            <div className="mb-4 pr-8">
-                                <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-sidebar-foreground/60">
+                            <div className="mb-4">
+                                <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
                                     <History className="h-3.5 w-3.5" /> Ultime aperte
                                 </p>
                                 <div className="flex flex-wrap gap-2">
                                     {shownRecents.map(p => (
                                         <Link key={p} href={p} prefetch={false} onClick={() => setNavOpen(false)}
-                                            className="rounded-full bg-sidebar-accent px-3 py-1.5 text-sm text-sidebar-accent-foreground">
+                                            className="rounded-full bg-slate-700 px-3 py-1.5 text-sm text-slate-100">
                                             {labelOf(p)}
                                         </Link>
                                     ))}
@@ -192,31 +156,59 @@ export function MobileNavBar() {
                                         className={cn(
                                             "flex min-h-[84px] flex-col items-center justify-center gap-2 rounded-xl border px-1.5 py-3 text-center text-xs font-medium leading-tight transition-colors active:scale-[0.97]",
                                             active
-                                                ? "border-blue-400/60 bg-sidebar-accent text-sidebar-accent-foreground"
-                                                : "border-sidebar-border bg-sidebar-accent/30 text-sidebar-foreground/85 active:bg-sidebar-accent"
+                                                ? "border-blue-500 bg-blue-600 text-white"
+                                                : "border-slate-600 bg-slate-700/60 text-slate-100 active:bg-slate-600"
                                         )}>
-                                        <item.icon className={cn("h-6 w-6", active ? "text-blue-400" : "text-sidebar-foreground/70")} />
+                                        <item.icon className={cn("h-6 w-6", active ? "text-white" : "text-blue-400")} />
                                         <span>{item.label}</span>
                                     </Link>
                                 );
                             })}
                         </div>
+                        {user && (
+                            <div className="mt-4 flex items-center gap-2 border-t border-slate-700 pt-3">
+                                <Link href="/settings/profile" prefetch={false} onClick={() => setNavOpen(false)} className="min-w-0 flex-1 rounded-md px-1 py-1">
+                                    <p className="truncate text-sm font-medium">{fullName || user.email}</p>
+                                    <p className="text-xs capitalize text-slate-400">{userRole || "User"}</p>
+                                </Link>
+                                <span className="[&_button]:!text-slate-200"><NotificationBell onNavigate={() => setNavOpen(false)} /></span>
+                                <button type="button" onClick={() => signOut()} aria-label="Esci"
+                                    className="grid h-9 w-9 place-items-center rounded-md text-slate-200 active:bg-slate-700">
+                                    <LogOut className="h-4 w-4" />
+                                </button>
+                            </div>
+                        )}
                     </div>
-                    {user && (
-                        <div className="flex items-center gap-2 border-t border-sidebar-border p-3" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
-                            <Link href="/settings/profile" prefetch={false} onClick={() => setNavOpen(false)} className="min-w-0 flex-1 rounded-md px-2 py-1">
-                                <p className="truncate text-sm font-medium">{fullName || user.email}</p>
-                                <p className="text-xs capitalize text-sidebar-foreground/60">{userRole || "User"}</p>
-                            </Link>
-                            <NotificationBell onNavigate={() => setNavOpen(false)} />
-                            <button type="button" onClick={() => signOut()} aria-label="Esci"
-                                className="grid h-9 w-9 place-items-center rounded-md text-sidebar-foreground/70 active:bg-sidebar-accent">
-                                <LogOut className="h-4 w-4" />
-                            </button>
-                        </div>
-                    )}
-                </SheetContent>
-            </Sheet>
+                )}
+                <div className="relative flex h-16 items-stretch">
+                    <button type="button" onClick={() => { setDialOpen(false); setNavOpen(o => !o); }} className={cn(sideButton, "bg-slate-800")} aria-label={navOpen ? "Chiudi il menu" : "Naviga tra le pagine"} aria-expanded={navOpen}>
+                        {navOpen ? <X className="h-5 w-5" /> : <LayoutGrid className="h-5 w-5" />}
+                        <span className="text-[10px] font-medium">{navOpen ? "Chiudi" : "Naviga"}</span>
+                    </button>
+
+                    <svg width="96" height="64" viewBox="0 0 96 64" className="-mx-px shrink-0 fill-slate-800" aria-hidden="true">
+                        <path d="M0,0 C16,0 20,22 48,22 C76,22 80,0 96,0 V64 H0 Z" />
+                    </svg>
+
+                    <button type="button" onClick={() => { setNavOpen(false); setDialOpen(o => !o); }} aria-label={dialOpen ? "Chiudi le azioni" : "Azioni"} aria-expanded={dialOpen}
+                        className={cn("absolute left-1/2 top-0 grid h-14 w-14 -translate-x-1/2 -translate-y-[38px] place-items-center rounded-full bg-blue-600 text-white shadow-lg ring-4 ring-slate-800/10 transition-all active:scale-95", navOpen && "pointer-events-none scale-50 opacity-0")}>
+                        <span className={cn("transition-transform duration-200", dialOpen && "rotate-90")}>
+                            {dialOpen ? <X className="h-6 w-6" /> : <Zap className="h-6 w-6" />}
+                        </span>
+                        {!dialOpen && pageActions.length > 0 && (
+                            <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                                {pageActions.length}
+                            </span>
+                        )}
+                    </button>
+
+                    <button type="button" onClick={() => { setDialOpen(false); setNavOpen(false); setSearchOpen(true); }} className={cn(sideButton, "bg-slate-800")} aria-label="Cerca">
+                        <Search className="h-5 w-5" />
+                        <span className="text-[10px] font-medium">Cerca</span>
+                    </button>
+                </div>
+                <div className="bg-slate-800" style={{ height: "env(safe-area-inset-bottom)" }} />
+            </div>
 
             {/* Pannello Cerca */}
             <MobileSearchSheet open={searchOpen} onOpenChange={setSearchOpen} />
