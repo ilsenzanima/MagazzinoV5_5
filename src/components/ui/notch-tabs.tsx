@@ -239,7 +239,7 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
   if (items.length === 0) {
     return (
       <SlotsCtx.Provider value={slots}>
-        <div style={{ minHeight: H }} className={cn("flex items-center justify-between gap-3 rounded-2xl bg-slate-800 px-4 text-white shadow-md dark:bg-slate-700", nested ? "mt-0" : "mt-1 lg:mt-7", "max-lg:mb-4", className)}>
+        <div style={{ minHeight: H }} className={cn("flex items-center justify-between gap-3 rounded-2xl bg-slate-800 px-4 text-white shadow-md dark:bg-slate-700", nested ? "mt-0" : "mt-1 lg:mt-7", nested ? "" : "mb-6", className)}>
           {titleBlock}
           {actionsBlock}
         </div>
