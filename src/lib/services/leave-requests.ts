@@ -74,6 +74,19 @@ export const leaveRequestsApi = {
     },
 
     delete: async (id: string): Promise<void> => {
+        // Toglie anche le ore inserite in automatico dalla richiesta (non quelle scritte a mano)
+        const { data: req } = await supabase.from('leave_requests').select('worker_id, date, end_date').eq('id', id).maybeSingle();
+        if (req) {
+            const { error: attErr } = await supabase
+                .from('attendance')
+                .delete()
+                .eq('worker_id', req.worker_id)
+                .eq('status', 'holiday')
+                .eq('notes', 'Richiesta Permesso (Auto-generato)')
+                .gte('date', req.date)
+                .lte('date', req.end_date || req.date);
+            if (attErr) throw attErr;
+        }
         const { error } = await supabase
             .from('leave_requests')
             .delete()

@@ -18,6 +18,7 @@ import { useAuth } from "@/components/auth-provider"
 import { confirmDialog } from "@/components/ui/confirm-host"
 import { notify } from "@/lib/notify"
 import { supabase } from "@/lib/supabase"
+import { leaveRequestsApi } from "@/lib/api"
 import { AGENDA_KINDS, AgendaInput, AgendaItem, AgendaKind, agendaApi, getAutoItems, kindInfo, todayIso } from "@/lib/services/agenda"
 
 const headCls = "text-xs font-semibold uppercase tracking-wide text-slate-600"
@@ -140,6 +141,12 @@ function AgendaContent() {
     try { await agendaApi.remove(i.id); setItems(prev => prev.filter(x => x.id !== i.id)) } catch { notify.error("Eliminazione non riuscita") }
   }
 
+  // Permesso/ferie importato: si elimina qui, insieme alle ore messe in automatico nelle presenze
+  const removeLeave = async (i: AgendaItem) => {
+    if (!await confirmDialog(`Eliminare «${i.title}»? Verranno tolte anche le ore inserite in automatico nelle presenze.`)) return
+    try { await leaveRequestsApi.delete(i.id.replace(/^leave-/, "")); setItems(prev => prev.filter(x => x.id !== i.id)) } catch { notify.error("Eliminazione non riuscita") }
+  }
+
   const set = <K extends keyof AgendaInput>(key: K, value: AgendaInput[K]) => setForm(f => ({ ...f, [key]: value }))
   const needsWorker = form.kind === "visita" || form.kind === "corso" || form.kind === "permesso"
 
@@ -220,7 +227,12 @@ function AgendaContent() {
                   <TableCell className="py-2">
                     <div className="flex justify-end gap-1">
                       {i.auto ? (
-                        <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="Apri"><Link href={i.href ?? "/agenda"}><ExternalLink className="h-4 w-4" /></Link></Button>
+                        <>
+                          <Button asChild variant="ghost" size="icon" className="h-8 w-8" title="Apri"><Link href={i.href ?? "/agenda"}><ExternalLink className="h-4 w-4" /></Link></Button>
+                          {i.auto === "leave" && userRole === "admin" && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-700" onClick={() => removeLeave(i)} title="Elimina il permesso"><Trash2 className="h-4 w-4" /></Button>
+                          )}
+                        </>
                       ) : (
                         <>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(i)} title="Modifica"><Pencil className="h-4 w-4" /></Button>

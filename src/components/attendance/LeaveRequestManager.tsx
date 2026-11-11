@@ -4,7 +4,6 @@ import { useState } from "react"
 import { LeaveRequestForm } from "./LeaveRequestForm"
 import { LeaveRequestList } from "./LeaveRequestList"
 import { Worker, LeaveRequest, leaveRequestsApi } from "@/lib/api"
-import { Separator } from "@/components/ui/separator"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft } from "lucide-react"
 import { NotchTabs, NotchHelp } from "@/components/ui/notch-tabs"
@@ -33,7 +32,7 @@ export function LeaveRequestManager({ workers, initialRequests }: LeaveRequestMa
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
             <div className="space-y-2">
                 <Link href="/attendance" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900">
                     <ArrowLeft className="mr-1 h-4 w-4" /> Presenze
@@ -48,10 +47,8 @@ export function LeaveRequestManager({ workers, initialRequests }: LeaveRequestMa
                 onSuccess={loadRequests}
             />
 
-            <Separator />
-
-            <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Ultime Richieste</h3>
+            <div className="space-y-3">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">Ultime richieste</h3>
                 <LeaveRequestList
                     requests={requests}
                     isAdmin={isAdmin}

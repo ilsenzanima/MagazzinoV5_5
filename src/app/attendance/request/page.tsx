@@ -32,7 +32,7 @@ export default async function RequestPage() {
     }));
 
     return (
-        <div className="container mx-auto py-6 max-w-5xl">
+        <div>
             <LeaveRequestManager
                 workers={workers}
                 initialRequests={requests}

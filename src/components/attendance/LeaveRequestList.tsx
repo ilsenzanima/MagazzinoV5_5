@@ -2,24 +2,14 @@
 
 import { format, isSameDay } from "date-fns"
 import { it } from "date-fns/locale"
-import { FileText, User, Calendar, Clock, Trash2, ArrowRight } from "lucide-react"
-import { Card, CardContent } from "@/components/ui/card"
+import { FileText, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { LeaveRequest } from "@/lib/services/leave-requests"
 import { toast } from "sonner"
 import { leaveRequestsApi } from "@/lib/api"
 import { generateLeaveRequestPDF } from "@/lib/pdf/leave-request-pdf"
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+import { confirmDialog } from "@/components/ui/confirm-host"
 
 interface LeaveRequestListProps {
     requests: LeaveRequest[]
@@ -27,9 +17,10 @@ interface LeaveRequestListProps {
     onDelete?: () => void
 }
 
-export function LeaveRequestList({ requests, isAdmin, onDelete }: LeaveRequestListProps) {
+const headCls = "text-xs font-semibold uppercase tracking-wide text-slate-600"
 
-    const handleCardClick = async (req: LeaveRequest) => {
+export function LeaveRequestList({ requests, isAdmin, onDelete }: LeaveRequestListProps) {
+    const handlePdf = async (req: LeaveRequest) => {
         try {
             await generateLeaveRequestPDF(req)
             toast.success("PDF generato!")
@@ -39,8 +30,9 @@ export function LeaveRequestList({ requests, isAdmin, onDelete }: LeaveRequestLi
         }
     }
 
-    const handleDelete = async (e: React.MouseEvent, req: LeaveRequest) => {
-        e.stopPropagation()
+    const handleDelete = async (req: LeaveRequest) => {
+        const who = `${req.worker?.first_name ?? ""} ${req.worker?.last_name ?? ""}`.trim()
+        if (!await confirmDialog(`Eliminare la richiesta di ${who || "questo dipendente"}? Verranno tolte anche le ore inserite in automatico nelle presenze.`)) return
         try {
             await leaveRequestsApi.delete(req.id)
             toast.success("Richiesta eliminata")
@@ -52,96 +44,45 @@ export function LeaveRequestList({ requests, isAdmin, onDelete }: LeaveRequestLi
     }
 
     const formatDateRange = (startDate: string, endDate: string) => {
-        const start = new Date(startDate)
-        const end = new Date(endDate)
-
-        if (isSameDay(start, end)) {
-            return format(start, "d MMM yyyy", { locale: it })
-        }
-        return (
-            <span className="flex items-center gap-1">
-                {format(start, "d MMM", { locale: it })}
-                <ArrowRight className="h-3 w-3" />
-                {format(end, "d MMM yyyy", { locale: it })}
-            </span>
-        )
-    }
-
-    if (requests.length === 0) {
-        return (
-            <div className="text-center py-10 text-muted-foreground">
-                Nessuna richiesta recente.
-            </div>
-        )
+        const start = new Date(`${startDate}T12:00:00`)
+        const end = new Date(`${endDate}T12:00:00`)
+        if (isSameDay(start, end)) return format(start, "EEE d MMM yyyy", { locale: it })
+        return `${format(start, "EEE d MMM", { locale: it })} → ${format(end, "EEE d MMM yyyy", { locale: it })}`
     }
 
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {requests.map((req) => (
-                <Card
-                    key={req.id}
-                    className="cursor-pointer hover:bg-accent/50 transition-colors border-l-4 border-l-red-500 relative group"
-                    onClick={() => handleCardClick(req)}
-                >
-                    <CardContent className="p-4 space-y-3">
-                        <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-2 font-medium">
-                                <User className="h-4 w-4 text-muted-foreground" />
-                                <span className="truncate">
-                                    {req.worker?.first_name} {req.worker?.last_name}
-                                </span>
-                            </div>
-                            <div className="bg-red-100 text-red-600 p-1.5 rounded-full">
-                                <FileText className="h-4 w-4" />
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                            <Calendar className="h-4 w-4 opacity-70" />
-                            {formatDateRange(req.date, req.end_date || req.date)}
-                        </div>
-
-                        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                            <Clock className="h-4 w-4 opacity-70" />
-                            <span>{req.hours} ore/giorno</span>
-                        </div>
-
-                        {isAdmin && (
-                            <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                        onClick={(e) => e.stopPropagation()}
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                        <AlertDialogTitle>Eliminare questa richiesta?</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                            Questa azione non può essere annullata. La richiesta verrà eliminata permanentemente.
-                                            <br /><br />
-                                            <strong>Nota:</strong> I dati nelle presenze dovranno essere gestiti manualmente.
-                                        </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                        <AlertDialogCancel>Annulla</AlertDialogCancel>
-                                        <AlertDialogAction
-                                            onClick={(e) => handleDelete(e as any, req)}
-                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                        >
-                                            Elimina
-                                        </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                </AlertDialogContent>
-                            </AlertDialog>
-                        )}
-                    </CardContent>
-                </Card>
-            ))}
+        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+            <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+                <TableHeader>
+                    <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                        <TableHead className={headCls}>Dipendente</TableHead>
+                        <TableHead className={`w-64 ${headCls}`}>Periodo</TableHead>
+                        <TableHead className={`hidden w-32 sm:table-cell ${headCls}`}>Ore al giorno</TableHead>
+                        <TableHead className="w-24" />
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {requests.length === 0 ? (
+                        <TableRow>
+                            <TableCell colSpan={4} className="py-14 text-center text-slate-400">Nessuna richiesta recente.</TableCell>
+                        </TableRow>
+                    ) : requests.map((req) => (
+                        <TableRow key={req.id}>
+                            <TableCell className="truncate py-2 text-sm font-medium">{req.worker?.first_name} {req.worker?.last_name}</TableCell>
+                            <TableCell className="py-2 text-sm capitalize">{formatDateRange(req.date, req.end_date || req.date)}</TableCell>
+                            <TableCell className="hidden py-2 text-sm sm:table-cell">{req.hours}</TableCell>
+                            <TableCell className="py-2">
+                                <div className="flex justify-end gap-1">
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handlePdf(req)} title="Scarica PDF"><FileText className="h-4 w-4" /></Button>
+                                    {isAdmin && (
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-700" onClick={() => handleDelete(req)} title="Elimina"><Trash2 className="h-4 w-4" /></Button>
+                                    )}
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
         </div>
     )
 }
