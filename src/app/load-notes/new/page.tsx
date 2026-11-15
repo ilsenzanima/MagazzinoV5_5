@@ -253,7 +253,7 @@ export default function NewLoadNotePage() {
     return (
         <DashboardLayout>
           <BlockBrowserBack />
-            <div className="max-w-4xl mx-auto pb-10 overflow-hidden">
+            <div className="pb-10 overflow-hidden">
                 <div className="mb-6">
                     <Link href="/load-notes" className="flex items-center text-muted-foreground hover:text-foreground mb-2">
                         <ArrowLeft className="h-4 w-4 mr-1" />
