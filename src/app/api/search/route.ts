@@ -84,6 +84,12 @@ export async function GET(req: NextRequest) {
   const limit = only ? 20 : 5
 
   const lists = await Promise.all(targets.map(async def => {
+    // Articoli: stessa ricerca della pagina Inventario (nome, codice, marca, tipologia, modello e codici fornitore)
+    if (def.key === "articoli") {
+      const { data, error } = await supabase.rpc("get_inventory_search", { p_search: words.join(" "), p_limit: limit, p_offset: 0 })
+      if (error) return [] as Hit[]
+      return (data ?? []).map(def.map).filter((h: Hit | null): h is Hit => !!h)
+    }
     let query = supabase.from(def.table).select(def.select).limit(limit).order(def.order, { ascending: true })
     if (def.softDelete) query = query.is("deleted_at", null)
     for (const w of words) query = query.or(def.cols.map(c => `${c}.ilike.%${w}%`).join(","))
