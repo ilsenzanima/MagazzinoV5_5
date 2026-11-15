@@ -394,3 +394,9 @@ div[class~="border"]:has(> [data-slot="table-container"]):not([data-slot="card"]
   background-size: 200px 200px, 100% 100%, 100% 100%, 32px 32px, 32px 32px, 32px 32px, 8px 8px, 8px 8px;
   background-attachment: scroll, fixed, fixed, scroll, scroll, scroll, scroll, scroll;
 }
+
+/* Suggerimento delle ricerche piu' lungo della casella: scorre da una parte all'altra con una breve pausa agli estremi */
+@keyframes placeholder-scroll {
+  0%, 18% { transform: translateX(0); }
+  82%, 100% { transform: translateX(var(--shift)); }
+}

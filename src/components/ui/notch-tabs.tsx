@@ -86,6 +86,34 @@ export function NotchButton({ className, ...props }: React.ComponentProps<typeof
   )
 }
 
+// Testo di suggerimento che scorre da una parte all'altra quando e' piu' lungo della casella (ricerche con voci lunghe)
+export function ScrollingPlaceholder({ text, show, className }: { text: string; show: boolean; className?: string }) {
+  const box = useRef<HTMLDivElement>(null)
+  const span = useRef<HTMLSpanElement>(null)
+  const [shift, setShift] = useState(0)
+  useLayoutEffect(() => {
+    const el = box.current
+    if (!show || !el) return
+    const measure = () => setShift(Math.max(0, (span.current?.scrollWidth ?? 0) - el.clientWidth))
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [text, show])
+  if (!show) return null
+  return (
+    <div ref={box} aria-hidden="true" className={cn("pointer-events-none absolute inset-y-0 flex items-center overflow-hidden", className)}>
+      <span
+        ref={span}
+        className="whitespace-nowrap text-slate-400 motion-reduce:!animate-none"
+        style={shift > 0 ? ({ animation: `placeholder-scroll ${Math.round(shift / 18 + 4)}s ease-in-out infinite alternate`, "--shift": `-${shift}px` } as React.CSSProperties) : undefined}
+      >
+        {text}
+      </span>
+    </div>
+  )
+}
+
 // Barra di ricerca a destra nella striscia. Fuori da <NotchTabs> resta una normale casella di ricerca nella pagina.
 export function NotchSearch({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
   const { actions, title } = useContext(SlotsCtx)
@@ -100,10 +128,10 @@ export function NotchSearch({ value, onChange, placeholder }: { value: string; o
             type="search"
             value={value}
             onChange={e => onChange(e.target.value)}
-            placeholder={placeholder}
             aria-label={placeholder}
             className="h-11 w-full rounded-full border border-slate-300 bg-white pl-10 pr-4 text-base text-slate-800 outline-none focus:ring-2 focus:ring-blue-400"
           />
+          <ScrollingPlaceholder text={placeholder} show={!value} className="left-10 right-4 text-base" />
         </div>
       </PhoneSearchPortal>
     )
@@ -115,11 +143,11 @@ export function NotchSearch({ value, onChange, placeholder }: { value: string; o
         type="search"
         value={value}
         onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
         aria-label={placeholder}
         title={placeholder}
-        className="h-9 w-full rounded-full border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-800 shadow-sm outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-blue-400"
+        className="h-9 w-full rounded-full border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-800 shadow-sm outline-none focus:ring-2 focus:ring-blue-400"
       />
+      <ScrollingPlaceholder text={placeholder} show={!value} className="left-9 right-3 text-sm" />
     </div>
   )
   return actions ? createPortal(field, actions) : field

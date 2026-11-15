@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { ChevronLeft, Search } from "lucide-react";
-import { useNotchSlots, NestedStripCtx, NotchTabs, NotchSearch, NotchActions } from "@/components/ui/notch-tabs";
+import { useNotchSlots, NestedStripCtx, NotchTabs, NotchSearch, NotchActions, ScrollingPlaceholder } from "@/components/ui/notch-tabs";
 import { useContext, useEffect } from "react";
 import { useMobileSearch, usePhone } from "@/components/layout/mobile-actions";
 import { Button } from "@/components/ui/button";
@@ -52,7 +52,8 @@ export function ListPageHeader({ title, actions, search, searchActions, children
                 <div className="relative w-72 max-w-full">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <Label htmlFor={search.id + "-strip"} className="sr-only">{search.label}</Label>
-                    <Input id={search.id + "-strip"} name="search" type="search" autoComplete="off" placeholder={search.placeholder} className="h-9 rounded-full border-none bg-white pl-9 text-slate-800" value={search.value} onChange={(e) => search.onChange(e.target.value)} />
+                    <Input id={search.id + "-strip"} name="search" type="search" autoComplete="off" aria-label={search.placeholder} className="h-9 rounded-full border-none bg-white pl-9 text-slate-800" value={search.value} onChange={(e) => search.onChange(e.target.value)} />
+                    <ScrollingPlaceholder text={search.placeholder} show={!search.value} className="left-9 right-3 text-sm" />
                 </div>
             )}
             {searchActions}
