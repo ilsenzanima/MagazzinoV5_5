@@ -68,7 +68,7 @@ import { useViewMode } from "@/hooks/useViewMode"
 import { compressImageIfNeeded } from "@/lib/image-compress"
 import { uploadFileToDrive } from "@/lib/drive-upload"
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
-import { UploadStatusBar } from "@/components/ui/upload-status-row"
+import { DocumentUploadDialog, usePendingFiles } from "@/components/documents/DocumentUploadDialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { PaginationControls } from "@/components/ui/pagination-controls"
@@ -81,12 +81,6 @@ interface JobConformitaProps {
     jobId: string
     jobLabel?: string
     jobName?: string
-}
-
-interface PendingFile {
-    file: File
-    name: string
-    notes: string
 }
 
 const UNTYPED_KEY = "__untyped__"
@@ -183,12 +177,9 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
     }
 
     // Upload wizard state
-    const [upStep, setUpStep] = useState<1 | 2>(1)
     const [upDocTypeId, setUpDocTypeId] = useState("")
     const [upFolderId, setUpFolderId] = useState("")
-    const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
-    const [dragOver, setDragOver] = useState(false)
-    const upRef = useRef<HTMLInputElement>(null)
+    const { files: pendingFiles, setFiles: setPendingFiles, add: addFiles, update: updatePending, remove: removePending, clear: clearPending } = usePendingFiles()
 
     // New folder dialog
     const [newFolderOpen, setNewFolderOpen] = useState(false)
@@ -240,11 +231,9 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
     }
 
     const openUpload = (preset?: CollectionRef) => {
-        setUpStep(1)
         setUpDocTypeId(preset?.typeId ?? "")
         setUpFolderId(preset?.folderId ?? "")
-        setPendingFiles([])
-        setDragOver(false)
+        clearPending()
         batchUpload.reset()
         setUploadOpen(true)
     }
@@ -400,52 +389,11 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
         else toast.error(`Eliminati ${deleted.size} documenti su ${list.length}`)
     }
 
-    const handleFilesSelected = (files: FileList | null) => {
-        if (!files || files.length === 0) return
-        setPendingFiles(prev => {
-            const room = MAX_BATCH_UPLOAD_FILES - prev.length
-            if (room <= 0) {
-                toast.error(`Puoi caricare al massimo ${MAX_BATCH_UPLOAD_FILES} file alla volta`)
-                return prev
-            }
-            const selected = Array.from(files)
-            if (selected.length > room) toast.error(`Puoi caricare al massimo ${MAX_BATCH_UPLOAD_FILES} file alla volta, aggiunti solo i primi ${room}`)
-            const newPending: PendingFile[] = selected.slice(0, room).map(f => ({
-                file: f,
-                name: f.name.replace(/\.[^.]+$/, ''),
-                notes: "",
-            }))
-            return [...prev, ...newPending]
-        })
-    }
-
-    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault()
-        setDragOver(false)
-        handleFilesSelected(e.dataTransfer.files)
-    }
-
-    const goToStep2 = () => {
-        if (!upDocTypeId) {
-            toast.error("Selezionare il tipo di documento.")
-            return
-        }
-        if (pendingFiles.length === 0) return
-        setUpStep(2)
-    }
-
-    const updatePending = (idx: number, patch: Partial<PendingFile>) => {
-        setPendingFiles(prev => prev.map((p, i) => i === idx ? { ...p, ...patch } : p))
-    }
-
-    const removePending = (idx: number) => {
-        setPendingFiles(prev => prev.filter((_, i) => i !== idx))
-    }
-
     const batchUpload = useBatchUpload()
 
     const handleUploadAll = async () => {
         if (pendingFiles.length === 0) return
+        if (!upDocTypeId) { toast.error("Selezionare il tipo di documento."); return }
         setUploading(true)
         const selectedType = docTypes.find(t => t.id === upDocTypeId)
         const selectedFolder = upFolderId ? folders.find(f => f.id === upFolderId) : undefined
@@ -886,102 +834,27 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
             </>
             )}
 
-            {/* Upload dialog - step 1: tipo + file multipli */}
-            <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-                    <DialogHeader><DialogTitle>Carica documenti conformità</DialogTitle></DialogHeader>
-                    {upStep === 1 ? (
-                        <div className="space-y-4 py-2">
-                            <div className="space-y-1">
-                                <Label>Tipo documento</Label>
-                                <Select value={upDocTypeId} onValueChange={v => { setUpDocTypeId(v); setUpFolderId("") }}>
-                                    <SelectTrigger><SelectValue placeholder="Seleziona tipo documento" /></SelectTrigger>
-                                    <SelectContent>
-                                        {docTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                                {docTypes.length === 0 && (
-                                    <p className="text-xs text-slate-400">Nessun tipo configurato. Vai in Impostazioni &gt; Dati &gt; Documenti Conformità Cantiere per crearne uno.</p>
-                                )}
-                            </div>
-                            {docTypes.find(t => t.id === upDocTypeId)?.allowsFolders && (
-                                <div className="space-y-1">
-                                    <Label>Cartella (opzionale)</Label>
-                                    <div className="flex gap-2">
-                                        <Select value={upFolderId || "root"} onValueChange={v => setUpFolderId(v === "root" ? "" : v)}>
-                                            <SelectTrigger><SelectValue placeholder="Nessuna cartella" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="root">Nessuna cartella</SelectItem>
-                                                {folders.filter(f => f.documentTypeId === upDocTypeId).map(f => (
-                                                    <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <Button type="button" variant="outline" size="icon" onClick={() => openNewFolder(upDocTypeId)} title="Nuova cartella">
-                                            <FolderPlus className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            )}
-                            <div className="space-y-1">
-                                <Label>File (puoi selezionarne più di uno, anche con drag&drop)</Label>
-                                <div
-                                    className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer transition-colors ${dragOver ? 'bg-blue-50 border-blue-400 dark:bg-blue-950' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                                    onClick={() => upRef.current?.click()}
-                                    onDragOver={e => { e.preventDefault(); setDragOver(true) }}
-                                    onDragLeave={() => setDragOver(false)}
-                                    onDrop={handleDrop}
-                                >
-                                    <input type="file" multiple className="hidden" ref={upRef} onChange={e => handleFilesSelected(e.target.files)} />
-                                    <Upload className="h-8 w-8 text-slate-400 mb-2" />
-                                    <p className="text-sm text-slate-600 font-medium">
-                                        {pendingFiles.length > 0 ? `${pendingFiles.length} file selezionati` : "Clicca o trascina qui i file"}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="space-y-4 py-2">
-                            <p className="text-xs text-slate-500">Per ogni file inserisci nome e nota (opzionale).</p>
-                            {pendingFiles.map((pf, idx) => (
-                                <div key={idx} className="border rounded-lg p-3 space-y-2 relative">
-                                    <Button variant="ghost" size="icon" disabled={batchUpload.statuses[idx]?.status === 'uploading'} className="absolute top-1 right-1 h-6 w-6 text-slate-400 hover:text-red-600" onClick={() => removePending(idx)}>
-                                        <X className="h-3.5 w-3.5" />
-                                    </Button>
-                                    <p className="text-xs text-slate-400 truncate pr-6">{pf.file.name}</p>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Nome documento</Label>
-                                        <Input value={pf.name} disabled={batchUpload.statuses[idx]?.status === 'uploading'} onChange={e => updatePending(idx, { name: e.target.value })} />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Nota (opzionale)</Label>
-                                        <Input value={pf.notes} disabled={batchUpload.statuses[idx]?.status === 'uploading'} onChange={e => updatePending(idx, { notes: e.target.value })} placeholder="Breve descrizione" />
-                                    </div>
-                                    <UploadStatusBar state={batchUpload.statuses[idx]} />
-                                </div>
-                            ))}
-                            {pendingFiles.length === 0 && (
-                                <p className="text-sm text-slate-400 italic text-center py-4">Nessun file selezionato.</p>
-                            )}
-                        </div>
-                    )}
-                    <DialogFooter>
-                        {upStep === 1 ? (
-                            <>
-                                <Button variant="outline" onClick={() => setUploadOpen(false)}>Annulla</Button>
-                                <Button onClick={goToStep2} disabled={pendingFiles.length === 0}>Continua</Button>
-                            </>
-                        ) : (
-                            <>
-                                <Button variant="outline" onClick={() => setUpStep(1)}>Indietro</Button>
-                                <Button onClick={handleUploadAll} disabled={uploading || pendingFiles.length === 0}>
-                                    {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Carica {pendingFiles.length > 1 ? `(${pendingFiles.length})` : ""}
-                                </Button>
-                            </>
-                        )}
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <DocumentUploadDialog
+                open={uploadOpen}
+                onOpenChange={setUploadOpen}
+                title="Carica documenti conformità"
+                docTypes={docTypes}
+                emptyTypesHint="Nessun tipo configurato. Vai in Impostazioni > Dati > Documenti Conformità Cantiere per crearne uno."
+                typeId={upDocTypeId}
+                onTypeChange={setUpDocTypeId}
+                folders={folders}
+                folderId={upFolderId}
+                onFolderChange={setUpFolderId}
+                onNewFolder={openNewFolder}
+                files={pendingFiles}
+                onAddFiles={addFiles}
+                onUpdateFile={updatePending}
+                onRemoveFile={removePending}
+                statuses={batchUpload.statuses}
+                uploading={uploading}
+                onSubmit={handleUploadAll}
+                showOldRev={false}
+            />
 
             {/* Edit dialog */}
             <Dialog open={editOpen} onOpenChange={setEditOpen}>

@@ -20,13 +20,7 @@ import { FloatingAddButton } from "@/components/ui/floating-add-button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { NotchActions, NotchSearch } from "@/components/ui/notch-tabs"
 import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload"
-import { UploadStatusBar } from "@/components/ui/upload-status-row"
-
-interface PendingFile {
-    file: File
-    name: string
-    notes: string
-}
+import { DocumentUploadDialog, usePendingFiles } from "@/components/documents/DocumentUploadDialog"
 
 interface Props {
     jobId?: string
@@ -57,9 +51,7 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     // Upload wizard
-    const [upStep, setUpStep] = useState<1 | 2>(1)
-    const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
-    const [dragOver, setDragOver] = useState(false)
+    const { files: pendingFiles, setFiles: setPendingFiles, add: addFiles, update: updatePending, remove: removePending, clear: clearPending } = usePendingFiles()
 
     // Edit form
     const [editName, setEditName] = useState("")
@@ -86,51 +78,9 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
     }
 
     const openUpload = () => {
-        setUpStep(1)
-        setPendingFiles([])
+        clearPending()
         batchUpload.reset()
         setUploadOpen(true)
-    }
-
-    const addFiles = (files: FileList | File[]) => {
-        setPendingFiles(prev => {
-            const room = MAX_BATCH_UPLOAD_FILES - prev.length
-            if (room <= 0) {
-                notify.error(`Puoi caricare al massimo ${MAX_BATCH_UPLOAD_FILES} file alla volta`)
-                return prev
-            }
-            const selected = Array.from(files)
-            if (selected.length > room) notify.error(`Puoi caricare al massimo ${MAX_BATCH_UPLOAD_FILES} file alla volta, aggiunti solo i primi ${room}`)
-            const arr = selected.slice(0, room).map(file => ({
-                file,
-                name: file.name.replace(/\.[^.]+$/, ''),
-                notes: "",
-            }))
-            return [...prev, ...arr]
-        })
-    }
-
-    const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files?.length) addFiles(e.target.files)
-    }
-
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault()
-        setDragOver(false)
-        if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files)
-    }
-
-    const goToStep2 = () => {
-        if (pendingFiles.length === 0) return
-        setUpStep(2)
-    }
-
-    const updatePending = (index: number, patch: Partial<PendingFile>) => {
-        setPendingFiles(prev => prev.map((p, i) => i === index ? { ...p, ...patch } : p))
-    }
-
-    const removePending = (index: number) => {
-        setPendingFiles(prev => prev.filter((_, i) => i !== index))
     }
 
     const batchUpload = useBatchUpload()
@@ -288,74 +238,19 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
 
             <FloatingAddButton onClick={openUpload} label="Carica analisi costi" />
 
-            {/* Upload dialog */}
-            <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-                    <DialogHeader><DialogTitle>Carica Analisi Costi di Terzi</DialogTitle></DialogHeader>
-                    {upStep === 1 ? (
-                        <div className="space-y-4 py-2">
-                            <div className="space-y-1">
-                                <Label>File (puoi selezionarne più di uno, anche con drag&drop)</Label>
-                                <div
-                                    className={`border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer transition-colors ${dragOver ? 'bg-blue-50 border-blue-400 dark:bg-blue-950' : 'hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                                    onClick={() => fileInputRef.current?.click()}
-                                    onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-                                    onDragLeave={() => setDragOver(false)}
-                                    onDrop={handleDrop}
-                                >
-                                    <input type="file" multiple className="hidden" ref={fileInputRef} onChange={handleFilesSelected} />
-                                    <Upload className="h-8 w-8 text-slate-400 mb-2" />
-                                    <p className="text-sm text-slate-600 font-medium">
-                                        {pendingFiles.length > 0 ? `${pendingFiles.length} file selezionati` : "Clicca o trascina qui i file"}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="space-y-4 py-2">
-                            <p className="text-xs text-slate-500">Per ogni file inserisci nome e nota (opzionale).</p>
-                            {pendingFiles.map((p, i) => (
-                                <div key={i} className="border rounded-lg p-3 space-y-2 relative">
-                                    {!uploading && (
-                                        <Button variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6 text-slate-400 hover:text-red-600" onClick={() => removePending(i)}>
-                                            <X className="h-3.5 w-3.5" />
-                                        </Button>
-                                    )}
-                                    <p className="text-xs text-slate-400 truncate pr-6">{p.file.name}</p>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Nome documento</Label>
-                                        <Input value={p.name} disabled={batchUpload.statuses[i]?.status === 'uploading'} onChange={e => updatePending(i, { name: e.target.value })} />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-xs">Nota (opzionale)</Label>
-                                        <Input value={p.notes} disabled={batchUpload.statuses[i]?.status === 'uploading'} onChange={e => updatePending(i, { notes: e.target.value })} placeholder="Breve descrizione" />
-                                    </div>
-                                    <UploadStatusBar state={batchUpload.statuses[i]} />
-                                </div>
-                            ))}
-                            {pendingFiles.length === 0 && (
-                                <p className="text-sm text-slate-400 italic text-center py-4">Nessun file selezionato.</p>
-                            )}
-                        </div>
-                    )}
-                    <DialogFooter>
-                        {upStep === 1 ? (
-                            <>
-                                <Button variant="outline" onClick={() => setUploadOpen(false)}>Annulla</Button>
-                                <Button onClick={goToStep2} disabled={pendingFiles.length === 0}>Continua</Button>
-                            </>
-                        ) : (
-                            <>
-                                <Button variant="outline" onClick={() => setUpStep(1)}>Indietro</Button>
-                                <Button onClick={handleUploadAll} disabled={uploading || pendingFiles.length === 0}>
-                                    {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Carica {pendingFiles.length > 1 ? `(${pendingFiles.length})` : ""}
-                                </Button>
-                            </>
-                        )}
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <DocumentUploadDialog
+                open={uploadOpen}
+                onOpenChange={setUploadOpen}
+                title="Carica analisi costi di terzi"
+                files={pendingFiles}
+                onAddFiles={addFiles}
+                onUpdateFile={updatePending}
+                onRemoveFile={removePending}
+                statuses={batchUpload.statuses}
+                uploading={uploading}
+                onSubmit={handleUploadAll}
+                showOldRev={false}
+            />
 
             {/* Edit dialog */}
             <Dialog open={editOpen} onOpenChange={setEditOpen}>

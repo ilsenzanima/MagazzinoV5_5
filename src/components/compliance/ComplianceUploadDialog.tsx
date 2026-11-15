@@ -24,8 +24,8 @@ import { toast } from "sonner";
 import { complianceApi, ComplianceDocument } from "@/lib/services/compliance";
 import { ComplianceDocumentTypeConfig } from "@/lib/services/compliance-document-types";
 import { Supplier } from "@/lib/types";
-import { useBatchUpload, MAX_BATCH_UPLOAD_FILES } from "@/hooks/useBatchUpload";
-import { UploadStatusBar } from "@/components/ui/upload-status-row";
+import { useBatchUpload } from "@/hooks/useBatchUpload";
+import { DocumentUploadDialog, usePendingFiles } from "@/components/documents/DocumentUploadDialog";
 
 // Il tipo con cui si caricano i documenti che il produttore rilascia per un DDT preciso
 const isProducerConformity = (t?: ComplianceDocumentTypeConfig) => !!t && /conformit.*produttore/i.test(t.name);
@@ -129,13 +129,7 @@ export function PurchaseSearchCombobox({
     );
 }
 
-// ── Multi-upload wizard ──────────────────────────────────────────────────────
-
-interface PendingComplianceFile {
-    file: File;
-    name: string;
-    notes: string;
-}
+// ── Caricamento documenti (modale unica) ─────────────────────────────────────
 
 export function ComplianceUploadDialog({
     open,
@@ -157,26 +151,22 @@ export function ComplianceUploadDialog({
     fixedPurchase?: { id: string; number?: string };
     initialFiles?: File[];
 }) {
-    const [step, setStep] = useState<1 | 2>(1);
     const [localSupplierId, setLocalSupplierId] = useState(supplierId);
     const [documentTypeId, setDocumentTypeId] = useState("");
     // Variante "conformità produttore": il documento può essere la prova di una bolla di acquisto precisa
     const [linkToPurchase, setLinkToPurchase] = useState(false);
     const [linkedPurchaseId, setLinkedPurchaseId] = useState("");
-    const [pendingFiles, setPendingFiles] = useState<PendingComplianceFile[]>([]);
-    const [dragOver, setDragOver] = useState(false);
+    const { files: pendingFiles, setFiles: setPendingFiles, add: addFiles, update: updatePending, remove: removePending } = usePendingFiles();
     const [uploading, setUploading] = useState(false);
-    const fileRef = useRef<HTMLInputElement>(null);
+    const batchUpload = useBatchUpload();
 
     useEffect(() => {
         if (open) {
-            setStep(1);
             setLocalSupplierId(supplierId);
             setDocumentTypeId("");
             setLinkToPurchase(false);
             setLinkedPurchaseId("");
-            setPendingFiles((initialFiles ?? []).map(f => ({ file: f, name: f.name.replace(/\.[^.]+$/, ''), notes: "" })));
-            setDragOver(false);
+            setPendingFiles((initialFiles ?? []).map(f => ({ file: f, name: f.name.replace(/\.[^.]+$/, ''), notes: "", isOld: false, isRev: false })));
             batchUpload.reset();
         }
     }, [open, supplierId]);
@@ -186,56 +176,14 @@ export function ComplianceUploadDialog({
     const linked = !!fixedPurchase || (producerType && linkToPurchase);
     const purchaseIdToLink = fixedPurchase ? fixedPurchase.id : linkedPurchaseId;
 
-    const handleFilesSelected = (files: FileList | null) => {
-        if (!files || files.length === 0) return;
-        setPendingFiles((prev) => {
-            const room = MAX_BATCH_UPLOAD_FILES - prev.length;
-            if (room <= 0) {
-                toast.error(`Puoi caricare al massimo ${MAX_BATCH_UPLOAD_FILES} file alla volta`);
-                return prev;
-            }
-            const selected = Array.from(files);
-            if (selected.length > room) toast.error(`Puoi caricare al massimo ${MAX_BATCH_UPLOAD_FILES} file alla volta, aggiunti solo i primi ${room}`);
-            const newPending: PendingComplianceFile[] = selected.slice(0, room).map((f) => ({
-                file: f,
-                name: f.name.replace(/\.[^.]+$/, ''),
-                notes: "",
-            }));
-            return [...prev, ...newPending];
-        });
-    };
-
-    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        setDragOver(false);
-        handleFilesSelected(e.dataTransfer.files);
-    };
-
-    const goToStep2 = () => {
-        if (!documentTypeId) {
-            toast.error("Selezionare il tipo di documento.");
-            return;
-        }
-        if (!effectiveSupplierId || pendingFiles.length === 0) return;
+    const handleUploadAll = async () => {
+        if (pendingFiles.length === 0) return;
+        if (!documentTypeId) { toast.error("Selezionare il tipo di documento."); return; }
+        if (!effectiveSupplierId) { toast.error("Selezionare il fornitore."); return; }
         if (linked && !purchaseIdToLink) {
             toast.error("Cerca e seleziona la bolla di acquisto a cui è collegato.");
             return;
         }
-        setStep(2);
-    };
-
-    const updatePending = (idx: number, patch: Partial<PendingComplianceFile>) => {
-        setPendingFiles((prev) => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
-    };
-
-    const removePending = (idx: number) => {
-        setPendingFiles((prev) => prev.filter((_, i) => i !== idx));
-    };
-
-    const batchUpload = useBatchUpload();
-
-    const handleUploadAll = async () => {
-        if (pendingFiles.length === 0) return;
         setUploading(true);
         const supplierName = suppliers.find(s => s.id === effectiveSupplierId)?.name || effectiveSupplierId;
         const uploaded: ComplianceDocument[] = [];
@@ -269,144 +217,90 @@ export function ComplianceUploadDialog({
         }
     };
 
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Carica documenti</DialogTitle>
-                </DialogHeader>
-                {step === 1 ? (
-                    <div className="space-y-4 py-2">
-                        {(
-                            <div className="space-y-1.5">
-                                <Label>Fornitore <span className="text-destructive">*</span></Label>
-                                <Select value={localSupplierId} disabled={!!fixedPurchase} onValueChange={(v) => { setLocalSupplierId(v); setLinkedPurchaseId(""); }}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Seleziona fornitore" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {suppliers.map((s) => (
-                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
-                            <div className="space-y-1.5">
-                                <Label>Tipo documento</Label>
-                                <Select value={documentTypeId} onValueChange={(v) => { setDocumentTypeId(v); setLinkToPurchase(false); setLinkedPurchaseId(""); }}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Seleziona tipo" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {docTypes.map((t) => (
-                                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        {fixedPurchase && (
-                            <p className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
-                                Il documento sarà collegato alla bolla{fixedPurchase.number ? <> <span className="font-medium text-foreground">{fixedPurchase.number}</span></> : ""}: specifico di quel DDT, non riutilizzabile altrove.
-                            </p>
-                        )}
-                        {producerType && !fixedPurchase && (
-                            <div className="space-y-2 rounded-md border bg-muted/30 p-3">
-                                <label className="flex cursor-pointer items-start gap-2 text-sm">
-                                    <Checkbox
-                                        className="mt-0.5"
-                                        checked={linkToPurchase}
-                                        onCheckedChange={(c) => { setLinkToPurchase(!!c); if (!c) setLinkedPurchaseId(""); }}
-                                    />
-                                    <span>
-                                        Collegato a una bolla di acquisto
-                                        <span className="block text-xs text-muted-foreground">
-                                            Prova rilasciata dal produttore per quella bolla: si vedrà anche nella pagina dell&apos;acquisto e non sarà riutilizzabile altrove.
-                                        </span>
-                                    </span>
-                                </label>
-                                {linkToPurchase && (
-                                    effectiveSupplierId ? (
-                                        <PurchaseSearchCombobox
-                                            key={effectiveSupplierId}
-                                            supplierId={effectiveSupplierId}
-                                            value={linkedPurchaseId}
-                                            onChange={(id) => setLinkedPurchaseId(id)}
-                                        />
-                                    ) : (
-                                        <p className="text-xs text-muted-foreground">Scegli prima il fornitore per cercare la bolla.</p>
-                                    )
-                                )}
-                                {linkToPurchase && <p className="text-xs text-muted-foreground">La bolla scelta vale per tutti i file di questo caricamento.</p>}
-                            </div>
-                        )}
-                        <div className="space-y-1.5">
-                            <Label>File (puoi selezionarne più di uno, anche con drag&drop)</Label>
-                            <div
-                                className={`border-2 border-dashed rounded-md p-6 flex flex-col items-center justify-center cursor-pointer transition-colors ${dragOver ? 'bg-primary/5 border-primary' : 'hover:border-primary'}`}
-                                onClick={() => fileRef.current?.click()}
-                                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                                onDragLeave={() => setDragOver(false)}
-                                onDrop={handleDrop}
-                            >
-                                <input
-                                    ref={fileRef}
-                                    type="file"
-                                    multiple
-                                    accept=".pdf,.PDF,image/*"
-                                    className="hidden"
-                                    onChange={(e) => handleFilesSelected(e.target.files)}
-                                />
-                                <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-                                <p className="text-sm font-medium text-muted-foreground">
-                                    {pendingFiles.length > 0 ? `${pendingFiles.length} file selezionati` : "Clicca o trascina qui i file"}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="space-y-4 py-2">
-                        <p className="text-xs text-muted-foreground">Per ogni file inserisci nome e nota (opzionale).</p>
-                        {pendingFiles.map((pf, idx) => (
-                            <div key={idx} className="border rounded-lg p-3 space-y-2 relative">
-                                <Button variant="ghost" size="icon" disabled={batchUpload.statuses[idx]?.status === 'uploading'} className="absolute top-1 right-1 h-6 w-6 text-muted-foreground hover:text-destructive" onClick={() => removePending(idx)}>
-                                    <X className="h-3.5 w-3.5" />
-                                </Button>
-                                <p className="text-xs text-muted-foreground truncate pr-6">{pf.file.name}</p>
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Nome documento</Label>
-                                    <Input value={pf.name} disabled={batchUpload.statuses[idx]?.status === 'uploading'} onChange={(e) => updatePending(idx, { name: e.target.value })} />
-                                </div>
-                                <div className="space-y-1">
-                                    <Label className="text-xs">Nota (opzionale)</Label>
-                                    <Input value={pf.notes} disabled={batchUpload.statuses[idx]?.status === 'uploading'} onChange={(e) => updatePending(idx, { notes: e.target.value })} placeholder="Breve descrizione" />
-                                </div>
-                                <UploadStatusBar state={batchUpload.statuses[idx]} />
-                            </div>
-                        ))}
-                        {pendingFiles.length === 0 && (
-                            <p className="text-sm text-muted-foreground italic text-center py-4">Nessun file selezionato.</p>
-                        )}
-                    </div>
-                )}
-                <DialogFooter>
-                    {step === 1 ? (
-                        <>
-                            <Button variant="outline" onClick={() => onOpenChange(false)}>Annulla</Button>
-                            <Button onClick={goToStep2} disabled={!effectiveSupplierId || pendingFiles.length === 0}>Continua</Button>
-                        </>
-                    ) : (
-                        <>
-                            <Button variant="outline" onClick={() => setStep(1)}>Indietro</Button>
-                            <Button onClick={handleUploadAll} disabled={uploading || pendingFiles.length === 0}>
-                                {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Carica {pendingFiles.length > 1 ? `(${pendingFiles.length})` : ""}
-                            </Button>
-                        </>
+    const topSlot = (
+        <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                    <Label>Fornitore <span className="text-destructive">*</span></Label>
+                    <Select value={localSupplierId} disabled={!!fixedPurchase || uploading} onValueChange={(v) => { setLocalSupplierId(v); setLinkedPurchaseId(""); }}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Seleziona fornitore" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {suppliers.map((s) => (
+                                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-1.5">
+                    <Label>Tipo documento</Label>
+                    <Select value={documentTypeId} disabled={uploading} onValueChange={(v) => { setDocumentTypeId(v); setLinkToPurchase(false); setLinkedPurchaseId(""); }}>
+                        <SelectTrigger>
+                            <SelectValue placeholder="Seleziona tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {docTypes.map((t) => (
+                                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+            {fixedPurchase && (
+                <p className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground">
+                    Il documento sarà collegato alla bolla{fixedPurchase.number ? <> <span className="font-medium text-foreground">{fixedPurchase.number}</span></> : ""}: specifico di quel DDT, non riutilizzabile altrove.
+                </p>
+            )}
+            {producerType && !fixedPurchase && (
+                <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+                    <label className="flex cursor-pointer items-start gap-2 text-sm">
+                        <Checkbox
+                            className="mt-0.5"
+                            checked={linkToPurchase}
+                            onCheckedChange={(c) => { setLinkToPurchase(!!c); if (!c) setLinkedPurchaseId(""); }}
+                        />
+                        <span>
+                            Collegato a una bolla di acquisto
+                            <span className="block text-xs text-muted-foreground">
+                                Prova rilasciata dal produttore per quella bolla: si vedrà anche nella pagina dell&apos;acquisto e non sarà riutilizzabile altrove.
+                            </span>
+                        </span>
+                    </label>
+                    {linkToPurchase && (
+                        effectiveSupplierId ? (
+                            <PurchaseSearchCombobox
+                                key={effectiveSupplierId}
+                                supplierId={effectiveSupplierId}
+                                value={linkedPurchaseId}
+                                onChange={(id) => setLinkedPurchaseId(id)}
+                            />
+                        ) : (
+                            <p className="text-xs text-muted-foreground">Scegli prima il fornitore per cercare la bolla.</p>
+                        )
                     )}
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                    {linkToPurchase && <p className="text-xs text-muted-foreground">La bolla scelta vale per tutti i file di questo caricamento.</p>}
+                </div>
+            )}
+        </div>
+    );
+
+    return (
+        <DocumentUploadDialog
+            open={open}
+            onOpenChange={onOpenChange}
+            title="Carica documenti"
+            topSlot={topSlot}
+            accept=".pdf,.PDF,image/*"
+            files={pendingFiles}
+            onAddFiles={addFiles}
+            onUpdateFile={updatePending}
+            onRemoveFile={removePending}
+            statuses={batchUpload.statuses}
+            uploading={uploading}
+            onSubmit={handleUploadAll}
+            showOldRev={false}
+            submitDisabled={!effectiveSupplierId}
+        />
     );
 }
-

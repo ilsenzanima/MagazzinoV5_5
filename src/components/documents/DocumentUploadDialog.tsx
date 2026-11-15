@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { CheckCircle2, FileText, FolderPlus, Loader2, Upload, X, XCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -53,10 +53,12 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   title?: string
-  docTypes: UploadDocType[]
+  docTypes?: UploadDocType[] // senza tipi (es. offerte fornitori) la scelta di tipo e cartella non compare
+  topSlot?: ReactNode // campi in piu' sopra l'area file (es. il fornitore)
+  submitDisabled?: boolean
   emptyTypesHint?: string
-  typeId: string
-  onTypeChange: (id: string) => void
+  typeId?: string
+  onTypeChange?: (id: string) => void
   folders?: UploadFolder[]
   folderId?: string
   onFolderChange?: (id: string) => void
@@ -69,19 +71,21 @@ interface Props {
   uploading: boolean
   onSubmit: () => void
   accept?: string
+  showOldRev?: boolean // colonne Old/Rev: solo dove il documento le prevede
 }
 
 const fmtSize = (n: number) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`)
 
 // Modale unica per caricare documenti: tipo e cartella in alto, area di trascinamento, tabella con una riga per file
 export function DocumentUploadDialog({
-  open, onOpenChange, title = "Carica documenti", docTypes, emptyTypesHint, typeId, onTypeChange,
+  open, onOpenChange, title = "Carica documenti", docTypes, topSlot, submitDisabled, emptyTypesHint, typeId = "", onTypeChange,
   folders = [], folderId = "", onFolderChange, onNewFolder, files, onAddFiles, onUpdateFile, onRemoveFile,
-  statuses, uploading, onSubmit, accept,
+  statuses, uploading, onSubmit, accept, showOldRev = true,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragOver, setDragOver] = useState(false)
-  const type = docTypes.find(t => t.id === typeId)
+  const types = docTypes ?? []
+  const type = types.find(t => t.id === typeId)
   const typeFolders = folders.filter(f => f.documentTypeId === typeId)
   const done = statuses.filter(s => s.status === "done").length
   const busy = (i: number) => uploading && statuses[i]?.status === "uploading"
@@ -92,14 +96,15 @@ export function DocumentUploadDialog({
         <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
 
         <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
+          {topSlot}
+          {docTypes && <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label>Tipo documento</Label>
-              <Select value={typeId} onValueChange={v => { onTypeChange(v); onFolderChange?.("") }} disabled={uploading}>
+              <Select value={typeId} onValueChange={v => { onTypeChange?.(v); onFolderChange?.("") }} disabled={uploading}>
                 <SelectTrigger><SelectValue placeholder="Seleziona il tipo" /></SelectTrigger>
-                <SelectContent>{docTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+                <SelectContent>{types.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
               </Select>
-              {docTypes.length === 0 && emptyTypesHint && <p className="text-xs text-slate-400">{emptyTypesHint}</p>}
+              {types.length === 0 && emptyTypesHint && <p className="text-xs text-slate-400">{emptyTypesHint}</p>}
             </div>
             {type?.allowsFolders && (
               <div className="space-y-1">
@@ -120,7 +125,7 @@ export function DocumentUploadDialog({
                 </div>
               </div>
             )}
-          </div>
+          </div>}
 
           <div
             className={`flex cursor-pointer items-center justify-center gap-3 rounded-xl border-2 border-dashed text-center transition-colors ${files.length === 0 ? "flex-col px-6 py-10" : "flex-row px-4 py-3"} ${dragOver ? "border-blue-400 bg-blue-50 dark:bg-blue-950" : "border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-800"}`}
@@ -145,8 +150,8 @@ export function DocumentUploadDialog({
                     <tr className="bg-slate-100 text-left text-xs font-semibold uppercase tracking-wide text-slate-600 dark:bg-muted">
                       <th className="px-3 py-2">Nome documento</th>
                       <th className="w-64 px-2 py-2">Nota</th>
-                      <th className="w-14 px-2 py-2 text-center" title='Mostra il banner "OLD"'>Old</th>
-                      <th className="w-14 px-2 py-2 text-center" title='Mostra il banner "REV"'>Rev</th>
+                      {showOldRev && <th className="w-14 px-2 py-2 text-center" title='Mostra il banner "OLD"'>Old</th>}
+                      {showOldRev && <th className="w-14 px-2 py-2 text-center" title='Mostra il banner "REV"'>Rev</th>}
                       <th className="w-10 px-2 py-2" />
                     </tr>
                   </thead>
@@ -163,8 +168,8 @@ export function DocumentUploadDialog({
                           <td className="px-2 py-2 align-top">
                             <Input value={pf.notes} disabled={busy(idx) || st?.status === "done"} onChange={e => onUpdateFile(idx, { notes: e.target.value })} placeholder="Breve descrizione" className="h-8" />
                           </td>
-                          <td className="px-2 py-2 text-center align-top"><div className="flex h-8 items-center justify-center"><Checkbox checked={pf.isOld} disabled={uploading} onCheckedChange={v => onUpdateFile(idx, { isOld: v === true })} aria-label="Banner OLD" /></div></td>
-                          <td className="px-2 py-2 text-center align-top"><div className="flex h-8 items-center justify-center"><Checkbox checked={pf.isRev} disabled={uploading} onCheckedChange={v => onUpdateFile(idx, { isRev: v === true })} aria-label="Banner REV" /></div></td>
+                          {showOldRev && <td className="px-2 py-2 text-center align-top"><div className="flex h-8 items-center justify-center"><Checkbox checked={pf.isOld} disabled={uploading} onCheckedChange={v => onUpdateFile(idx, { isOld: v === true })} aria-label="Banner OLD" /></div></td>}
+                          {showOldRev && <td className="px-2 py-2 text-center align-top"><div className="flex h-8 items-center justify-center"><Checkbox checked={pf.isRev} disabled={uploading} onCheckedChange={v => onUpdateFile(idx, { isRev: v === true })} aria-label="Banner REV" /></div></td>}
                           <td className="px-2 py-2 align-top">
                             <div className="flex h-8 items-center justify-center">
                               {st?.status === "uploading" ? <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
@@ -193,7 +198,7 @@ export function DocumentUploadDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={uploading}>Annulla</Button>
-          <Button onClick={onSubmit} disabled={uploading || files.length === 0}>
+          <Button onClick={onSubmit} disabled={uploading || files.length === 0 || submitDisabled}>
             {uploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Carica{files.length > 1 ? ` ${files.length} file` : ""}
           </Button>
         </DialogFooter>
