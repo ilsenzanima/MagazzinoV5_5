@@ -1,6 +1,6 @@
 import { useState } from "react"
 
-export const MAX_BATCH_UPLOAD_FILES = 20
+export const MAX_BATCH_UPLOAD_FILES = 50
 
 export type UploadItemStatus = "pending" | "uploading" | "done" | "error"
 
@@ -20,7 +20,7 @@ export function useBatchUpload() {
     const run = async <T,>(
         items: T[],
         uploadOne: (item: T, index: number) => Promise<void>,
-        concurrency = 2
+        concurrency = 3
     ) => {
         setRunning(true)
         const finalStatuses: UploadItemState[] = items.map(() => ({ status: "pending" }))
