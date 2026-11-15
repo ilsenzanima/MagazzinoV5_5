@@ -47,9 +47,10 @@ export async function GET(req: NextRequest) {
         }
         return new NextResponse(
             `<html><body style="font-family:monospace;padding:2rem;word-break:break-all">
-            <h2>Nuovo refresh token generato (scope drive.file)</h2>
-            <p>Copia questo valore e impostalo come <b>GOOGLE_DRIVE_REFRESH_TOKEN_NEW</b> nelle Environment Variables di Vercel
-            (NON sostituire ancora quello attuale: prima va eseguita la migrazione dei file esistenti).</p>
+            <h2>Nuovo refresh token generato (scope drive)</h2>
+            <p>Copia questo valore e impostalo come <b>GOOGLE_DRIVE_REFRESH_TOKEN</b> nelle Environment Variables di Vercel
+            (e in .env.local), poi rifai il deploy. Con lo scope completo l'app vede tutti i file della cartella,
+            compresi quelli gi&agrave; caricati con il vecchio token.</p>
             <pre style="background:#111;color:#0f0;padding:1rem;border-radius:8px">${tokens.refresh_token}</pre>
             </body></html>`,
             { status: 200, headers: { 'Content-Type': 'text/html' } }
