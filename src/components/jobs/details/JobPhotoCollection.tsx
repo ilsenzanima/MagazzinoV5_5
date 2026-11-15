@@ -1,9 +1,13 @@
 "use client"
 
-import { useEffect, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ArrowLeft, Upload, Images, CheckSquare, FolderInput, Trash2, X } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { NotchActions, NotchButton, NotchSearch } from "@/components/ui/notch-tabs"
+import { FloatingAddButton } from "@/components/ui/floating-add-button"
+import { PhoneSearchPortal, usePhone } from "@/components/layout/mobile-actions"
 import { format } from "date-fns"
 import { it } from "date-fns/locale"
 import { isImageFileType } from "@/components/ui/photo-gallery"
@@ -43,6 +47,23 @@ export function PhotoThumb({ doc, className = "" }: { doc: PhotoDocLike; classNa
   )
 }
 
+type SortKey = "recent" | "oldest" | "name_asc" | "name_desc" | "number"
+
+const SORTS: { value: SortKey; label: string }[] = [
+  { value: "recent", label: "Più recenti" },
+  { value: "oldest", label: "Meno recenti" },
+  { value: "name_asc", label: "Nome A → Z" },
+  { value: "name_desc", label: "Nome Z → A" },
+  { value: "number", label: "Numero nel nome" },
+]
+
+const byName = (a: string, b: string) => a.localeCompare(b, "it", { numeric: true, sensitivity: "base" })
+// Primo numero scritto nel nome (es. «Foto 12» -> 12); senza numero va in fondo
+const firstNumber = (name: string) => {
+  const m = name.match(/\d+/)
+  return m ? Number(m[0]) : Number.POSITIVE_INFINITY
+}
+
 interface JobPhotoCollectionProps<T extends PhotoDocLike> {
   title: string
   docs: T[]
@@ -59,6 +80,25 @@ interface JobPhotoCollectionProps<T extends PhotoDocLike> {
 export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack, backLabel = "Documenti Cantiere", onAdd, onOpen, menu, onMoveSelected, onDeleteSelected }: JobPhotoCollectionProps<T>) {
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [search, setSearch] = useState("")
+  const [sort, setSort] = useState<SortKey>("recent")
+  const phone = usePhone()
+
+  const shown = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const list = q ? docs.filter(d => `${d.name} ${d.notes ?? ""}`.toLowerCase().includes(q)) : [...docs]
+    const time = (d: T) => new Date(d.createdAt).getTime() || 0
+    list.sort((a, b) => {
+      switch (sort) {
+        case "oldest": return time(a) - time(b)
+        case "name_asc": return byName(a.name, b.name)
+        case "name_desc": return byName(b.name, a.name)
+        case "number": return firstNumber(a.name) - firstNumber(b.name) || byName(a.name, b.name)
+        default: return time(b) - time(a)
+      }
+    })
+    return list
+  }, [docs, search, sort])
 
   // Dopo uno spostamento o un'eliminazione le foto che non ci sono più escono dalla selezione
   useEffect(() => {
@@ -69,8 +109,8 @@ export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack
     })
   }, [docs])
 
-  const selectedDocs = docs.filter(d => selected.has(d.id))
-  const allSelected = docs.length > 0 && selectedDocs.length === docs.length
+  const selectedDocs = shown.filter(d => selected.has(d.id))
+  const allSelected = shown.length > 0 && selectedDocs.length === shown.length
   const toggle = (id: string) => setSelected(prev => {
     const next = new Set(prev)
     if (next.has(id)) next.delete(id); else next.add(id)
@@ -78,29 +118,43 @@ export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack
   })
   const exitSelect = () => { setSelectMode(false); setSelected(new Set()) }
 
+  const sortSelect = (
+    <Select value={sort} onValueChange={v => setSort(v as SortKey)}>
+      <SelectTrigger className="h-9 w-[190px] rounded-full border-slate-300 bg-white text-slate-800" aria-label="Ordina le foto">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {SORTS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  )
+
   return (
     <div className="space-y-4">
+      {/* Ricerca, ordinamento e selezione stanno nella striscia in alto (su telefono: Cerca e Azioni della barra in basso) */}
+      <NotchSearch value={search} onChange={setSearch} placeholder="Cerca per nome o nota..." />
+      {phone
+        ? <PhoneSearchPortal title={title}>{sortSelect}</PhoneSearchPortal>
+        : <NotchActions>{sortSelect}</NotchActions>}
+      {docs.length > 0 && !selectMode && (
+        <NotchActions>
+          <NotchButton type="button" onClick={() => setSelectMode(true)}>
+            <CheckSquare />Seleziona
+          </NotchButton>
+        </NotchActions>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="sm" className="-ml-2 text-slate-600" onClick={onBack}>
           <ArrowLeft className="mr-1.5 h-4 w-4" />{backLabel}
         </Button>
-        <div className="ml-auto flex items-center gap-2">
-          {docs.length > 0 && !selectMode && (
-            <Button variant="outline" onClick={() => setSelectMode(true)}>
-              <CheckSquare className="mr-2 h-4 w-4" />Seleziona
-            </Button>
-          )}
-          <Button variant="outline" onClick={onAdd}>
-            <Upload className="mr-2 h-4 w-4" />Aggiungi foto
-          </Button>
-        </div>
       </div>
 
       <div className="flex items-baseline gap-3">
         <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-800 dark:text-slate-100">
           <Images className="h-5 w-5 text-blue-600" />{title}
         </h2>
-        <span className="text-sm text-slate-500">{docs.length} foto</span>
+        <span className="text-sm text-slate-500">{search.trim() ? `${shown.length} di ${docs.length} foto` : `${docs.length} foto`}</span>
       </div>
 
       {selectMode && (
@@ -108,7 +162,7 @@ export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack
           <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
             <Checkbox
               checked={allSelected}
-              onCheckedChange={v => setSelected(v ? new Set(docs.map(d => d.id)) : new Set())}
+              onCheckedChange={v => setSelected(v ? new Set(shown.map(d => d.id)) : new Set())}
               aria-label="Seleziona tutte"
             />
             {selectedDocs.length > 0 ? `${selectedDocs.length} selezionate` : "Seleziona tutte"}
@@ -125,13 +179,13 @@ export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack
         </div>
       )}
 
-      {docs.length === 0 ? (
+      {shown.length === 0 ? (
         <p className="rounded-md border border-dashed py-12 text-center text-sm text-slate-400">
-          Nessuna foto in questa raccolta. Usa «Aggiungi foto» per caricarne.
+          {docs.length === 0 ? "Nessuna foto in questa raccolta. Usa il pulsante blu in basso per caricarne." : "Nessuna foto corrisponde alla ricerca."}
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-          {docs.map(doc => {
+          {shown.map(doc => {
             const isSel = selected.has(doc.id)
             return (
               <div key={doc.id} className={`group relative overflow-hidden rounded-lg border bg-white dark:bg-slate-900 ${isSel ? "ring-2 ring-blue-500" : ""}`}>
@@ -161,6 +215,8 @@ export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack
           })}
         </div>
       )}
+
+      <FloatingAddButton onClick={onAdd} label="Aggiungi foto" icon={<Upload className="h-6 w-6" />} />
     </div>
   )
 }
