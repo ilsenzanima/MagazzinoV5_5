@@ -30,7 +30,9 @@ export async function GET(req: NextRequest) {
     const url = oauth2Client.generateAuthUrl({
         access_type: 'offline',
         prompt: 'consent',
-        scope: ['https://www.googleapis.com/auth/drive.file'],
+        // Scope completo: con drive.file l'app vede solo i file creati da lei stessa
+        // e dà "file non trovato" sui PDF caricati in altro modo (es. importazione storica).
+        scope: ['https://www.googleapis.com/auth/drive'],
     })
 
     return NextResponse.redirect(url)
