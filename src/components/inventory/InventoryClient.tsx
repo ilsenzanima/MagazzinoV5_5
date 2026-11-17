@@ -18,9 +18,11 @@ import {
   Loader2,
   ArrowUp,
   ArrowDown,
-  ArrowUpDown
+  ArrowUpDown,
+  Wrench
 } from "lucide-react";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { checkDateInfo } from "@/lib/utils/equipment-check";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -164,11 +166,64 @@ function MinStockCell({ item, canEdit, onSaved }: { item: InventoryItem; canEdit
   );
 }
 
+// Cella modificabile direttamente nella tabella (solo admin e operativi): clic, scrivi, Invio per salvare
+function InlineCell({ display, initial, type, canEdit, label, onSave, align = "left" }: {
+  display: React.ReactNode; initial: string; type: "text" | "number" | "date"; canEdit: boolean; label: string;
+  onSave: (value: string) => Promise<void>; align?: "left" | "right"
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const done = useRef(false);
+
+  const finish = async (save: boolean) => {
+    if (done.current) return;
+    done.current = true;
+    if (!save || value === initial) { setEditing(false); return; }
+    setSaving(true);
+    try { await onSave(value); }
+    catch (err) { console.error("Failed to save " + label, err); notify.error("Non sono riuscito a salvare: " + label); }
+    finally { setSaving(false); setEditing(false); }
+  };
+
+  if (!canEdit) return <>{display}</>;
+  if (editing) {
+    return (
+      <Input
+        autoFocus
+        type={type}
+        step={type === "number" ? "any" : undefined}
+        min={type === "number" ? 0 : undefined}
+        value={value}
+        disabled={saving}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => finish(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); finish(true); }
+          if (e.key === "Escape") { e.preventDefault(); finish(false); }
+        }}
+        className={`h-7 text-sm ${type === "number" ? "w-24 text-right" : "w-full min-w-32"} ${align === "right" ? "ml-auto" : ""}`}
+        aria-label={label}
+      />
+    );
+  }
+  return (
+    <button type="button" title={"Clicca per modificare: " + label}
+      onClick={(e) => { e.stopPropagation(); done.current = false; setValue(initial); setEditing(true); }}
+      className={`block min-h-6 w-full min-w-10 rounded px-1.5 py-0.5 hover:bg-blue-50 dark:hover:bg-blue-900/30 ${align === "right" ? "text-right" : "text-left"}`}>
+      {display}
+    </button>
+  );
+}
+
 export default function InventoryClient({ initialItems, initialTotal, initialTypes }: InventoryClientProps) {
   const { userRole } = useAuth();
   const router = useRouter();
+  const canEditCells = userRole === 'admin' || userRole === 'operativo';
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") || "all";
+  const initialKind: "materials" | "equipment" = searchParams.get("kind") === "equipment" ? "equipment" : "materials";
   const initialSearch = searchParams.get("q") || "";
   const initialBrand = searchParams.get("brand") || "all";
   const initialType = searchParams.get("type") || "all";
@@ -181,6 +236,8 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(initialSearch);
   const [activeTab, setActiveTab] = useState(initialTab);
+  // Due elenchi separati: materiali di consumo e attrezzature
+  const [kind, setKind] = useState<"materials" | "equipment">(initialKind);
   const [isScanning, setIsScanning] = useState(false);
   const [items, setItems] = useState<InventoryItem[]>(initialItems);
   const [itemTypes, setItemTypes] = useState<ItemType[]>(initialTypes);
@@ -217,6 +274,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   // restores the exact view instead of resetting it.
   useEffect(() => {
     const params = new URLSearchParams();
+    if (kind !== "materials") params.set("kind", kind);
     if (activeTab !== "all") params.set("tab", activeTab);
     if (debouncedSearchTerm) params.set("q", debouncedSearchTerm);
     if (selectedBrand !== "all") params.set("brand", selectedBrand);
@@ -227,7 +285,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
     if (sortDir !== "asc") params.set("dir", sortDir);
     const query = params.toString();
     router.replace(query ? `/inventory?${query}` : "/inventory", { scroll: false });
-  }, [activeTab, debouncedSearchTerm, selectedBrand, selectedType, selectedWarehouse, page, sortKey, sortDir, router]);
+  }, [kind, activeTab, debouncedSearchTerm, selectedBrand, selectedType, selectedWarehouse, page, sortKey, sortDir, router]);
 
   // Load warehouses for the location tabs
   useEffect(() => {
@@ -297,13 +355,13 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   useEffect(() => {
     // Skip first load if parameters match initial props
     // This prevents double fetching on mount
-    if (page === 1 && debouncedSearchTerm === "" && activeTab === "all" && selectedBrand === "all" && selectedType === "all" && selectedWarehouse === "all" && sortKey === "name" && sortDir === "asc" && items === initialItems) {
+    if (page === 1 && debouncedSearchTerm === "" && kind === "materials" && activeTab === "all" && selectedBrand === "all" && selectedType === "all" && selectedWarehouse === "all" && sortKey === "name" && sortDir === "asc" && items === initialItems) {
       return;
     }
 
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearchTerm, activeTab, selectedBrand, selectedType, selectedWarehouse, sortKey, sortDir]);
+  }, [page, debouncedSearchTerm, kind, activeTab, selectedBrand, selectedType, selectedWarehouse, sortKey, sortDir]);
 
   const loadItems = async () => {
     try {
@@ -316,6 +374,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         limit,
         search: debouncedSearchTerm,
         tab: activeTab,
+        kind,
         brand: selectedBrand !== "all" ? selectedBrand : undefined,
         type: selectedType !== "all" ? selectedType : undefined,
         warehouseId: selectedWarehouse !== "all" ? selectedWarehouse : undefined,
@@ -392,6 +451,14 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
       <ListPageHeader
         strip
         title="Gestione Inventario"
+        tabs={{
+          items: [
+            { value: "materials", label: "Materiali", icon: <Package /> },
+            { value: "equipment", label: "Attrezzature", icon: <Wrench /> },
+          ],
+          value: kind,
+          onValueChange: v => { setKind(v as "materials" | "equipment"); setPage(1); },
+        }}
         actions={(userRole === 'admin' || userRole === 'operativo') && (
           <Link href="/inventory/new" className="w-full sm:w-auto md:hidden">
             <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
@@ -476,7 +543,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         }
       >
         {/* Telefono: magazzino e scorte in due menu sulla stessa riga */}
-        <div className="grid grid-cols-2 gap-2 md:hidden">
+        {kind !== "equipment" && <div className="grid grid-cols-2 gap-2 md:hidden">
           {stockWarehouses.length > 1 ? (
             <Select value={selectedWarehouse} onValueChange={(val) => { setSelectedWarehouse(val); setPage(1); }}>
               <SelectTrigger aria-label="Magazzino"><SelectValue placeholder="Magazzino" /></SelectTrigger>
@@ -494,7 +561,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
               <SelectItem value="out_of_stock">Esauriti</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </div>}
       </ListPageHeader>
 
       {/* Lista Articoli */}
@@ -558,6 +625,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       </button>
                     </div>
                   </TableHead>
+                  {kind !== "equipment" && (
                   <TableHead className="w-32 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
                     <div className="flex items-center gap-1">
                       <div className="min-w-0 flex-1">
@@ -576,6 +644,36 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       </button>
                     </div>
                   </TableHead>
+                  )}
+                  {kind === "equipment" ? (
+                    <>
+                  <TableHead className="w-36 whitespace-nowrap border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <button type="button" onClick={() => toggleSort("purchased")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+                      Acquistate
+                      {sortKey === "purchased" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-36 whitespace-nowrap border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <button type="button" onClick={() => toggleSort("available_count")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+                      Disponibili
+                      {sortKey === "available_count" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-56 whitespace-nowrap border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <button type="button" onClick={() => toggleSort("location")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+                      Posizione
+                      {sortKey === "location" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-56 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <button type="button" onClick={() => toggleSort("next_check_date")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+                      Prossima verifica
+                      {sortKey === "next_check_date" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    </button>
+                  </TableHead>
+                    </>
+                  ) : (
+                    <>
                   <TableHead className="w-40 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
                     {stockWarehouses.length > 1 ? (
                       <Select value={selectedWarehouse} onValueChange={(val) => { setSelectedWarehouse(val); setPage(1); }}>
@@ -613,12 +711,14 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                     </button>
                   </TableHead>
                   <TableHead className="w-28 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Da processare</TableHead>
+                    </>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                    <TableCell colSpan={kind === "equipment" ? 9 : 10} className="py-10 text-center text-slate-400 dark:text-slate-500">
                       <Package className="mx-auto mb-2 h-12 w-12 opacity-20" />
                       <p>Nessun articolo trovato</p>
                     </TableCell>
@@ -641,7 +741,31 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       </TableCell>
                       <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.model || <span className="text-slate-300">—</span>}</TableCell>
                       <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.brand}</TableCell>
-                      <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.type}</TableCell>
+                      {kind !== "equipment" && <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.type}</TableCell>}
+                      {kind === "equipment" ? (
+                        <>
+                      <TableCell className="border-r py-2 text-right text-sm text-slate-600 dark:text-slate-300">
+                        {(item.purchasedQuantity ?? 0) > 0 ? item.purchasedQuantity!.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : <span className="text-slate-300" title="Nessuna quantita' registrata negli acquisti">—</span>}
+                      </TableCell>
+                      <TableCell className="border-r py-1 text-right text-sm font-semibold text-slate-800 dark:text-slate-200" onClick={(e) => e.stopPropagation()}>
+                        <InlineCell type="number" align="right" label="Disponibili" canEdit={canEditCells}
+                          initial={item.availableCount != null ? String(item.availableCount) : ""}
+                          display={item.availableCount != null ? item.availableCount.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : <span className="font-normal text-slate-300">—</span>}
+                          onSave={async (v) => { const n = v.trim() === "" ? null : Math.max(0, Number(v.replace(",", "."))); if (n !== null && !Number.isFinite(n)) throw new Error("numero non valido"); await inventoryApi.update(item.id, { availableCount: n }); setItems(prev => prev.map(i => i.id === item.id ? { ...i, availableCount: n } : i)); }} />
+                      </TableCell>
+                      <TableCell className="border-r py-1 text-sm text-slate-600 dark:text-slate-300" onClick={(e) => e.stopPropagation()}>
+                        <InlineCell type="text" label="Posizione" canEdit={canEditCells} initial={item.location ?? ""}
+                          display={item.location || <span className="text-slate-300">—</span>}
+                          onSave={async (v) => { const t = v.trim(); await inventoryApi.update(item.id, { location: t }); setItems(prev => prev.map(i => i.id === item.id ? { ...i, location: t } : i)); }} />
+                      </TableCell>
+                      <TableCell className="py-1 text-sm" onClick={(e) => e.stopPropagation()}>
+                        <InlineCell type="date" label="Prossima verifica" canEdit={canEditCells} initial={item.nextCheckDate ?? ""}
+                          display={<span className={checkDateInfo(item.nextCheckDate).cls}>{checkDateInfo(item.nextCheckDate).label}</span>}
+                          onSave={async (v) => { const d = v || null; await inventoryApi.update(item.id, { nextCheckDate: d }); setItems(prev => prev.map(i => i.id === item.id ? { ...i, nextCheckDate: d } : i)); }} />
+                      </TableCell>
+                        </>
+                      ) : (
+                        <>
                       <TableCell className="border-r py-2 text-xs text-slate-600 dark:text-slate-300">
                         {(() => {
                           const where = stockMap.get(item.id) || [];
@@ -678,6 +802,8 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                         )}
                         {!(pending && (pending.uscita > 0 || pending.reso > 0)) && <span className="text-slate-300">—</span>}
                       </TableCell>
+                        </>
+                      )}
                     </TableRow>
                   );
                 })}
@@ -704,7 +830,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                           typeInfo={itemTypes.find(t => t.name === item.type)}
                         />
 
-                        {item.quantity === 0 && (
+                        {kind !== "equipment" && item.quantity === 0 && (
                           <div className="absolute inset-0 bg-white/10 flex items-center justify-center z-10">
                             <Badge variant="destructive" className="text-sm font-bold shadow-sm">ESAURITO</Badge>
                           </div>
@@ -730,7 +856,14 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                           <Badge variant="secondary" className="text-[10px] font-normal text-slate-600 dark:text-slate-400">
                             {item.type}
                           </Badge>
-                          <div className="ml-auto text-right flex flex-col items-end gap-1">
+                          {kind === "equipment" && (
+                            <div className="ml-auto flex flex-col items-end gap-0.5 text-right text-[11px]">
+                              {item.availableCount != null && <span className="font-semibold text-slate-700 dark:text-slate-200">Disponibili: {item.availableCount.toLocaleString('it-IT', { maximumFractionDigits: 2 })}</span>}
+                              {item.location && <span className="text-slate-500 dark:text-slate-400">{item.location}</span>}
+                              {item.nextCheckDate && <span className={checkDateInfo(item.nextCheckDate).cls}>Verifica: {checkDateInfo(item.nextCheckDate).label}</span>}
+                            </div>
+                          )}
+                          {kind !== "equipment" && <div className="ml-auto text-right flex flex-col items-end gap-1">
                             {item.coefficient !== 1 ? (
                               <>
                                 <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mr-1">
@@ -771,7 +904,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                                 </>
                               );
                             })()}
-                          </div>
+                          </div>}
                         </div>
                       </div>
                     </CardContent>

@@ -31,7 +31,7 @@ export interface AgendaItem {
     remindDaysBefore: number;
     done: boolean;
     // Voci importate in automatico (sola lettura): permessi richiesti, scadenze di corsi e visite mediche
-    auto?: 'leave' | 'course' | 'exam';
+    auto?: 'leave' | 'course' | 'exam' | 'equipment';
     href?: string;
 }
 
@@ -109,11 +109,13 @@ const AUTO_WARNING_DAYS = 60;
 // Voci importate in automatico: permessi/ferie richiesti, ultimo attestato di ogni corso e ultima visita medica in scadenza
 export async function getAutoItems(client: SupabaseClient): Promise<AgendaItem[]> {
     const today = todayIso();
-    const [wRes, lRes, cRes, eRes] = await Promise.all([
+    const [wRes, lRes, cRes, eRes, qRes] = await Promise.all([
         client.from('workers').select('id, first_name, last_name').eq('is_active', true).is('deleted_at', null),
         client.from('leave_requests').select('id, worker_id, date, end_date, hours, status').neq('status', 'rejected').gte('date', addDaysIso(today, -60)).order('date', { ascending: true }),
         client.from('worker_courses').select('id, worker_id, course_name, completion_date, validity_years'),
         client.from('worker_medical_exams').select('id, worker_id, exam_date, next_exam_date'),
+        // Attrezzature con una verifica o revisione in scadenza
+        client.from('inventory').select('id, name, code, location, next_check_date').is('deleted_at', null).ilike('category', 'attrezzatura').not('next_check_date', 'is', null).lte('next_check_date', addDaysIso(today, AUTO_WARNING_DAYS)),
     ]);
     const names = new Map<string, string>();
     (wRes.data ?? []).forEach((w: any) => names.set(w.id, `${w.last_name ?? ''} ${w.first_name ?? ''}`.trim()));
@@ -168,6 +170,14 @@ export async function getAutoItems(client: SupabaseClient): Promise<AgendaItem[]
             ...blank, id: `exam-${e.id}`, kind: 'visita', auto: 'exam', href: `/workers/${e.worker_id}`,
             title: `${names.get(e.worker_id)} · prossima visita medica`,
             date: e.next_exam_date, endDate: null, workerId: e.worker_id, workerName: names.get(e.worker_id) ?? null, done: false,
+        });
+    });
+    // Attrezzature: verifica o revisione in scadenza
+    (qRes.data ?? []).forEach((q: any) => {
+        out.push({
+            ...blank, id: `equip-${q.id}`, kind: 'scadenza', auto: 'equipment', href: `/inventory/${q.id}`,
+            title: `${q.name} · verifica attrezzatura`,
+            date: q.next_check_date, endDate: null, location: q.location || null, workerId: null, workerName: null, done: false,
         });
     });
     return out;

@@ -22,6 +22,7 @@ export default async function InventoryPage() {
     .from('inventory')
     .select('*', { count: 'estimated' })
     .is('deleted_at', null) // gli admin vedono anche gli eliminati: non vanno nell'elenco
+    .or('category.is.null,category.not.ilike.attrezzatura') // l'elenco di partenza e' quello dei materiali: le attrezzature hanno la loro scheda
     .order('name')
     .range(0, 49); // 50 articoli per pagina
 

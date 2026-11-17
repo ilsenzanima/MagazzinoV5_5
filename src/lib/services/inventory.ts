@@ -68,7 +68,10 @@ export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
     realQuantity: dbItem.real_quantity,
     model: dbItem.model,
     packQuantity: dbItem.pack_quantity !== null && dbItem.pack_quantity !== undefined ? Number(dbItem.pack_quantity) : null,
-    variantAttributes: dbItem.variant_attributes ?? null
+    variantAttributes: dbItem.variant_attributes ?? null,
+    nextCheckDate: dbItem.next_check_date ?? null,
+    availableCount: dbItem.available_count != null ? Number(dbItem.available_count) : null,
+    purchasedQuantity: dbItem.purchased_quantity != null ? Number(dbItem.purchased_quantity) : null
 });
 
 export const mapInventoryItemToDbItem = (item: Partial<InventoryItem>) => {
@@ -92,6 +95,8 @@ export const mapInventoryItemToDbItem = (item: Partial<InventoryItem>) => {
     if (item.model !== undefined) dbItem.model = item.model;
     if (item.packQuantity !== undefined) dbItem.pack_quantity = item.packQuantity;
     if (item.variantAttributes !== undefined) dbItem.variant_attributes = item.variantAttributes;
+    if (item.nextCheckDate !== undefined) dbItem.next_check_date = item.nextCheckDate || null;
+    if (item.availableCount !== undefined) dbItem.available_count = item.availableCount;
 
     return dbItem;
 };
@@ -161,13 +166,13 @@ export const inventoryApi = {
     },
 
     // Modificato per usare RPC avanzata se c'è ricerca o filtri complessi
-    getPaginated: async (options: { page: number; limit: number; search?: string; tab?: string; brand?: string; type?: string; warehouseId?: string; sort?: string; dir?: 'asc' | 'desc' }) => {
+    getPaginated: async (options: { page: number; limit: number; search?: string; tab?: string; brand?: string; type?: string; warehouseId?: string; sort?: string; dir?: 'asc' | 'desc'; kind?: 'materials' | 'equipment' }) => {
         const from = (options.page - 1) * options.limit;
 
         // Se c'è una ricerca o tab specifici, o filtri avanzati, usiamo la RPC get_inventory_search
         // Nota: La RPC deve essere stata creata nel DB e aggiornata per supportare brand/type/warehouse
         const customSort = !!options.sort && !(options.sort === 'name' && (options.dir ?? 'asc') === 'asc');
-        if (options.search || options.tab || options.brand || options.type || options.warehouseId || customSort) {
+        if (options.search || options.tab || options.brand || options.type || options.warehouseId || options.kind || customSort) {
             const { data, error } = await supabase.rpc('get_inventory_search', {
                 p_search: options.search || '',
                 p_status: options.tab || 'all',
@@ -177,7 +182,9 @@ export const inventoryApi = {
                 p_type: options.type || null,
                 p_warehouse_id: options.warehouseId || null,
                 p_sort: options.sort || 'name',
-                p_dir: options.dir || 'asc'
+                p_dir: options.dir || 'asc',
+                // Attrezzature (categoria «Attrezzatura») e materiali di consumo sono due elenchi separati
+                p_equipment: options.kind === 'equipment' ? true : options.kind === 'materials' ? false : null
             });
 
             if (error) {
@@ -222,6 +229,16 @@ export const inventoryApi = {
             if (qty <= 0.001) continue;
             map.set(r.item_id, [...(map.get(r.item_id) || []), { warehouseId: r.warehouse_id, quantity: qty }]);
         }
+        return map;
+    },
+
+    // Quantita' acquistate in totale per ogni articolo (somma delle righe di acquisto)
+    getPurchasedQuantities: async (itemIds: string[]): Promise<Map<string, number>> => {
+        const map = new Map<string, number>();
+        if (itemIds.length === 0) return map;
+        const { data, error } = await supabase.from('purchase_items').select('item_id, quantity').in('item_id', itemIds);
+        if (error) throw error;
+        for (const r of data ?? []) map.set(r.item_id, (map.get(r.item_id) || 0) + (Number(r.quantity) || 0));
         return map;
     },
 

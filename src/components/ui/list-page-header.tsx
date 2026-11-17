@@ -28,10 +28,12 @@ interface ListPageHeaderProps {
     children?: React.ReactNode;
     // Da tablet in su: striscia scura con titolo a sinistra e ricerca a destra (come le pagine della commessa)
     strip?: boolean;
+    // Schede nella striscia (es. Materiali / Attrezzature)
+    tabs?: { items: { value: string; label: string; icon: React.ReactNode }[]; value: string; onValueChange: (value: string) => void };
 }
 
 // Intestazione standard delle pagine con un elenco: riquadro fisso in alto con titolo e barra di ricerca
-export function ListPageHeader({ title, actions, search, searchActions, children, strip }: ListPageHeaderProps) {
+export function ListPageHeader({ title, actions, search, searchActions, children, strip, tabs }: ListPageHeaderProps) {
     const { actions: slot } = useNotchSlots();
     const nested = useContext(NestedStripCtx);
     // Dentro una pagina unita da PC: niente seconda striscia, ricerca e filtri vanno nella striscia di sopra
@@ -85,12 +87,12 @@ export function ListPageHeader({ title, actions, search, searchActions, children
             mobile.searchSlot
         ) : null;
         // Ogni pagina ha in alto la fascia scura con il titolo (se non sta già dentro una fascia)
-        return <>{slot ? null : <NotchTabs title={title} />}{searchBody}</>;
+        return <>{slot ? null : <NotchTabs title={title} items={tabs?.items} value={tabs?.value} onValueChange={tabs?.onValueChange} />}{searchBody}</>;
     }
     // Pagina con fascia (non unita a un'altra): stessa fascia di tutte le pagine, con ricerca e filtri a destra
     if (strip && !merged) {
         return (
-            <NotchTabs title={title}>
+            <NotchTabs title={title} items={tabs?.items} value={tabs?.value} onValueChange={tabs?.onValueChange}>
                 {search && <NotchSearch value={search.value} onChange={search.onChange} placeholder={search.placeholder} />}
                 {searchActions && <NotchActions>{searchActions}</NotchActions>}
                 {children}

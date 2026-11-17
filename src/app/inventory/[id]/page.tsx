@@ -75,6 +75,7 @@ import { HelpTip } from "@/components/ui/help-tip";
 import dynamic from "next/dynamic";
 import { loadNotesService } from "@/lib/services/load-notes";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { isEquipmentType, checkDateInfo } from "@/lib/utils/equipment-check";
 const ImageCropper = dynamic(
   () => import("@/components/ui/image-cropper").then((m) => ({ default: m.ImageCropper })),
   { ssr: false, loading: () => null }
@@ -291,7 +292,10 @@ export default function InventoryDetailPage() {
         unit: item.unit,
         coefficient: item.coefficient,
         packQuantity: item.packQuantity ?? null,
-        description: item.description
+        description: item.description,
+        location: item.location,
+        availableCount: item.availableCount ?? null,
+        nextCheckDate: item.nextCheckDate ?? null
       });
       setCoefficientInput(item.coefficient != null ? String(item.coefficient) : "1");
       setIsEditing(true);
@@ -866,6 +870,43 @@ export default function InventoryDetailPage() {
                       <Input id="type" value={item.type} readOnly className="bg-slate-50 dark:bg-muted" />
                     )}
                   </div>
+                  {isEquipmentType(isEditing ? editForm.type : item.type) && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="availableCount" className="flex items-center">
+                          Disponibili
+                          <FieldTip text="Quanti pezzi sono disponibili adesso. Lo segni tu a mano (es. comprati 10, disponibili 3)." />
+                        </Label>
+                        {isEditing ? (
+                          <Input id="availableCount" type="number" min={0} step="any" value={editForm.availableCount ?? ""} onChange={(e) => setEditForm({ ...editForm, availableCount: e.target.value === "" ? null : Number(e.target.value) })} />
+                        ) : (
+                          <Input id="availableCount" value={item.availableCount ?? "—"} readOnly className="bg-slate-50 dark:bg-muted" />
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="location" className="flex items-center">
+                          Posizione
+                          <FieldTip text="Dove si trova adesso l'attrezzatura (es. Magazzino principale, In uso a Rossi, Cantiere X). Si aggiorna a mano quando cambia." />
+                        </Label>
+                        {isEditing ? (
+                          <Input id="location" placeholder="Es. Magazzino principale, in uso a Rossi..." value={editForm.location ?? ""} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} />
+                        ) : (
+                          <Input id="location" value={item.location || "—"} readOnly className="bg-slate-50 dark:bg-muted" />
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="nextCheckDate" className="flex items-center">
+                          Prossima verifica
+                          <FieldTip text="Data entro cui va fatta la verifica o la revisione. Compare nell'Agenda e nell'avviso del mattino a partire da 60 giorni prima." />
+                        </Label>
+                        {isEditing ? (
+                          <Input id="nextCheckDate" type="date" value={editForm.nextCheckDate ?? ""} onChange={(e) => setEditForm({ ...editForm, nextCheckDate: e.target.value || null })} />
+                        ) : (
+                          <Input id="nextCheckDate" value={checkDateInfo(item.nextCheckDate).label} readOnly className={`bg-slate-50 dark:bg-muted ${checkDateInfo(item.nextCheckDate).cls}`} />
+                        )}
+                      </div>
+                    </>
+                  )}
                   <div className="space-y-2">
                     <Label htmlFor="unit">Unità di Misura</Label>
                     {isEditing ? (
