@@ -251,7 +251,6 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const [sortKey, setSortKey] = useState<string>(initialSort);
   const [sortDir, setSortDir] = useState<"asc" | "desc">(initialDir);
   const [stockMap, setStockMap] = useState<Map<string, { warehouseId: string; quantity: number }[]>>(new Map());
-  const [purchasedMap, setPurchasedMap] = useState<Map<string, number>>(new Map());
   const [pendingMap, setPendingMap] = useState<Map<string, { uscita: number; reso: number }>>(new Map());
 
   // Pagination state
@@ -313,16 +312,6 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
       .catch(console.error);
     return () => { cancelled = true; };
   }, [items]);
-
-  // Quantita' acquistate (solo elenco attrezzature)
-  useEffect(() => {
-    if (kind !== "equipment") return;
-    let cancelled = false;
-    inventoryApi.getPurchasedQuantities(items.map(i => i.id))
-      .then(map => { if (!cancelled) setPurchasedMap(map); })
-      .catch(console.error);
-    return () => { cancelled = true; };
-  }, [items, kind]);
 
   const toggleSort = (key: string) => {
     if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"));
@@ -636,6 +625,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       </button>
                     </div>
                   </TableHead>
+                  {kind !== "equipment" && (
                   <TableHead className="w-32 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
                     <div className="flex items-center gap-1">
                       <div className="min-w-0 flex-1">
@@ -654,9 +644,15 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       </button>
                     </div>
                   </TableHead>
+                  )}
                   {kind === "equipment" ? (
                     <>
-                  <TableHead className="w-24 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Acquistate</TableHead>
+                  <TableHead className="w-24 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <button type="button" onClick={() => toggleSort("purchased")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+                      Acquistate
+                      {sortKey === "purchased" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    </button>
+                  </TableHead>
                   <TableHead className="w-28 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
                     <button type="button" onClick={() => toggleSort("available_count")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
                       Disponibili
@@ -722,7 +718,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
               <TableBody>
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                    <TableCell colSpan={kind === "equipment" ? 9 : 10} className="py-10 text-center text-slate-400 dark:text-slate-500">
                       <Package className="mx-auto mb-2 h-12 w-12 opacity-20" />
                       <p>Nessun articolo trovato</p>
                     </TableCell>
@@ -745,11 +741,11 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       </TableCell>
                       <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.model || <span className="text-slate-300">—</span>}</TableCell>
                       <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.brand}</TableCell>
-                      <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.type}</TableCell>
+                      {kind !== "equipment" && <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.type}</TableCell>}
                       {kind === "equipment" ? (
                         <>
                       <TableCell className="border-r py-2 text-right text-sm text-slate-600 dark:text-slate-300">
-                        {(purchasedMap.get(item.id) ?? 0) > 0 ? purchasedMap.get(item.id)!.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : <span className="text-slate-300" title="Nessuna quantita' registrata negli acquisti">—</span>}
+                        {(item.purchasedQuantity ?? 0) > 0 ? item.purchasedQuantity!.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : <span className="text-slate-300" title="Nessuna quantita' registrata negli acquisti">—</span>}
                       </TableCell>
                       <TableCell className="border-r py-1 text-right text-sm font-semibold text-slate-800 dark:text-slate-200" onClick={(e) => e.stopPropagation()}>
                         <InlineCell type="number" align="right" label="Disponibili" canEdit={canEditCells}

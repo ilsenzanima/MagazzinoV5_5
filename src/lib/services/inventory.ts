@@ -70,7 +70,8 @@ export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
     packQuantity: dbItem.pack_quantity !== null && dbItem.pack_quantity !== undefined ? Number(dbItem.pack_quantity) : null,
     variantAttributes: dbItem.variant_attributes ?? null,
     nextCheckDate: dbItem.next_check_date ?? null,
-    availableCount: dbItem.available_count != null ? Number(dbItem.available_count) : null
+    availableCount: dbItem.available_count != null ? Number(dbItem.available_count) : null,
+    purchasedQuantity: dbItem.purchased_quantity != null ? Number(dbItem.purchased_quantity) : null
 });
 
 export const mapInventoryItemToDbItem = (item: Partial<InventoryItem>) => {
