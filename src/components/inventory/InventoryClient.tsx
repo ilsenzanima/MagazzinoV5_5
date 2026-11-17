@@ -18,7 +18,8 @@ import {
   Loader2,
   ArrowUp,
   ArrowDown,
-  ArrowUpDown
+  ArrowUpDown,
+  Wrench
 } from "lucide-react";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
@@ -169,6 +170,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") || "all";
+  const initialKind: "materials" | "equipment" = searchParams.get("kind") === "equipment" ? "equipment" : "materials";
   const initialSearch = searchParams.get("q") || "";
   const initialBrand = searchParams.get("brand") || "all";
   const initialType = searchParams.get("type") || "all";
@@ -181,6 +183,8 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(initialSearch);
   const [activeTab, setActiveTab] = useState(initialTab);
+  // Due elenchi separati: materiali di consumo e attrezzature
+  const [kind, setKind] = useState<"materials" | "equipment">(initialKind);
   const [isScanning, setIsScanning] = useState(false);
   const [items, setItems] = useState<InventoryItem[]>(initialItems);
   const [itemTypes, setItemTypes] = useState<ItemType[]>(initialTypes);
@@ -217,6 +221,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   // restores the exact view instead of resetting it.
   useEffect(() => {
     const params = new URLSearchParams();
+    if (kind !== "materials") params.set("kind", kind);
     if (activeTab !== "all") params.set("tab", activeTab);
     if (debouncedSearchTerm) params.set("q", debouncedSearchTerm);
     if (selectedBrand !== "all") params.set("brand", selectedBrand);
@@ -227,7 +232,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
     if (sortDir !== "asc") params.set("dir", sortDir);
     const query = params.toString();
     router.replace(query ? `/inventory?${query}` : "/inventory", { scroll: false });
-  }, [activeTab, debouncedSearchTerm, selectedBrand, selectedType, selectedWarehouse, page, sortKey, sortDir, router]);
+  }, [kind, activeTab, debouncedSearchTerm, selectedBrand, selectedType, selectedWarehouse, page, sortKey, sortDir, router]);
 
   // Load warehouses for the location tabs
   useEffect(() => {
@@ -297,13 +302,13 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   useEffect(() => {
     // Skip first load if parameters match initial props
     // This prevents double fetching on mount
-    if (page === 1 && debouncedSearchTerm === "" && activeTab === "all" && selectedBrand === "all" && selectedType === "all" && selectedWarehouse === "all" && sortKey === "name" && sortDir === "asc" && items === initialItems) {
+    if (page === 1 && debouncedSearchTerm === "" && kind === "materials" && activeTab === "all" && selectedBrand === "all" && selectedType === "all" && selectedWarehouse === "all" && sortKey === "name" && sortDir === "asc" && items === initialItems) {
       return;
     }
 
     loadItems();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedSearchTerm, activeTab, selectedBrand, selectedType, selectedWarehouse, sortKey, sortDir]);
+  }, [page, debouncedSearchTerm, kind, activeTab, selectedBrand, selectedType, selectedWarehouse, sortKey, sortDir]);
 
   const loadItems = async () => {
     try {
@@ -316,6 +321,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         limit,
         search: debouncedSearchTerm,
         tab: activeTab,
+        kind,
         brand: selectedBrand !== "all" ? selectedBrand : undefined,
         type: selectedType !== "all" ? selectedType : undefined,
         warehouseId: selectedWarehouse !== "all" ? selectedWarehouse : undefined,
@@ -392,6 +398,14 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
       <ListPageHeader
         strip
         title="Gestione Inventario"
+        tabs={{
+          items: [
+            { value: "materials", label: "Materiali", icon: <Package /> },
+            { value: "equipment", label: "Attrezzature", icon: <Wrench /> },
+          ],
+          value: kind,
+          onValueChange: v => { setKind(v as "materials" | "equipment"); setPage(1); },
+        }}
         actions={(userRole === 'admin' || userRole === 'operativo') && (
           <Link href="/inventory/new" className="w-full sm:w-auto md:hidden">
             <Button className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
