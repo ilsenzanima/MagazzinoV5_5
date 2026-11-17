@@ -22,6 +22,7 @@ import {
   Wrench
 } from "lucide-react";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { checkDateInfo } from "@/lib/utils/equipment-check";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -490,7 +491,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
         }
       >
         {/* Telefono: magazzino e scorte in due menu sulla stessa riga */}
-        <div className="grid grid-cols-2 gap-2 md:hidden">
+        {kind !== "equipment" && <div className="grid grid-cols-2 gap-2 md:hidden">
           {stockWarehouses.length > 1 ? (
             <Select value={selectedWarehouse} onValueChange={(val) => { setSelectedWarehouse(val); setPage(1); }}>
               <SelectTrigger aria-label="Magazzino"><SelectValue placeholder="Magazzino" /></SelectTrigger>
@@ -508,7 +509,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
               <SelectItem value="out_of_stock">Esauriti</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </div>}
       </ListPageHeader>
 
       {/* Lista Articoli */}
@@ -590,6 +591,13 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       </button>
                     </div>
                   </TableHead>
+                  {kind === "equipment" ? (
+                    <>
+                  <TableHead className="w-64 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Posizione</TableHead>
+                  <TableHead className="w-52 text-xs font-semibold uppercase tracking-wide text-slate-600">Prossima verifica</TableHead>
+                    </>
+                  ) : (
+                    <>
                   <TableHead className="w-40 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
                     {stockWarehouses.length > 1 ? (
                       <Select value={selectedWarehouse} onValueChange={(val) => { setSelectedWarehouse(val); setPage(1); }}>
@@ -627,12 +635,14 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                     </button>
                   </TableHead>
                   <TableHead className="w-28 text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Da processare</TableHead>
+                    </>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                    <TableCell colSpan={kind === "equipment" ? 8 : 10} className="py-10 text-center text-slate-400 dark:text-slate-500">
                       <Package className="mx-auto mb-2 h-12 w-12 opacity-20" />
                       <p>Nessun articolo trovato</p>
                     </TableCell>
@@ -656,6 +666,13 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.model || <span className="text-slate-300">—</span>}</TableCell>
                       <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.brand}</TableCell>
                       <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.type}</TableCell>
+                      {kind === "equipment" ? (
+                        <>
+                      <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.location || <span className="text-slate-300">—</span>}</TableCell>
+                      <TableCell className={`py-2 text-sm ${checkDateInfo(item.nextCheckDate).cls}`}>{checkDateInfo(item.nextCheckDate).label}</TableCell>
+                        </>
+                      ) : (
+                        <>
                       <TableCell className="border-r py-2 text-xs text-slate-600 dark:text-slate-300">
                         {(() => {
                           const where = stockMap.get(item.id) || [];
@@ -692,6 +709,8 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                         )}
                         {!(pending && (pending.uscita > 0 || pending.reso > 0)) && <span className="text-slate-300">—</span>}
                       </TableCell>
+                        </>
+                      )}
                     </TableRow>
                   );
                 })}
@@ -718,7 +737,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                           typeInfo={itemTypes.find(t => t.name === item.type)}
                         />
 
-                        {item.quantity === 0 && (
+                        {kind !== "equipment" && item.quantity === 0 && (
                           <div className="absolute inset-0 bg-white/10 flex items-center justify-center z-10">
                             <Badge variant="destructive" className="text-sm font-bold shadow-sm">ESAURITO</Badge>
                           </div>
@@ -744,7 +763,13 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                           <Badge variant="secondary" className="text-[10px] font-normal text-slate-600 dark:text-slate-400">
                             {item.type}
                           </Badge>
-                          <div className="ml-auto text-right flex flex-col items-end gap-1">
+                          {kind === "equipment" && (
+                            <div className="ml-auto flex flex-col items-end gap-0.5 text-right text-[11px]">
+                              {item.location && <span className="text-slate-500 dark:text-slate-400">{item.location}</span>}
+                              {item.nextCheckDate && <span className={checkDateInfo(item.nextCheckDate).cls}>Verifica: {checkDateInfo(item.nextCheckDate).label}</span>}
+                            </div>
+                          )}
+                          {kind !== "equipment" && <div className="ml-auto text-right flex flex-col items-end gap-1">
                             {item.coefficient !== 1 ? (
                               <>
                                 <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mr-1">
@@ -785,7 +810,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                                 </>
                               );
                             })()}
-                          </div>
+                          </div>}
                         </div>
                       </div>
                     </CardContent>
