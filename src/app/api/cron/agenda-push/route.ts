@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   ]
 
   // Articoli con scorta minima impostata ed esauriti (come nella campanella: solo quelli gia' verificati)
-  const { data: stock } = await admin.from("inventory").select("quantity").is("deleted_at", null).gt("min_stock", 0).not("verified_at", "is", null).limit(1000)
+  const { data: stock } = await admin.from("inventory").select("quantity").is("deleted_at", null).gt("min_stock", 0).not("verified_at", "is", null).or("category.is.null,category.not.ilike.attrezzatura").limit(1000)
   const out = (stock ?? []).filter(i => (Number(i.quantity) || 0) <= 0).length
   if (out > 0) lines.push(out === 1 ? "1 articolo esaurito" : `${out} articoli esauriti`)
 

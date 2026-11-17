@@ -37,6 +37,7 @@ const getStockAlerts = async (prefs: NotificationPreferences): Promise<AppAlert[
         .select('id, code, name, quantity, min_stock, unit, verified_at')
         .is('deleted_at', null)
         .gt('min_stock', 0)
+        .or('category.is.null,category.not.ilike.attrezzatura') // le attrezzature non hanno avvisi di scorta
         .order('name', { ascending: true })
         .limit(1000);
 
