@@ -657,9 +657,24 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                   {kind === "equipment" ? (
                     <>
                   <TableHead className="w-24 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Acquistate</TableHead>
-                  <TableHead className="w-28 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Disponibili</TableHead>
-                  <TableHead className="w-56 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Posizione</TableHead>
-                  <TableHead className="w-52 text-xs font-semibold uppercase tracking-wide text-slate-600">Prossima verifica</TableHead>
+                  <TableHead className="w-28 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <button type="button" onClick={() => toggleSort("available_count")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+                      Disponibili
+                      {sortKey === "available_count" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-56 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <button type="button" onClick={() => toggleSort("location")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+                      Posizione
+                      {sortKey === "location" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    </button>
+                  </TableHead>
+                  <TableHead className="w-52 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                    <button type="button" onClick={() => toggleSort("next_check_date")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
+                      Prossima verifica
+                      {sortKey === "next_check_date" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                    </button>
+                  </TableHead>
                     </>
                   ) : (
                     <>
@@ -734,7 +749,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       {kind === "equipment" ? (
                         <>
                       <TableCell className="border-r py-2 text-right text-sm text-slate-600 dark:text-slate-300">
-                        {purchasedMap.has(item.id) ? purchasedMap.get(item.id)!.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : <span className="text-slate-300">—</span>}
+                        {(purchasedMap.get(item.id) ?? 0) > 0 ? purchasedMap.get(item.id)!.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : <span className="text-slate-300" title="Nessuna quantita' registrata negli acquisti">—</span>}
                       </TableCell>
                       <TableCell className="border-r py-1 text-right text-sm font-semibold text-slate-800 dark:text-slate-200" onClick={(e) => e.stopPropagation()}>
                         <InlineCell type="number" align="right" label="Disponibili" canEdit={canEditCells}
