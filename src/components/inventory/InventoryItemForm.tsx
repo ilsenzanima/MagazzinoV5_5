@@ -380,6 +380,11 @@ export const InventoryItemForm = forwardRef<InventoryItemFormHandle, InventoryIt
                                   placeholder={loadingData ? "Caricamento..." : "Seleziona Tipologia"}
                                   searchPlaceholder="Scrivi per cercare tipologia..."
                                 />
+                                {formData.type.trim().toLowerCase() === "attrezzatura" && (
+                                    <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
+                                        Attrezzatura = tutto ciò che serve per lavorare: utensili, punte, pennelli, dischi, guanti. Va nel tab Attrezzature, senza scorta minima: indica dove si trova e quanti ne hai disponibili. I materiali (pittura, siliconi, viti, lastre) vanno nelle altre tipologie.
+                                    </p>
+                                )}
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="minStock" className="flex items-center">
