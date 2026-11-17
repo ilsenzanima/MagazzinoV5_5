@@ -647,25 +647,25 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                   )}
                   {kind === "equipment" ? (
                     <>
-                  <TableHead className="w-24 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  <TableHead className="w-36 whitespace-nowrap border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
                     <button type="button" onClick={() => toggleSort("purchased")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
                       Acquistate
                       {sortKey === "purchased" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
                     </button>
                   </TableHead>
-                  <TableHead className="w-28 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  <TableHead className="w-36 whitespace-nowrap border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">
                     <button type="button" onClick={() => toggleSort("available_count")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
                       Disponibili
                       {sortKey === "available_count" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
                     </button>
                   </TableHead>
-                  <TableHead className="w-56 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  <TableHead className="w-56 whitespace-nowrap border-r text-xs font-semibold uppercase tracking-wide text-slate-600">
                     <button type="button" onClick={() => toggleSort("location")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
                       Posizione
                       {sortKey === "location" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
                     </button>
                   </TableHead>
-                  <TableHead className="w-52 text-xs font-semibold uppercase tracking-wide text-slate-600">
+                  <TableHead className="w-56 whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-slate-600">
                     <button type="button" onClick={() => toggleSort("next_check_date")} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
                       Prossima verifica
                       {sortKey === "next_check_date" ? (sortDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
