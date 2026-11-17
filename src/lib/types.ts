@@ -35,6 +35,7 @@ export interface InventoryItem {
     model?: string;
     packQuantity?: number | null; // quantità normale per confezione, nell'unità dell'articolo
     variantAttributes?: Record<string, string> | null; // valori strutturati della scheda della tipologia
+    availableCount?: number | null; // attrezzature: pezzi disponibili, segnati a mano
     nextCheckDate?: string | null; // attrezzature: prossima verifica o revisione (yyyy-MM-dd)
 }
 

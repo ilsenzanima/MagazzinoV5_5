@@ -294,6 +294,7 @@ export default function InventoryDetailPage() {
         packQuantity: item.packQuantity ?? null,
         description: item.description,
         location: item.location,
+        availableCount: item.availableCount ?? null,
         nextCheckDate: item.nextCheckDate ?? null
       });
       setCoefficientInput(item.coefficient != null ? String(item.coefficient) : "1");
@@ -871,6 +872,17 @@ export default function InventoryDetailPage() {
                   </div>
                   {isEquipmentType(isEditing ? editForm.type : item.type) && (
                     <>
+                      <div className="space-y-2">
+                        <Label htmlFor="availableCount" className="flex items-center">
+                          Disponibili
+                          <FieldTip text="Quanti pezzi sono disponibili adesso. Lo segni tu a mano (es. comprati 10, disponibili 3)." />
+                        </Label>
+                        {isEditing ? (
+                          <Input id="availableCount" type="number" min={0} step="any" value={editForm.availableCount ?? ""} onChange={(e) => setEditForm({ ...editForm, availableCount: e.target.value === "" ? null : Number(e.target.value) })} />
+                        ) : (
+                          <Input id="availableCount" value={item.availableCount ?? "—"} readOnly className="bg-slate-50 dark:bg-muted" />
+                        )}
+                      </div>
                       <div className="space-y-2">
                         <Label htmlFor="location" className="flex items-center">
                           Posizione

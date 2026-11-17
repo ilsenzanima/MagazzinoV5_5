@@ -69,7 +69,8 @@ export const mapDbItemToInventoryItem = (dbItem: any): InventoryItem => ({
     model: dbItem.model,
     packQuantity: dbItem.pack_quantity !== null && dbItem.pack_quantity !== undefined ? Number(dbItem.pack_quantity) : null,
     variantAttributes: dbItem.variant_attributes ?? null,
-    nextCheckDate: dbItem.next_check_date ?? null
+    nextCheckDate: dbItem.next_check_date ?? null,
+    availableCount: dbItem.available_count != null ? Number(dbItem.available_count) : null
 });
 
 export const mapInventoryItemToDbItem = (item: Partial<InventoryItem>) => {
@@ -94,6 +95,7 @@ export const mapInventoryItemToDbItem = (item: Partial<InventoryItem>) => {
     if (item.packQuantity !== undefined) dbItem.pack_quantity = item.packQuantity;
     if (item.variantAttributes !== undefined) dbItem.variant_attributes = item.variantAttributes;
     if (item.nextCheckDate !== undefined) dbItem.next_check_date = item.nextCheckDate || null;
+    if (item.availableCount !== undefined) dbItem.available_count = item.availableCount;
 
     return dbItem;
 };
@@ -226,6 +228,16 @@ export const inventoryApi = {
             if (qty <= 0.001) continue;
             map.set(r.item_id, [...(map.get(r.item_id) || []), { warehouseId: r.warehouse_id, quantity: qty }]);
         }
+        return map;
+    },
+
+    // Quantita' acquistate in totale per ogni articolo (somma delle righe di acquisto)
+    getPurchasedQuantities: async (itemIds: string[]): Promise<Map<string, number>> => {
+        const map = new Map<string, number>();
+        if (itemIds.length === 0) return map;
+        const { data, error } = await supabase.from('purchase_items').select('item_id, quantity').in('item_id', itemIds);
+        if (error) throw error;
+        for (const r of data ?? []) map.set(r.item_id, (map.get(r.item_id) || 0) + (Number(r.quantity) || 0));
         return map;
     },
 

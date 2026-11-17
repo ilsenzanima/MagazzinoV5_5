@@ -166,9 +166,61 @@ function MinStockCell({ item, canEdit, onSaved }: { item: InventoryItem; canEdit
   );
 }
 
+// Cella modificabile direttamente nella tabella (solo admin e operativi): clic, scrivi, Invio per salvare
+function InlineCell({ display, initial, type, canEdit, label, onSave, align = "left" }: {
+  display: React.ReactNode; initial: string; type: "text" | "number" | "date"; canEdit: boolean; label: string;
+  onSave: (value: string) => Promise<void>; align?: "left" | "right"
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const done = useRef(false);
+
+  const finish = async (save: boolean) => {
+    if (done.current) return;
+    done.current = true;
+    if (!save || value === initial) { setEditing(false); return; }
+    setSaving(true);
+    try { await onSave(value); }
+    catch (err) { console.error("Failed to save " + label, err); notify.error("Non sono riuscito a salvare: " + label); }
+    finally { setSaving(false); setEditing(false); }
+  };
+
+  if (!canEdit) return <>{display}</>;
+  if (editing) {
+    return (
+      <Input
+        autoFocus
+        type={type}
+        step={type === "number" ? "any" : undefined}
+        min={type === "number" ? 0 : undefined}
+        value={value}
+        disabled={saving}
+        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => finish(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") { e.preventDefault(); finish(true); }
+          if (e.key === "Escape") { e.preventDefault(); finish(false); }
+        }}
+        className={`h-7 text-sm ${type === "number" ? "w-24 text-right" : "w-full min-w-32"} ${align === "right" ? "ml-auto" : ""}`}
+        aria-label={label}
+      />
+    );
+  }
+  return (
+    <button type="button" title={"Clicca per modificare: " + label}
+      onClick={(e) => { e.stopPropagation(); done.current = false; setValue(initial); setEditing(true); }}
+      className={`block min-h-6 w-full min-w-10 rounded px-1.5 py-0.5 hover:bg-blue-50 dark:hover:bg-blue-900/30 ${align === "right" ? "text-right" : "text-left"}`}>
+      {display}
+    </button>
+  );
+}
+
 export default function InventoryClient({ initialItems, initialTotal, initialTypes }: InventoryClientProps) {
   const { userRole } = useAuth();
   const router = useRouter();
+  const canEditCells = userRole === 'admin' || userRole === 'operativo';
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") || "all";
   const initialKind: "materials" | "equipment" = searchParams.get("kind") === "equipment" ? "equipment" : "materials";
@@ -199,6 +251,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const [sortKey, setSortKey] = useState<string>(initialSort);
   const [sortDir, setSortDir] = useState<"asc" | "desc">(initialDir);
   const [stockMap, setStockMap] = useState<Map<string, { warehouseId: string; quantity: number }[]>>(new Map());
+  const [purchasedMap, setPurchasedMap] = useState<Map<string, number>>(new Map());
   const [pendingMap, setPendingMap] = useState<Map<string, { uscita: number; reso: number }>>(new Map());
 
   // Pagination state
@@ -260,6 +313,16 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
       .catch(console.error);
     return () => { cancelled = true; };
   }, [items]);
+
+  // Quantita' acquistate (solo elenco attrezzature)
+  useEffect(() => {
+    if (kind !== "equipment") return;
+    let cancelled = false;
+    inventoryApi.getPurchasedQuantities(items.map(i => i.id))
+      .then(map => { if (!cancelled) setPurchasedMap(map); })
+      .catch(console.error);
+    return () => { cancelled = true; };
+  }, [items, kind]);
 
   const toggleSort = (key: string) => {
     if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"));
@@ -593,7 +656,9 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                   </TableHead>
                   {kind === "equipment" ? (
                     <>
-                  <TableHead className="w-64 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Posizione</TableHead>
+                  <TableHead className="w-24 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Acquistate</TableHead>
+                  <TableHead className="w-28 border-r text-right text-xs font-semibold uppercase tracking-wide text-slate-600">Disponibili</TableHead>
+                  <TableHead className="w-56 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Posizione</TableHead>
                   <TableHead className="w-52 text-xs font-semibold uppercase tracking-wide text-slate-600">Prossima verifica</TableHead>
                     </>
                   ) : (
@@ -642,7 +707,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
               <TableBody>
                 {items.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={kind === "equipment" ? 8 : 10} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                    <TableCell colSpan={10} className="py-10 text-center text-slate-400 dark:text-slate-500">
                       <Package className="mx-auto mb-2 h-12 w-12 opacity-20" />
                       <p>Nessun articolo trovato</p>
                     </TableCell>
@@ -668,8 +733,25 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                       <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.type}</TableCell>
                       {kind === "equipment" ? (
                         <>
-                      <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{item.location || <span className="text-slate-300">—</span>}</TableCell>
-                      <TableCell className={`py-2 text-sm ${checkDateInfo(item.nextCheckDate).cls}`}>{checkDateInfo(item.nextCheckDate).label}</TableCell>
+                      <TableCell className="border-r py-2 text-right text-sm text-slate-600 dark:text-slate-300">
+                        {purchasedMap.has(item.id) ? purchasedMap.get(item.id)!.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : <span className="text-slate-300">—</span>}
+                      </TableCell>
+                      <TableCell className="border-r py-1 text-right text-sm font-semibold text-slate-800 dark:text-slate-200" onClick={(e) => e.stopPropagation()}>
+                        <InlineCell type="number" align="right" label="Disponibili" canEdit={canEditCells}
+                          initial={item.availableCount != null ? String(item.availableCount) : ""}
+                          display={item.availableCount != null ? item.availableCount.toLocaleString('it-IT', { maximumFractionDigits: 2 }) : <span className="font-normal text-slate-300">—</span>}
+                          onSave={async (v) => { const n = v.trim() === "" ? null : Math.max(0, Number(v.replace(",", "."))); if (n !== null && !Number.isFinite(n)) throw new Error("numero non valido"); await inventoryApi.update(item.id, { availableCount: n }); setItems(prev => prev.map(i => i.id === item.id ? { ...i, availableCount: n } : i)); }} />
+                      </TableCell>
+                      <TableCell className="border-r py-1 text-sm text-slate-600 dark:text-slate-300" onClick={(e) => e.stopPropagation()}>
+                        <InlineCell type="text" label="Posizione" canEdit={canEditCells} initial={item.location ?? ""}
+                          display={item.location || <span className="text-slate-300">—</span>}
+                          onSave={async (v) => { const t = v.trim(); await inventoryApi.update(item.id, { location: t }); setItems(prev => prev.map(i => i.id === item.id ? { ...i, location: t } : i)); }} />
+                      </TableCell>
+                      <TableCell className="py-1 text-sm" onClick={(e) => e.stopPropagation()}>
+                        <InlineCell type="date" label="Prossima verifica" canEdit={canEditCells} initial={item.nextCheckDate ?? ""}
+                          display={<span className={checkDateInfo(item.nextCheckDate).cls}>{checkDateInfo(item.nextCheckDate).label}</span>}
+                          onSave={async (v) => { const d = v || null; await inventoryApi.update(item.id, { nextCheckDate: d }); setItems(prev => prev.map(i => i.id === item.id ? { ...i, nextCheckDate: d } : i)); }} />
+                      </TableCell>
                         </>
                       ) : (
                         <>
@@ -765,6 +847,7 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                           </Badge>
                           {kind === "equipment" && (
                             <div className="ml-auto flex flex-col items-end gap-0.5 text-right text-[11px]">
+                              {item.availableCount != null && <span className="font-semibold text-slate-700 dark:text-slate-200">Disponibili: {item.availableCount.toLocaleString('it-IT', { maximumFractionDigits: 2 })}</span>}
                               {item.location && <span className="text-slate-500 dark:text-slate-400">{item.location}</span>}
                               {item.nextCheckDate && <span className={checkDateInfo(item.nextCheckDate).cls}>Verifica: {checkDateInfo(item.nextCheckDate).label}</span>}
                             </div>
