@@ -21,6 +21,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select"
 import { toast } from "sonner"
 import { Worker } from "@/lib/api"
 import { leaveRequestsApi } from "@/lib/api"
+import { leaveDays } from "@/lib/services/leave-requests"
 
 const formSchema = z.object({
     workerId: z.string().min(1, "Seleziona un dipendente"),
@@ -56,6 +57,10 @@ export function LeaveRequestForm({ workers, onSuccess }: LeaveRequestFormProps) 
     useEffect(() => {
         form.setValue("endDate", startDate)
     }, [startDate, form])
+
+    const endDate = form.watch("endDate")
+    // Giorni che verranno calcolati e giorni saltati (sabati, domeniche, festivi)
+    const days = startDate && endDate && endDate >= startDate ? leaveDays(startDate, endDate) : null
 
     const workerOptions = workers.map(w => ({
         value: w.id,
@@ -167,6 +172,13 @@ export function LeaveRequestForm({ workers, onSuccess }: LeaveRequestFormProps) 
                         )}
                     />
                 </div>
+
+                {days && (
+                    <p className="text-sm text-slate-600 dark:text-slate-300">
+                        {days.counted.length} {days.counted.length === 1 ? "giorno calcolato" : "giorni calcolati"}
+                        {days.skipped.length > 0 && <span className="text-slate-500"> · saltati {days.skipped.length} tra sabati, domeniche e festivi</span>}
+                    </p>
+                )}
 
                 <Button type="submit" disabled={isSubmitting} className="w-full md:w-auto">
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

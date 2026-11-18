@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { attendanceApi } from './attendance';
 import { format, addDays, differenceInDays } from 'date-fns';
+import { isItalianHoliday } from '@/lib/utils';
 
 export interface LeaveRequest {
     id: string;
@@ -16,6 +17,26 @@ export interface LeaveRequest {
         first_name: string;
         last_name: string;
     };
+}
+
+const toLocalDate = (iso: string) => {
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d);
+};
+
+// Giorni di una richiesta: i sabati, le domeniche e i festivi non si calcolano.
+// Se il periodo è fatto solo di giorni non lavorativi (es. un solo sabato) si tengono tutti, come richiesto.
+export function leaveDays(startDate: string, endDate: string): { counted: string[]; skipped: string[] } {
+    const start = toLocalDate(startDate);
+    const total = Math.max(0, differenceInDays(toLocalDate(endDate), start));
+    const counted: string[] = [];
+    const skipped: string[] = [];
+    for (let i = 0; i <= total; i++) {
+        const day = addDays(start, i);
+        const off = day.getDay() === 0 || day.getDay() === 6 || isItalianHoliday(day);
+        (off ? skipped : counted).push(format(day, 'yyyy-MM-dd'));
+    }
+    return counted.length === 0 ? { counted: skipped, skipped: [] } : { counted, skipped };
 }
 
 export const leaveRequestsApi = {
@@ -37,15 +58,11 @@ export const leaveRequestsApi = {
 
         // 2. Create attendance records for each day in the range
         try {
-            const start = new Date(request.startDate);
-            const end = new Date(request.endDate);
-            const daysDiff = differenceInDays(end, start);
-
-            for (let i = 0; i <= daysDiff; i++) {
-                const currentDate = addDays(start, i);
+            // Si crea una riga di presenza solo per i giorni da calcolare; la richiesta resta una sola (un solo avviso in agenda)
+            for (const day of leaveDays(request.startDate, request.endDate).counted) {
                 await attendanceApi.addAttendance({
                     workerId: request.workerId,
-                    date: format(currentDate, 'yyyy-MM-dd'),
+                    date: day,
                     hours: request.hours,
                     status: 'holiday',
                     notes: 'Richiesta Permesso (Auto-generato)'
