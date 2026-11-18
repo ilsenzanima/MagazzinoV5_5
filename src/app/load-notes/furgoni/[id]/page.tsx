@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useMobileActions } from "@/components/layout/mobile-actions";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { NoteLineDialog, NoteLineResult } from "@/components/load-notes/NoteLineDialog";
 import { MoveToNoteDialog } from "@/components/load-notes/MoveToNoteDialog";
@@ -118,6 +119,12 @@ export default function VanDetailPage() {
         try { await vansService.delete(van.id); router.push("/load-notes?vista=furgoni"); } catch { toast.error("Impossibile eliminare il furgone"); }
     };
 
+    // Telefono: con delle righe selezionate, «Sposta su nota» e «Togli» stanno nel pannello «Azioni»
+    useMobileActions(selected.size > 0 ? [
+        { label: `Sposta su nota (${selected.size})`, icon: <ArrowRightLeft className="h-5 w-5" />, onClick: () => { setMoveIds([...selected]); setMoveOpen(true); } },
+        { label: `Togli dal furgone (${selected.size})`, icon: <Trash2 className="h-5 w-5" />, onClick: removeSelected },
+    ] : []);
+
     if (loading) {
         return <DashboardLayout><div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></DashboardLayout>;
     }
@@ -162,7 +169,7 @@ export default function VanDetailPage() {
                     <Card>
                         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
                             <CardTitle>Materiale sul furgone ({van.items.length})</CardTitle>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="hidden flex-wrap gap-2 md:flex">
                                 {selected.size > 0 && (
                                     <>
                                         <Button variant="outline" size="sm" onClick={removeSelected}><Trash2 className="mr-1 h-4 w-4" /> Togli ({selected.size})</Button>
