@@ -13,6 +13,13 @@ export interface VanItem {
     coefficient?: number;
 }
 
+// Quantità di una riga del furgone da spostare su una nota (pieces facoltativo)
+export interface VanMove {
+    id: string;
+    quantity: number;
+    pieces?: number;
+}
+
 export interface Van {
     id: string;
     name: string;
@@ -132,18 +139,19 @@ export const vansService = {
         if (error) throw error;
     },
 
-    // Sposta le righe su una nota di carico da processare (le toglie dal furgone). Restituisce quante ne ha spostate
-    moveToNote: async (itemIds: string[], noteId: string): Promise<number> => {
-        const { data, error } = await supabase.rpc("move_van_items_to_note", { p_item_ids: itemIds, p_note_id: noteId });
+    // Sposta (anche solo in parte) le righe su una nota di carico da processare. Se la quantità è tutta, la riga esce dal furgone,
+    // altrimenti resta con il rimanente. Restituisce quante righe ha spostato
+    moveToNote: async (moves: VanMove[], noteId: string): Promise<number> => {
+        const { data, error } = await supabase.rpc("move_van_items_partial", { p_moves: moves, p_note_id: noteId });
         if (error) throw error;
         return Number(data);
     },
 
     // Crea una nota di carico (con o senza commessa) e ci sposta le righe. Restituisce l'id della nota
-    moveToNewNote: async (itemIds: string[], note: { jobId?: string; notes?: string; date: string; noteType: "uscita" | "reso" }): Promise<string> => {
+    moveToNewNote: async (moves: VanMove[], note: { jobId?: string; notes?: string; date: string; noteType: "uscita" | "reso" }): Promise<string> => {
         const created = await loadNotesService.create({ date: note.date, noteType: note.noteType, jobId: note.jobId, notes: note.notes, items: [] });
         try {
-            await vansService.moveToNote(itemIds, created.id);
+            await vansService.moveToNote(moves, created.id);
         } catch (e) {
             await loadNotesService.delete(created.id);
             throw e;

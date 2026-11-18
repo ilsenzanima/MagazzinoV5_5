@@ -13,15 +13,18 @@ import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { jobsApi, Job } from "@/lib/api";
 import { LoadNote } from "@/lib/types";
 import { loadNotesService } from "@/lib/services/load-notes";
-import { vansService } from "@/lib/services/vans";
+import { vansService, VanItem, VanMove } from "@/lib/services/vans";
 
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    itemIds: string[];
+    // Righe del furgone da spostare: per ognuna si sceglie quanto spostare (di default tutto)
+    items: VanItem[];
     // Chiamata a spostamento riuscito, con l'id della nota che ha ricevuto il materiale
     onMoved: (noteId: string) => void;
 }
+
+const round = (n: number) => Math.round(n * 100) / 100;
 
 const noteLabel = (n: LoadNote) => {
     const job = n.jobDescription || n.jobCode;
@@ -30,7 +33,7 @@ const noteLabel = (n: LoadNote) => {
 };
 
 // Sposta le righe scelte del furgone su una nota di carico: una già aperta oppure una nuova (con o senza commessa)
-export function MoveToNoteDialog({ open, onOpenChange, itemIds, onMoved }: Props) {
+export function MoveToNoteDialog({ open, onOpenChange, items, onMoved }: Props) {
     const [mode, setMode] = useState<"existing" | "new">("existing");
     const [notes, setNotes] = useState<LoadNote[]>([]);
     const [noteId, setNoteId] = useState("");
@@ -41,6 +44,8 @@ export function MoveToNoteDialog({ open, onOpenChange, itemIds, onMoved }: Props
     const [jobsLoading, setJobsLoading] = useState(false);
     const [jobPickerOpen, setJobPickerOpen] = useState(false);
     const [busy, setBusy] = useState(false);
+    // Quantità e pezzi da spostare per ogni riga, come testo dei campi
+    const [amounts, setAmounts] = useState<Record<string, { pieces: string; quantity: string }>>({});
 
     const searchJobs = useCallback(async (term: string) => {
         setJobsLoading(true);
@@ -57,20 +62,40 @@ export function MoveToNoteDialog({ open, onOpenChange, itemIds, onMoved }: Props
     useEffect(() => {
         if (!open) return;
         setMode("existing"); setNoteId(""); setJob(null); setText(""); setNoteType("uscita");
+        setAmounts(Object.fromEntries(items.map(i => [i.id, { pieces: i.pieces == null ? "" : String(i.pieces), quantity: String(i.quantity) }])));
         loadNotesService.getAll({ status: "pending" }).then(setNotes).catch(() => toast.error("Errore nel caricamento delle note"));
         searchJobs("");
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, searchJobs]);
 
     const options = useMemo(() => notes.map(n => ({ value: n.id, label: noteLabel(n) })), [notes]);
-    const canConfirm = itemIds.length > 0 && (mode === "existing" ? !!noteId : !!job || text.trim().length > 0);
+
+    // Pezzi e quantità sono legati dal coefficiente dell'articolo: cambiando uno si ricalcola l'altro
+    const setAmount = (item: VanItem, field: "pieces" | "quantity", raw: string) => {
+        const value = parseFloat(raw);
+        const coefficient = item.coefficient && item.coefficient > 0 ? item.coefficient : 1;
+        setAmounts(prev => {
+            if (!(value >= 0)) return { ...prev, [item.id]: { ...prev[item.id], [field]: raw } };
+            const other = field === "pieces" ? String(round(value * coefficient)) : String(round(value / coefficient));
+            return { ...prev, [item.id]: field === "pieces" ? { pieces: raw, quantity: other } : { quantity: raw, pieces: item.pieces == null ? "" : other } };
+        });
+    };
+
+    const rowQty = (id: string) => parseFloat(amounts[id]?.quantity ?? "");
+    const rowsValid = items.length > 0 && items.every(i => rowQty(i.id) > 0 && rowQty(i.id) <= i.quantity + 1e-9);
+    const canConfirm = rowsValid && (mode === "existing" ? !!noteId : !!job || text.trim().length > 0);
 
     const confirm = async () => {
         setBusy(true);
         try {
+            const moves: VanMove[] = items.map(i => {
+                const pieces = parseFloat(amounts[i.id]?.pieces ?? "");
+                return { id: i.id, quantity: rowQty(i.id), pieces: pieces > 0 ? pieces : undefined };
+            });
             const target = mode === "existing"
-                ? (await vansService.moveToNote(itemIds, noteId), noteId)
-                : await vansService.moveToNewNote(itemIds, { jobId: job?.id, notes: text.trim() || undefined, date: new Date().toISOString().split("T")[0], noteType });
-            toast.success(`${itemIds.length} ${itemIds.length === 1 ? "riga spostata" : "righe spostate"} sulla nota`);
+                ? (await vansService.moveToNote(moves, noteId), noteId)
+                : await vansService.moveToNewNote(moves, { jobId: job?.id, notes: text.trim() || undefined, date: new Date().toISOString().split("T")[0], noteType });
+            toast.success(`${items.length} ${items.length === 1 ? "riga spostata" : "righe spostate"} sulla nota`);
             onOpenChange(false);
             onMoved(target);
         } catch (e: any) {
@@ -87,9 +112,41 @@ export function MoveToNoteDialog({ open, onOpenChange, itemIds, onMoved }: Props
                     <DialogHeader>
                         <DialogTitle>Sposta su una nota di carico</DialogTitle>
                         <DialogDescription>
-                            {itemIds.length} {itemIds.length === 1 ? "riga esce" : "righe escono"} dal furgone. Se la nota ha già lo stesso articolo, le quantità si sommano.
+                            Scegli quanto spostare di ogni materiale: se ne sposti solo una parte, il resto resta sul furgone. Se la nota ha già lo stesso articolo, le quantità si sommano.
                         </DialogDescription>
                     </DialogHeader>
+
+                    <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border p-2">
+                        {items.map(i => {
+                            const a = amounts[i.id] || { pieces: "", quantity: "" };
+                            const q = parseFloat(a.quantity);
+                            const invalid = a.quantity !== "" && (!(q > 0) || q > i.quantity + 1e-9);
+                            return (
+                                <div key={i.id} className="space-y-1 border-b pb-2 last:border-b-0 last:pb-0">
+                                    <div className="min-w-0">
+                                        <span className="font-mono text-[10px] text-muted-foreground">{i.inventoryCode}</span>
+                                        <div className="break-words text-sm font-medium leading-tight">{i.inventoryName}</div>
+                                        {i.inventoryModel && <div className="break-words text-xs text-muted-foreground">{i.inventoryModel}</div>}
+                                    </div>
+                                    <div className="flex items-end gap-2">
+                                        {i.pieces != null && (
+                                            <div className="space-y-1">
+                                                <Label className="text-xs text-muted-foreground">Pezzi</Label>
+                                                <Input type="number" inputMode="decimal" min="0" step="0.01" className="h-9 w-24 text-center"
+                                                    value={a.pieces} onChange={e => setAmount(i, "pieces", e.target.value)} />
+                                            </div>
+                                        )}
+                                        <div className="space-y-1">
+                                            <Label className="text-xs text-muted-foreground">Quantità ({i.inventoryUnit})</Label>
+                                            <Input type="number" inputMode="decimal" min="0" step="0.01" className={`h-9 w-28 text-center ${invalid ? "border-destructive" : ""}`}
+                                                value={a.quantity} onChange={e => setAmount(i, "quantity", e.target.value)} />
+                                        </div>
+                                        <span className="pb-2 text-xs text-muted-foreground">su {i.quantity} {i.inventoryUnit}</span>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
 
                     <div className="flex gap-1">
                         <Button type="button" size="sm" variant={mode === "existing" ? "default" : "outline"} onClick={() => setMode("existing")}>Nota esistente</Button>
