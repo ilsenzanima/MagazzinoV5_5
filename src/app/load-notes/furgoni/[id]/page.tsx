@@ -177,7 +177,42 @@ export default function VanDetailPage() {
                             {van.items.length === 0 ? (
                                 <p className="py-8 text-center text-sm text-muted-foreground">Il furgone è vuoto.</p>
                             ) : (
-                                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-card">
+                                <>
+                                {/* Telefono: una scheda per materiale, su più righe */}
+                                <div className="space-y-3 md:hidden">
+                                    {van.items.map(i => (
+                                        <div key={i.id} className={`rounded-lg border border-slate-200 p-3 dark:border-slate-700 ${selected.has(i.id) ? "bg-muted/30" : ""}`}>
+                                            <div className="flex items-start gap-3">
+                                                <Checkbox className="mt-1" checked={selected.has(i.id)} onCheckedChange={() => toggle(i.id)} aria-label="Seleziona riga" />
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="font-mono text-[11px] text-muted-foreground">{i.inventoryCode}</div>
+                                                    <div className="break-words font-medium leading-tight">{i.inventoryName}</div>
+                                                    {i.inventoryModel && <div className="break-words text-sm text-muted-foreground">{i.inventoryModel}</div>}
+                                                </div>
+                                            </div>
+                                            <div className="mt-3 grid grid-cols-2 gap-3">
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs text-muted-foreground">Pezzi</Label>
+                                                    <Input key={`m-${i.id}-p-${i.pieces}`} type="number" inputMode="decimal" min="0" step="0.01"
+                                                        defaultValue={i.pieces ?? ""} className="h-10 text-center"
+                                                        onBlur={e => saveAmounts(i, "pieces", e.target.value)} />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs text-muted-foreground">Quantità ({i.inventoryUnit})</Label>
+                                                    <Input key={`m-${i.id}-q-${i.quantity}`} type="number" inputMode="decimal" min="0" step="0.01"
+                                                        defaultValue={i.quantity} className="h-10 text-center"
+                                                        onBlur={e => saveAmounts(i, "quantity", e.target.value)} />
+                                                </div>
+                                            </div>
+                                            <Button size="sm" variant="outline" className="mt-3 w-full border-blue-300 text-blue-700 hover:bg-blue-50"
+                                                onClick={() => { setMoveIds([i.id]); setMoveOpen(true); }}>
+                                                <ArrowRightLeft className="mr-1 h-4 w-4" /> Sposta su nota
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
                                     <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
                                         <TableHeader>
                                             <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
@@ -222,6 +257,7 @@ export default function VanDetailPage() {
                                         </TableBody>
                                     </Table>
                                 </div>
+                                </>
                             )}
                         </CardContent>
                     </Card>
