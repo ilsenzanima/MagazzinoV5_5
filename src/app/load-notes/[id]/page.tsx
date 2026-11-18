@@ -207,13 +207,39 @@ export default function LoadNoteDetailPage() {
                                 Nessun materiale in questa nota.
                             </div>
                         ) : (
-                            <Table>
+                            <>
+                            {/* Telefono: una scheda per materiale, su più righe */}
+                            <div className="space-y-3 md:hidden">
+                                {note.items.map(item => {
+                                    const isChecked = checkedItems.has(item.id);
+                                    return (
+                                        <div key={item.id} className={`rounded-lg border border-slate-200 p-3 dark:border-slate-700 ${isChecked ? 'bg-muted/30' : ''}`}>
+                                            <div className="flex items-start gap-3">
+                                                <Checkbox className="mt-1" checked={isChecked} onCheckedChange={() => toggleCheck(item.id, isChecked)} aria-label="Spunta riga" />
+                                                <div className={`min-w-0 flex-1 ${isChecked ? 'text-muted-foreground line-through' : ''}`}>
+                                                    {item.inventoryCode && <div className="font-mono text-[11px] text-muted-foreground">{item.inventoryCode}</div>}
+                                                    <div className="break-words font-medium leading-tight">{item.inventoryName}</div>
+                                                    {item.inventoryModel && <div className="break-words text-sm text-muted-foreground">{item.inventoryModel}</div>}
+                                                </div>
+                                            </div>
+                                            <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                                                <div><div className="text-xs text-muted-foreground">Pezzi</div><div className="font-medium">{item.pieces ?? "—"}</div></div>
+                                                <div><div className="text-xs text-muted-foreground">Quantità</div><div className="font-bold">{item.quantity} <span className="text-xs font-normal">{item.inventoryUnit}</span></div></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Tabella: da tablet in su */}
+                            <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
+                            <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
                                 <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="w-[40px]"></TableHead>
-                                        <TableHead>Articolo</TableHead>
-                                        <TableHead className="text-center">Pezzi</TableHead>
-                                        <TableHead className="text-right">Quantità</TableHead>
+                                    <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                        <TableHead className="w-10 border-r"></TableHead>
+                                        <TableHead className="border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Articolo</TableHead>
+                                        <TableHead className="w-28 border-r text-center text-xs font-semibold uppercase tracking-wide text-slate-600">Pezzi</TableHead>
+                                        <TableHead className="w-40 text-center text-xs font-semibold uppercase tracking-wide text-slate-600">Quantità</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -221,22 +247,24 @@ export default function LoadNoteDetailPage() {
                                         const isChecked = checkedItems.has(item.id);
                                         return (
                                             <TableRow key={item.id} className={isChecked ? 'bg-muted/30' : ''}>
-                                                <TableCell>
+                                                <TableCell className="border-r py-2">
                                                     <Checkbox
                                                         checked={isChecked}
                                                         onCheckedChange={() => toggleCheck(item.id, isChecked)}
+                                                        aria-label="Spunta riga"
                                                     />
                                                 </TableCell>
-                                                <TableCell className={isChecked ? 'line-through text-muted-foreground' : ''}>
-                                                    <div className="font-medium">{item.inventoryName}</div>
+                                                <TableCell className={`border-r py-2 ${isChecked ? 'line-through text-muted-foreground' : ''}`}>
+                                                    {item.inventoryCode && <div className="font-mono text-[10px] leading-none text-muted-foreground">{item.inventoryCode}</div>}
+                                                    <div className="text-sm font-medium leading-tight">{item.inventoryName}</div>
                                                     {item.inventoryModel && (
                                                         <div className="text-xs text-muted-foreground">{item.inventoryModel}</div>
                                                     )}
                                                 </TableCell>
-                                                <TableCell className={`text-center ${isChecked ? 'text-muted-foreground' : ''}`}>
-                                                    {item.pieces}
+                                                <TableCell className={`border-r py-2 text-center text-sm ${isChecked ? 'text-muted-foreground' : 'text-slate-600 dark:text-slate-300'}`}>
+                                                    {item.pieces ?? "—"}
                                                 </TableCell>
-                                                <TableCell className={`text-right font-bold ${isChecked ? 'text-muted-foreground' : ''}`}>
+                                                <TableCell className={`py-2 text-center text-sm font-bold ${isChecked ? 'text-muted-foreground' : ''}`}>
                                                     {item.quantity} <span className="font-normal text-xs">{item.inventoryUnit}</span>
                                                 </TableCell>
                                             </TableRow>
@@ -244,6 +272,8 @@ export default function LoadNoteDetailPage() {
                                     })}
                                 </TableBody>
                             </Table>
+                            </div>
+                            </>
                         )}
                     </CardContent>
                 </Card>
