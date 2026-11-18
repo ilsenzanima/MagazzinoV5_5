@@ -119,6 +119,8 @@ export default function VanDetailPage() {
         return <DashboardLayout><p className="py-12 text-center text-muted-foreground">Furgone non trovato</p></DashboardLayout>;
     }
 
+    const someSelected = van.items.some(i => selected.has(i.id));
+    const headCls = "border-r text-xs font-semibold uppercase tracking-wide text-slate-600";
     const allSelected = van.items.length > 0 && van.items.every(i => selected.has(i.id));
 
     return (
@@ -166,37 +168,37 @@ export default function VanDetailPage() {
                                 <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}><Plus className="mr-1 h-4 w-4" /> Aggiungi materiale</Button>
                             </div>
                         </CardHeader>
-                        <CardContent className="p-0 sm:p-6 sm:pt-0">
+                        <CardContent>
                             {van.items.length === 0 ? (
                                 <p className="py-8 text-center text-sm text-muted-foreground">Il furgone è vuoto.</p>
                             ) : (
-                                <div className="overflow-x-auto">
-                                    <Table>
+                                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-card">
+                                    <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
                                         <TableHeader>
-                                            <TableRow>
-                                                <TableHead className="w-10">
-                                                    <Checkbox checked={allSelected} aria-label="Seleziona tutte"
+                                            <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                                <TableHead className="w-10 border-r">
+                                                    <Checkbox checked={allSelected ? true : someSelected ? "indeterminate" : false} aria-label="Seleziona tutte"
                                                         onCheckedChange={() => setSelected(allSelected ? new Set() : new Set(van.items.map(i => i.id)))} />
                                                 </TableHead>
-                                                <TableHead>Materiale</TableHead>
-                                                <TableHead className="w-24 text-center">Pezzi</TableHead>
-                                                <TableHead className="w-40 text-center">Quantità</TableHead>
+                                                <TableHead className={headCls}>Materiale</TableHead>
+                                                <TableHead className={`w-24 text-center ${headCls}`}>Pezzi</TableHead>
+                                                <TableHead className="w-40 text-center text-xs font-semibold uppercase tracking-wide text-slate-600">Quantità</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
                                             {van.items.map(i => (
                                                 <TableRow key={i.id} className={selected.has(i.id) ? "bg-muted/30" : ""}>
-                                                    <TableCell><Checkbox checked={selected.has(i.id)} onCheckedChange={() => toggle(i.id)} aria-label="Seleziona riga" /></TableCell>
-                                                    <TableCell>
+                                                    <TableCell className="border-r py-2"><Checkbox checked={selected.has(i.id)} onCheckedChange={() => toggle(i.id)} aria-label="Seleziona riga" /></TableCell>
+                                                    <TableCell className="border-r py-2">
                                                         <div className="font-mono text-[10px] leading-none text-muted-foreground">{i.inventoryCode}</div>
                                                         <div className="text-sm font-medium leading-tight">{i.inventoryName}</div>
                                                         {i.inventoryModel && <div className="text-xs text-muted-foreground">{i.inventoryModel}</div>}
                                                     </TableCell>
-                                                    <TableCell className="text-center text-sm">{i.pieces ?? "—"}</TableCell>
-                                                    <TableCell>
+                                                    <TableCell className="border-r py-2 text-center text-sm text-slate-600 dark:text-slate-300">{i.pieces ?? "—"}</TableCell>
+                                                    <TableCell className="py-2">
                                                         <div className="flex items-center justify-center gap-1">
                                                             <Input key={`${i.id}-${i.quantity}`} type="number" inputMode="decimal" min="0" step="0.01"
-                                                                defaultValue={i.quantity} className="h-9 w-24 px-1 text-center"
+                                                                defaultValue={i.quantity} className="h-8 w-24 px-1 text-center"
                                                                 onBlur={e => saveQuantity(i.id, e.target.value, i.pieces, i.coefficient, i.quantity)} />
                                                             <span className="text-[10px] text-muted-foreground">{i.inventoryUnit}</span>
                                                         </div>
