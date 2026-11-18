@@ -16,11 +16,12 @@ import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import {
     Plus, FileText, CheckCircle2, Clock, Trash2, Archive, RotateCcw, User, Calendar,
-    ArrowUpRight, ArrowDownRight, Loader2, ArrowUp, ArrowDown, ArrowUpDown,
+    ArrowUpRight, ArrowDownRight, Loader2, ArrowUp, ArrowDown, ArrowUpDown, ClipboardList, Truck,
 } from "lucide-react";
 import Link from "next/link";
 import { LoadNote } from "@/lib/types";
 import { loadNotesService } from "@/lib/services/load-notes";
+import { VansView } from "@/components/load-notes/VansView";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
@@ -88,10 +89,12 @@ function LoadNotesContent() {
     const [sortDir, setSortDir] = useState<"asc" | "desc">(searchParams.get("dir") === "asc" ? "asc" : "desc");
     const [page, setPage] = useState(Number(searchParams.get("page")) || 1);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [view, setView] = useState<"note" | "furgoni">(searchParams.get("vista") === "furgoni" ? "furgoni" : "note");
 
     // L'indirizzo segue filtri, ordinamento e pagina: indietro/avanti del browser ritrovano la stessa vista
     useEffect(() => {
         const params = new URLSearchParams();
+        if (view === "furgoni") { router.replace("/load-notes?vista=furgoni", { scroll: false }); return; }
         if (searchTerm) params.set("q", searchTerm);
         if (status !== "pending") params.set("stato", status);
         if (type !== "all") params.set("tipo", type);
@@ -101,7 +104,7 @@ function LoadNotesContent() {
         if (page !== 1) params.set("page", String(page));
         const query = params.toString();
         router.replace(query ? `/load-notes?${query}` : "/load-notes", { scroll: false });
-    }, [searchTerm, status, type, jobId, sortKey, sortDir, page, router]);
+    }, [view, searchTerm, status, type, jobId, sortKey, sortDir, page, router]);
 
     const fetchNotes = async () => {
         try {
@@ -270,10 +273,22 @@ function LoadNotesContent() {
         </div>
     );
 
+    const tabs = {
+        items: [
+            { value: "note", label: "Note", icon: <ClipboardList className="h-4 w-4" /> },
+            { value: "furgoni", label: "Furgoni", icon: <Truck className="h-4 w-4" /> },
+        ],
+        value: view,
+        onValueChange: (v: string) => setView(v === "furgoni" ? "furgoni" : "note"),
+    };
+
+    if (view === "furgoni") return <VansView tabs={tabs} />;
+
     return (
         <DashboardLayout>
             <ListPageHeader
         strip
+                tabs={tabs}
                 title="Note di Carico"
                 actions={
                     <Link href="/load-notes/new" className="w-full sm:w-auto md:hidden">

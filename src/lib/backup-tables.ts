@@ -62,6 +62,8 @@ export const BACKUP_TABLES = [
     'delivery_note_items',
     'load_notes',
     'load_note_items',
+    'vans',
+    'van_items',
     'movements',
     'workers',
     'attendance',

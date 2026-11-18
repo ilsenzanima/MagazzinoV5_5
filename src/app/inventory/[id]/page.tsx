@@ -74,6 +74,7 @@ import { DuplicateItemsNotice } from "@/components/inventory/DuplicateItemsNotic
 import { HelpTip } from "@/components/ui/help-tip";
 import dynamic from "next/dynamic";
 import { loadNotesService } from "@/lib/services/load-notes";
+import { vansService } from "@/lib/services/vans";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { isEquipmentType, checkDateInfo } from "@/lib/utils/equipment-check";
 const ImageCropper = dynamic(
@@ -130,6 +131,7 @@ export default function InventoryDetailPage() {
   const [jobUsage, setJobUsage] = useState<{ jobs: number; quantity: number } | null>(null);
 
   // Pending notes for this item
+  const [vanQty, setVanQty] = useState(0);
   const [pendingQty, setPendingQty] = useState<{ uscita: number; reso: number }>({ uscita: 0, reso: 0 });
 
   // Helper to handle pieces/quantity change
@@ -245,6 +247,9 @@ export default function InventoryDetailPage() {
           });
           setPendingQty({ uscita, reso });
         }).catch(console.error);
+
+        // Quantità di questo articolo sui furgoni (somma di tutti)
+        vansService.getTotalsByItem().then(t => setVanQty(t.get(id) || 0)).catch(console.error);
 
         // Load auxiliary data for forms in background
         const [jobsData, brandsData, typesData, unitsData, supplierCodesData, suppliersData, hiddenSupplierIds] = await Promise.all([
@@ -683,6 +688,18 @@ export default function InventoryDetailPage() {
                     {pendingQty.reso > 0 ? `${pendingQty.reso.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} ${item.unit}` : '—'}
                   </span>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="space-y-2 p-4">
+              <Label>Sui furgoni</Label>
+              <div className="flex items-center justify-between rounded-md border border-blue-100 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-900/20">
+                <Link href="/load-notes?vista=furgoni" className="text-blue-700 hover:underline dark:text-blue-300">Totale nei furgoni</Link>
+                <span className={`font-bold ${vanQty > 0 ? 'text-blue-700 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}>
+                  {vanQty > 0 ? `${vanQty.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} ${item.unit}` : '—'}
+                </span>
               </div>
             </CardContent>
           </Card>
