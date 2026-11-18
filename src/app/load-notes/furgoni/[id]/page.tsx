@@ -275,7 +275,7 @@ export default function VanDetailPage() {
             </div>
 
             <NoteLineDialog open={addOpen} onClose={() => setAddOpen(false)} items={inventory} onSearch={searchItems} loading={itemsLoading} onConfirm={addLine} />
-            <MoveToNoteDialog open={moveOpen} onOpenChange={setMoveOpen} itemIds={moveIds}
+            <MoveToNoteDialog open={moveOpen} onOpenChange={setMoveOpen} items={van.items.filter(i => moveIds.includes(i.id))}
                 onMoved={(noteId) => router.push(`/load-notes/${noteId}`)} />
             <FloatingAddButton onClick={() => setAddOpen(true)} label="Aggiungi materiale" />
             <SelectionMobileActions count={selected.size} onMove={() => { setMoveIds([...selected]); setMoveOpen(true); }} onRemove={removeSelected} />
