@@ -21,6 +21,15 @@ import { MoveToNoteDialog } from "@/components/load-notes/MoveToNoteDialog";
 import { inventoryApi, InventoryItem } from "@/lib/api";
 import { vansService, Van } from "@/lib/services/vans";
 
+// Il contesto del pannello «Azioni» esiste solo dentro DashboardLayout: la registrazione va fatta da un componente figlio
+function SelectionMobileActions({ count, onMove, onRemove }: { count: number; onMove: () => void; onRemove: () => void }) {
+    useMobileActions(count > 0 ? [
+        { label: `Sposta su nota (${count})`, icon: <ArrowRightLeft className="h-5 w-5" />, onClick: onMove },
+        { label: `Togli dal furgone (${count})`, icon: <Trash2 className="h-5 w-5" />, onClick: onRemove },
+    ] : []);
+    return null;
+}
+
 export default function VanDetailPage() {
     const { id } = useParams<{ id: string }>();
     const router = useRouter();
@@ -118,12 +127,6 @@ export default function VanDetailPage() {
         if (!await confirmDialog("Eliminare questo furgone?")) return;
         try { await vansService.delete(van.id); router.push("/load-notes?vista=furgoni"); } catch { toast.error("Impossibile eliminare il furgone"); }
     };
-
-    // Telefono: con delle righe selezionate, «Sposta su nota» e «Togli» stanno nel pannello «Azioni»
-    useMobileActions(selected.size > 0 ? [
-        { label: `Sposta su nota (${selected.size})`, icon: <ArrowRightLeft className="h-5 w-5" />, onClick: () => { setMoveIds([...selected]); setMoveOpen(true); } },
-        { label: `Togli dal furgone (${selected.size})`, icon: <Trash2 className="h-5 w-5" />, onClick: removeSelected },
-    ] : []);
 
     if (loading) {
         return <DashboardLayout><div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></DashboardLayout>;
@@ -275,6 +278,7 @@ export default function VanDetailPage() {
             <MoveToNoteDialog open={moveOpen} onOpenChange={setMoveOpen} itemIds={moveIds}
                 onMoved={(noteId) => router.push(`/load-notes/${noteId}`)} />
             <FloatingAddButton onClick={() => setAddOpen(true)} label="Aggiungi materiale" />
+            <SelectionMobileActions count={selected.size} onMove={() => { setMoveIds([...selected]); setMoveOpen(true); }} onRemove={removeSelected} />
         </DashboardLayout>
     );
 }
