@@ -88,11 +88,15 @@ export default function VanDetailPage() {
         if (next) setContinueAdd(true);
     };
 
-    const saveQuantity = (itemId: string, raw: string, prevPieces?: number, coefficient = 1, prevQuantity = 0) => {
-        const quantity = parseFloat(raw);
-        if (!(quantity > 0) || quantity === prevQuantity) return;
-        const pieces = coefficient !== 1 ? Math.round((quantity / coefficient) * 100) / 100 : (prevPieces != null ? quantity : undefined);
-        run(() => vansService.updateItem(itemId, { pieces: pieces ?? null, quantity }), "Impossibile salvare la quantità");
+    // Pezzi e quantità sono legati dal coefficiente dell'articolo: cambiando uno si ricalcola l'altro
+    const saveAmounts = (item: Van["items"][number], field: "pieces" | "quantity", raw: string) => {
+        const value = parseFloat(raw);
+        if (!(value > 0) || value === (field === "pieces" ? item.pieces : item.quantity)) return;
+        const coefficient = item.coefficient && item.coefficient > 0 ? item.coefficient : 1;
+        const round = (n: number) => Math.round(n * 100) / 100;
+        const pieces = field === "pieces" ? value : round(value / coefficient);
+        const quantity = field === "quantity" ? value : round(value * coefficient);
+        run(() => vansService.updateItem(item.id, { pieces, quantity }), "Impossibile salvare le quantità");
     };
 
     const toggle = (itemId: string) => setSelected(prev => {
@@ -182,7 +186,7 @@ export default function VanDetailPage() {
                                                         onCheckedChange={() => setSelected(allSelected ? new Set() : new Set(van.items.map(i => i.id)))} />
                                                 </TableHead>
                                                 <TableHead className={headCls}>Materiale</TableHead>
-                                                <TableHead className={`w-24 text-center ${headCls}`}>Pezzi</TableHead>
+                                                <TableHead className={`w-28 text-center ${headCls}`}>Pezzi</TableHead>
                                                 <TableHead className="w-40 text-center text-xs font-semibold uppercase tracking-wide text-slate-600">Quantità</TableHead>
                                                 <TableHead className="w-32" />
                                             </TableRow>
@@ -196,12 +200,14 @@ export default function VanDetailPage() {
                                                         <div className="text-sm font-medium leading-tight">{i.inventoryName}</div>
                                                         {i.inventoryModel && <div className="text-xs text-muted-foreground">{i.inventoryModel}</div>}
                                                     </TableCell>
-                                                    <TableCell className="border-r py-2 text-center text-sm text-slate-600 dark:text-slate-300">{i.pieces ?? "—"}</TableCell>
+                                                    <TableCell className="border-r py-2 text-center text-sm text-slate-600 dark:text-slate-300"><Input key={`${i.id}-p-${i.pieces}`} type="number" inputMode="decimal" min="0" step="0.01"
+                                                        defaultValue={i.pieces ?? ""} className="mx-auto h-8 w-20 px-1 text-center"
+                                                        onBlur={e => saveAmounts(i, "pieces", e.target.value)} /></TableCell>
                                                     <TableCell className="py-2">
                                                         <div className="flex items-center justify-center gap-1">
-                                                            <Input key={`${i.id}-${i.quantity}`} type="number" inputMode="decimal" min="0" step="0.01"
+                                                            <Input key={`${i.id}-q-${i.quantity}`} type="number" inputMode="decimal" min="0" step="0.01"
                                                                 defaultValue={i.quantity} className="h-8 w-24 px-1 text-center"
-                                                                onBlur={e => saveQuantity(i.id, e.target.value, i.pieces, i.coefficient, i.quantity)} />
+                                                                onBlur={e => saveAmounts(i, "quantity", e.target.value)} />
                                                             <span className="text-[10px] text-muted-foreground">{i.inventoryUnit}</span>
                                                         </div>
                                                     </TableCell>
