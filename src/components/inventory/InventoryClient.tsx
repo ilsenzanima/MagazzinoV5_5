@@ -64,6 +64,7 @@ import {
 import { brandsApi, Brand } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import { loadNotesService } from "@/lib/services/load-notes";
+import { vansService } from "@/lib/services/vans";
 import { warehousesApi } from "@/lib/services/warehouses";
 import type { Warehouse } from "@/lib/types";
 
@@ -320,6 +321,12 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   };
 
   const warehouseName = (id: string) => warehouses.find(w => w.id === id)?.name ?? "";
+
+  // Quantità totale per articolo sui furgoni (conteggio separato dalle note)
+  const [vanMap, setVanMap] = useState<Map<string, number>>(new Map());
+  useEffect(() => {
+    vansService.getTotalsByItem().then(setVanMap).catch(console.error);
+  }, []);
 
   // Load pending notes and build per-item map
   useEffect(() => {
@@ -800,7 +807,10 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                         {pending && pending.reso > 0 && (
                           <div className="text-green-600">↓ {pending.reso.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} entrata</div>
                         )}
-                        {!(pending && (pending.uscita > 0 || pending.reso > 0)) && <span className="text-slate-300">—</span>}
+                        {vanMap.get(item.id) ? (
+                          <div className="text-blue-600" title="Materiale caricato sui furgoni (non ancora su una nota)">🚚 {vanMap.get(item.id)!.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} furgoni</div>
+                        ) : null}
+                        {!(pending && (pending.uscita > 0 || pending.reso > 0)) && !vanMap.get(item.id) && <span className="text-slate-300">—</span>}
                       </TableCell>
                         </>
                       )}
@@ -886,6 +896,11 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                                 {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 , useGrouping: true})} {item.unit}
                               </Badge>
                             )}
+                            {vanMap.get(item.id) ? (
+                              <Badge variant="outline" className="text-[10px] text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-900/20">
+                                🚚 {vanMap.get(item.id)!.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} furgoni
+                              </Badge>
+                            ) : null}
                             {(() => {
                               const pending = pendingMap.get(item.id);
                               if (!pending || (pending.uscita === 0 && pending.reso === 0)) return null;

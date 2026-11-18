@@ -61,6 +61,15 @@ export const vansService = {
         return (vans || []).map(v => mapVan(v, byVan.get(v.id) || []));
     },
 
+    // Quantità totale di ogni articolo sui furgoni (somma di tutti i furgoni), per le viste dei materiali
+    getTotalsByItem: async (): Promise<Map<string, number>> => {
+        const { data, error } = await supabase.from("van_items").select("inventory_id, quantity");
+        if (error) throw error;
+        const totals = new Map<string, number>();
+        (data || []).forEach((r: any) => totals.set(r.inventory_id, (totals.get(r.inventory_id) || 0) + Number(r.quantity)));
+        return totals;
+    },
+
     getById: async (id: string): Promise<Van | null> => {
         const { data: van, error } = await supabase.from("vans").select("*").eq("id", id).maybeSingle();
         if (error) throw error;
