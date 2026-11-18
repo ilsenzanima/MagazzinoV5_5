@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Archive, ArrowRightLeft, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowLeft, Archive, ArrowRightLeft, Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { NoteLineDialog, NoteLineResult } from "@/components/load-notes/NoteLineDialog";
 import { MoveToNoteDialog } from "@/components/load-notes/MoveToNoteDialog";
 import { inventoryApi, InventoryItem } from "@/lib/api";
@@ -29,6 +30,7 @@ export default function VanDetailPage() {
     const [plate, setPlate] = useState("");
     const [addOpen, setAddOpen] = useState(false);
     const [moveOpen, setMoveOpen] = useState(false);
+    const [moveIds, setMoveIds] = useState<string[]>([]);
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [itemsLoading, setItemsLoading] = useState(false);
     const [continueAdd, setContinueAdd] = useState(false);
@@ -160,12 +162,11 @@ export default function VanDetailPage() {
                                 {selected.size > 0 && (
                                     <>
                                         <Button variant="outline" size="sm" onClick={removeSelected}><Trash2 className="mr-1 h-4 w-4" /> Togli ({selected.size})</Button>
-                                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => setMoveOpen(true)}>
+                                        <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={() => { setMoveIds([...selected]); setMoveOpen(true); }}>
                                             <ArrowRightLeft className="mr-1 h-4 w-4" /> Sposta su nota ({selected.size})
                                         </Button>
                                     </>
                                 )}
-                                <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}><Plus className="mr-1 h-4 w-4" /> Aggiungi materiale</Button>
                             </div>
                         </CardHeader>
                         <CardContent>
@@ -183,6 +184,7 @@ export default function VanDetailPage() {
                                                 <TableHead className={headCls}>Materiale</TableHead>
                                                 <TableHead className={`w-24 text-center ${headCls}`}>Pezzi</TableHead>
                                                 <TableHead className="w-40 text-center text-xs font-semibold uppercase tracking-wide text-slate-600">Quantità</TableHead>
+                                                <TableHead className="w-32" />
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -203,6 +205,12 @@ export default function VanDetailPage() {
                                                             <span className="text-[10px] text-muted-foreground">{i.inventoryUnit}</span>
                                                         </div>
                                                     </TableCell>
+                                                <TableCell className="py-2 text-right">
+                                                    <Button size="sm" variant="outline" className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                                                        onClick={() => { setMoveIds([i.id]); setMoveOpen(true); }}>
+                                                        <ArrowRightLeft className="mr-1 h-4 w-4" /> Sposta
+                                                    </Button>
+                                                </TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>
@@ -215,8 +223,9 @@ export default function VanDetailPage() {
             </div>
 
             <NoteLineDialog open={addOpen} onClose={() => setAddOpen(false)} items={inventory} onSearch={searchItems} loading={itemsLoading} onConfirm={addLine} />
-            <MoveToNoteDialog open={moveOpen} onOpenChange={setMoveOpen} itemIds={[...selected]}
+            <MoveToNoteDialog open={moveOpen} onOpenChange={setMoveOpen} itemIds={moveIds}
                 onMoved={(noteId) => router.push(`/load-notes/${noteId}`)} />
+            <FloatingAddButton onClick={() => setAddOpen(true)} label="Aggiungi materiale" />
         </DashboardLayout>
     );
 }

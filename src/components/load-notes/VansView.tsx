@@ -12,8 +12,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { vansService, Van } from "@/lib/services/vans";
+
+const headCls = "border-r text-xs font-semibold uppercase tracking-wide text-slate-600";
+const summary = (v: Van) => v.items.map(i => i.inventoryName).join(", ");
 
 type Tabs = React.ComponentProps<typeof ListPageHeader>["tabs"];
 
@@ -74,23 +78,52 @@ export function VansView({ tabs }: { tabs: Tabs }) {
                     <p>{vans.length === 0 ? "Nessun furgone: aggiungine uno con il pulsante +" : "Nessun furgone trovato"}</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {rows.map(v => (
-                        <Card key={v.id} className="cursor-pointer border-slate-200 transition-shadow hover:shadow-md dark:border-slate-700" onClick={() => router.push(`/load-notes/furgoni/${v.id}`)}>
-                            <CardContent className="p-4">
-                                <div className="flex items-center gap-2">
-                                    <Truck className="h-4 w-4 shrink-0 text-blue-600" />
-                                    <span className="truncate font-medium">{v.name}</span>
-                                    {v.archived && <span className="rounded bg-slate-100 px-1.5 text-[10px] uppercase text-slate-500">Archiviato</span>}
-                                </div>
-                                {v.plate && <p className="mt-0.5 text-xs text-slate-500">{v.plate}</p>}
-                                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                                    {v.items.length === 0 ? "Vuoto" : `${v.items.length} articoli: ${v.items.map(i => i.inventoryName).join(", ")}`}
-                                </p>
-                            </CardContent>
-                        </Card>
-                    ))}
-                </div>
+                <>
+                    {/* Tabella: da tablet in su */}
+                    <div className="mb-4 hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
+                        <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
+                            <TableHeader>
+                                <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                    <TableHead className={`w-64 ${headCls}`}>Furgone</TableHead>
+                                    <TableHead className={`w-32 ${headCls}`}>Targa</TableHead>
+                                    <TableHead className={headCls}>Materiale</TableHead>
+                                    <TableHead className="w-24 text-xs font-semibold uppercase tracking-wide text-slate-600">Stato</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {rows.map(v => (
+                                    <TableRow key={v.id} className="cursor-pointer" onClick={() => router.push(`/load-notes/furgoni/${v.id}`)}>
+                                        <TableCell className="border-r py-2 text-sm font-medium">
+                                            <span className="flex items-center gap-2"><Truck className="h-4 w-4 shrink-0 text-blue-600" /><span className="truncate">{v.name}</span></span>
+                                        </TableCell>
+                                        <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{v.plate || "—"}</TableCell>
+                                        <TableCell className="border-r py-2 text-xs text-slate-500 dark:text-slate-400">
+                                            <div className="line-clamp-2" title={summary(v)}>{v.items.length === 0 ? <span className="text-slate-300">Vuoto</span> : `${v.items.length} articoli: ${summary(v)}`}</div>
+                                        </TableCell>
+                                        <TableCell className="py-2 text-xs text-slate-500">{v.archived ? "Archiviato" : "Attivo"}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+
+                    {/* Schede: telefono */}
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:hidden">
+                        {rows.map(v => (
+                            <Card key={v.id} className="cursor-pointer border-slate-200 transition-shadow hover:shadow-md dark:border-slate-700" onClick={() => router.push(`/load-notes/furgoni/${v.id}`)}>
+                                <CardContent className="p-4">
+                                    <div className="flex items-center gap-2">
+                                        <Truck className="h-4 w-4 shrink-0 text-blue-600" />
+                                        <span className="truncate font-medium">{v.name}</span>
+                                        {v.archived && <span className="rounded bg-slate-100 px-1.5 text-[10px] uppercase text-slate-500">Archiviato</span>}
+                                    </div>
+                                    {v.plate && <p className="mt-0.5 text-xs text-slate-500">{v.plate}</p>}
+                                    <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{v.items.length === 0 ? "Vuoto" : `${v.items.length} articoli: ${summary(v)}`}</p>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                </>
             )}
 
             <FloatingAddButton onClick={() => { setName(""); setPlate(""); setCreateOpen(true); }} label="Nuovo furgone" />
