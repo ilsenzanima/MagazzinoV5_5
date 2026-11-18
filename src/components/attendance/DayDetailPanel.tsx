@@ -28,7 +28,7 @@ const STATUS_LABELS: Record<string, string> = {
     transfer: 'Trasferta', course: 'Corso', absence: 'Assenza', medical_exam: 'Visita medica',
 };
 
-// Voci con ore regolabili: cantiere e trasferta; le assenze si modificano dalla matita
+// Voci di lavoro (cantiere, magazzino, trasferta): nel riepilogo contano come «Lavoro» e mostrano il cantiere; le altre sono stati speciali
 const isWorkEntry = (a: Attendance) => a.status === 'presence' || a.status === 'transfer';
 
 const entryLabel = (a: Attendance) => isWorkEntry(a)
@@ -114,7 +114,7 @@ export default function DayDetailPanel({ worker, date, entries, periodEntries, p
                                 </p>
                                 {a.notes && <p className="truncate text-xs text-slate-400">{a.notes}</p>}
                             </div>
-                            {canEdit && isWorkEntry(a) ? (
+                            {canEdit ? (
                                 <HoursStepper hours={a.hours} onChange={d => onChangeHours(a, d)} />
                             ) : (
                                 <span className="w-16 text-center text-sm font-semibold">{fmtHours(a.hours)}</span>
