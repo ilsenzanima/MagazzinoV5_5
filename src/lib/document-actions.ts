@@ -82,8 +82,11 @@ function printBlob(blob: Blob, kind: "pdf" | "image"): Promise<void> {
             } catch (e) { frame.remove(); URL.revokeObjectURL(url); reject(e) }
         }
         // Per le immagini il frame si considera caricato solo dopo l'immagine, quindi si stampa a immagine pronta
-        if (kind === "image") frame.srcdoc = `<html><body style="margin:0"><img src="${url}" style="max-width:100%;max-height:100vh;display:block;margin:auto"></body></html>`
-        else frame.src = url
+        // (pagina in un blob e non in srcdoc: i blob sono già consentiti dalla politica di sicurezza del sito)
+        if (kind === "image") {
+            const page = new Blob([`<html><body style="margin:0"><img src="${url}" style="max-width:100%;max-height:100vh;display:block;margin:auto"></body></html>`], { type: "text/html" })
+            frame.src = URL.createObjectURL(page)
+        } else frame.src = url
         document.body.appendChild(frame)
     })
 }
