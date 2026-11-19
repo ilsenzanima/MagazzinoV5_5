@@ -4,7 +4,7 @@
 // Bumped on every meaningful change to this file so the browser installs a
 // new worker and (via activate below) drops any cache left by a previous
 // version, instead of accumulating entries under the same name forever.
-const CACHE_NAME = 'magazzino-v5-cache-v3';
+const CACHE_NAME = 'magazzino-v5-cache-v4';
 
 // Files to cache for offline access (minimal for now)
 const urlsToCache = [
@@ -97,6 +97,8 @@ self.addEventListener('fetch', (event) => {
 
     // Skip API requests and supabase
     const url = new URL(event.request.url);
+    // Indirizzi blob:/data: (anteprime e stampa dei documenti): non sono richieste di rete, il worker non deve toccarli
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
     if (url.pathname.startsWith('/api/') ||
         url.hostname.includes('supabase')) {
         return;
