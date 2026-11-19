@@ -70,21 +70,25 @@ function printBlob(blob: Blob, kind: "pdf" | "image"): Promise<void> {
     return new Promise((resolve, reject) => {
         const url = URL.createObjectURL(blob)
         const frame = document.createElement("iframe")
-        frame.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;"
+        // Il frame ha dimensioni reali ma e' invisibile: con 0x0 Chrome non carica il visualizzatore PDF e non stampa nulla
+        frame.style.cssText = "position:fixed;left:0;top:0;width:100vw;height:100vh;border:0;opacity:0;pointer-events:none;z-index:-1;"
         const done = () => { setTimeout(() => { frame.remove(); URL.revokeObjectURL(url) }, 1000); resolve() }
         frame.onload = () => {
-            try {
-                const w = frame.contentWindow!
-                w.focus()
-                w.print()
-                // I browser che non aspettano la chiusura della finestra di stampa: si dà tempo prima del file seguente
-                setTimeout(done, 800)
-            } catch (e) { frame.remove(); URL.revokeObjectURL(url); reject(e) }
+            // Al PDF serve un attimo perche' il visualizzatore sia pronto
+            setTimeout(() => {
+                try {
+                    const w = frame.contentWindow!
+                    w.focus()
+                    w.print()
+                    // I browser che non aspettano la chiusura della finestra di stampa: si dà tempo prima del file seguente
+                    setTimeout(done, 1500)
+                } catch (e) { frame.remove(); URL.revokeObjectURL(url); reject(e) }
+            }, kind === "pdf" ? 700 : 200)
         }
         // Per le immagini il frame si considera caricato solo dopo l'immagine, quindi si stampa a immagine pronta
         // (pagina in un blob e non in srcdoc: i blob sono già consentiti dalla politica di sicurezza del sito)
         if (kind === "image") {
-            const page = new Blob([`<html><body style="margin:0"><img src="${url}" style="max-width:100%;max-height:100vh;display:block;margin:auto"></body></html>`], { type: "text/html" })
+            const page = new Blob([`<html><body style="margin:0"><img loading="eager" src="${url}" style="max-width:100%;max-height:100vh;display:block;margin:auto"></body></html>`], { type: "text/html" })
             frame.src = URL.createObjectURL(page)
         } else frame.src = url
         document.body.appendChild(frame)
