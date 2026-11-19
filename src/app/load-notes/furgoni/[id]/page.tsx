@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useMobileActions } from "@/components/layout/mobile-actions";
@@ -41,6 +42,8 @@ export default function VanDetailPage() {
     const [addOpen, setAddOpen] = useState(false);
     const [moveOpen, setMoveOpen] = useState(false);
     const [moveIds, setMoveIds] = useState<string[]>([]);
+    // Dopo uno spostamento riuscito: nota che ha ricevuto il materiale (si sceglie se andarci o restare sul furgone)
+    const [movedToNote, setMovedToNote] = useState<string | null>(null);
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [itemsLoading, setItemsLoading] = useState(false);
     const [continueAdd, setContinueAdd] = useState(false);
@@ -276,7 +279,19 @@ export default function VanDetailPage() {
 
             <NoteLineDialog open={addOpen} onClose={() => setAddOpen(false)} items={inventory} onSearch={searchItems} loading={itemsLoading} onConfirm={addLine} />
             <MoveToNoteDialog open={moveOpen} onOpenChange={setMoveOpen} items={van.items.filter(i => moveIds.includes(i.id))}
-                onMoved={(noteId) => router.push(`/load-notes/${noteId}`)} />
+                onMoved={(noteId) => { setSelected(new Set()); setMovedToNote(noteId); load(); }} />
+            <Dialog open={!!movedToNote} onOpenChange={(open) => { if (!open) setMovedToNote(null); }}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Spostamento completato</DialogTitle>
+                        <DialogDescription>Il materiale è sulla nota di carico. Vuoi aprire la nota o restare nel furgone per spostare altro?</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setMovedToNote(null)}>Resta nel furgone</Button>
+                        <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => router.push(`/load-notes/${movedToNote}`)}>Vai alla nota</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             <FloatingAddButton onClick={() => setAddOpen(true)} label="Aggiungi materiale" />
             <SelectionMobileActions count={selected.size} onMove={() => { setMoveIds([...selected]); setMoveOpen(true); }} onRemove={removeSelected} />
         </DashboardLayout>

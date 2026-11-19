@@ -2,6 +2,19 @@
 // funzioni serverless di Vercel: il file viene inviato a pezzi (chunk) al nostro
 // endpoint di relay, che li inoltra a una sessione di upload "resumable" su Drive.
 
+// Il browser a volte non indica il tipo di un file Word/Excel (soprattutto su Windows): senza tipo Drive lo
+// salva come «octet-stream» e poi anteprima, apertura e stampa non funzionano. Si ricava dall'estensione.
+const MIME_BY_EXTENSION: Record<string, string> = {
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ppt: 'application/vnd.ms-powerpoint',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    pdf: 'application/pdf',
+}
+const mimeOf = (file: File) => file.type || MIME_BY_EXTENSION[file.name.split('.').pop()?.toLowerCase() ?? ''] || 'application/octet-stream'
+
 const CHUNK_SIZE = 4 * 1024 * 1024 // multiplo di 256KB, richiesto da Drive
 
 export interface DriveUploadResult {
@@ -55,7 +68,7 @@ export async function uploadFileToDrive(file: File, folderPath: string[] | strin
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             fileName: file.name,
-            mimeType: file.type || 'application/octet-stream',
+            mimeType: mimeOf(file),
             folderId,
         }),
     })

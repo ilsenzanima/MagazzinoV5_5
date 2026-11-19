@@ -235,6 +235,54 @@ export function officeNativePreviewUrlByExtension(fileId: string, extension?: st
     return `https://docs.google.com/${app}/d/${encodeURIComponent(fileId)}/preview`;
 }
 
+// Tipo del file dall'estensione: serve quando il browser non lo indica (file caricati con tipo vuoto finiscono
+// su Drive come «octet-stream» e poi non si aprono, non si vedono in anteprima e non si convertono)
+const MIME_BY_EXTENSION: Record<string, string> = {
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ppt: 'application/vnd.ms-powerpoint',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    pdf: 'application/pdf',
+};
+
+export function mimeTypeFromFileName(name: string): string | null {
+    const ext = name.split('.').pop()?.toLowerCase() ?? '';
+    return MIME_BY_EXTENSION[ext] ?? null;
+}
+
+const GOOGLE_MIME_BY_APP: Record<string, string> = {
+    document: 'application/vnd.google-apps.document',
+    spreadsheet: 'application/vnd.google-apps.spreadsheet',
+    presentation: 'application/vnd.google-apps.presentation',
+};
+
+/**
+ * PDF di un documento Word/Excel/PowerPoint caricato su Drive, per stamparlo senza aprirlo:
+ * Drive ne fa una copia temporanea convertita, la esporta in PDF e la copia viene subito eliminata.
+ */
+export async function convertOfficeToPdf(fileId: string): Promise<Buffer> {
+    const drive = getDriveClient();
+    const { data: meta } = await drive.files.get({ fileId, fields: 'mimeType, name' });
+    const mimeType = isOfficeMimeType(meta.mimeType || '') ? meta.mimeType! : (mimeTypeFromFileName(meta.name || '') ?? '');
+    const app = OFFICE_APP_BY_MIME_TYPE[mimeType];
+    if (!app) throw new Error('Il file non è un documento Office');
+
+    const copy = await drive.files.copy({
+        fileId,
+        requestBody: { mimeType: GOOGLE_MIME_BY_APP[app], name: `stampa-temporanea-${Date.now()}` },
+        fields: 'id',
+    });
+    const copyId = copy.data.id!;
+    try {
+        const res = await drive.files.export({ fileId: copyId, mimeType: 'application/pdf' }, { responseType: 'arraybuffer' });
+        return Buffer.from(res.data as ArrayBuffer);
+    } finally {
+        await drive.files.delete({ fileId: copyId }).catch(() => { /* copia temporanea: se resta, non pesa sull'utente */ });
+    }
+}
+
 export async function getFileMetadata(fileId: string): Promise<{ mimeType: string; name: string }> {
     const drive = getDriveClient();
     const { data } = await drive.files.get({ fileId, fields: 'mimeType, name' });

@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useEffect, useRef, useMemo } from "react"
+import { Printer } from "lucide-react"
+import { DocumentBulkBar, useDocSelection, printOne, downloadOne } from "@/components/documents/DocumentBulkBar"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent } from "@/components/ui/card"
 import { NotchSearch } from "@/components/ui/notch-tabs"
 import { FloatingAddButton } from "@/components/ui/floating-add-button"
@@ -252,6 +255,10 @@ export function SupplierOffers({ jobId, proposalId, jobLabel, inStrip }: Props) 
     const isDrive = (doc: SupplierOffer) => !!doc.fileUrl && !doc.fileUrl.includes('/')
     const dateOf = (doc: SupplierOffer) => format(new Date(doc.createdAt), 'dd/MM/yyyy', { locale: it })
 
+    const sel = useDocSelection()
+    const selectedDocs = rows.filter(d => sel.ids.has(d.id))
+    const allShownSelected = rows.length > 0 && rows.every(d => sel.ids.has(d.id))
+
     const rowMenu = (doc: SupplierOffer) => (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -261,11 +268,8 @@ export function SupplierOffers({ jobId, proposalId, jobLabel, inStrip }: Props) 
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
                 <DropdownMenuItem onClick={() => handleOpenDocument(doc.fileUrl)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>
-                {isDrive(doc) && (
-                    <DropdownMenuItem onClick={() => window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank')}>
-                        <Download className="mr-2 h-4 w-4" />Scarica
-                    </DropdownMenuItem>
-                )}
+                <DropdownMenuItem onClick={() => printOne(doc)}><Printer className="mr-2 h-4 w-4" />Stampa</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => downloadOne(doc)}><Download className="mr-2 h-4 w-4" />Scarica</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => openEdit(doc)}><Pencil className="mr-2 h-4 w-4" />Modifica</DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => { setActiveDoc(doc); setDeleteOpen(true) }} className="text-red-600 focus:text-red-600">
@@ -328,11 +332,14 @@ export function SupplierOffers({ jobId, proposalId, jobLabel, inStrip }: Props) 
 
                     <div className="grid grid-cols-1 gap-2 md:hidden">{supplierSelect()}</div>
 
+                    <DocumentBulkBar docs={selectedDocs} onClear={sel.clear} />
+
                     {/* Tabella (PC) */}
                     <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
                         <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
                             <TableHeader>
                                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                    <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : selectedDocs.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(rows.map(d => d.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
                                     <TableHead className={TABLE_HEAD_CLS}>{sortBtn("name", "Documento")}</TableHead>
                                     <TableHead className={`w-56 ${TABLE_HEAD_CLS}`}>
                                         <div className="flex items-center gap-1">
@@ -350,10 +357,11 @@ export function SupplierOffers({ jobId, proposalId, jobLabel, inStrip }: Props) 
                             <TableBody>
                                 {rows.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={5} className="py-10 text-center text-slate-400">Nessun documento con questi filtri</TableCell>
+                                        <TableCell colSpan={6} className="py-10 text-center text-slate-400">Nessun documento con questi filtri</TableCell>
                                     </TableRow>
                                 ) : rows.map(doc => (
                                     <TableRow key={doc.id} className="cursor-pointer" onClick={() => handleOpenDocument(doc.fileUrl)}>
+                                        <TableCell className="border-r py-2" onClick={e => e.stopPropagation()}><Checkbox checked={sel.ids.has(doc.id)} onCheckedChange={() => sel.toggle(doc.id)} aria-label="Seleziona documento" /></TableCell>
                                         <TableCell className="border-r py-2">
                                             <div className="flex min-w-0 items-center gap-2">
                                                 <span className="shrink-0">{getFileIcon(doc.fileType, "h-5 w-5")}</span>

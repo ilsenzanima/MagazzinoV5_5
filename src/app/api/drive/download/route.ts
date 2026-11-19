@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
-import { downloadFile, getDriveThumbnail, getFileMetadata, isOfficeMimeType, ensureFileLinkShareable, officeNativePreviewUrl } from "@/lib/google-drive"
+import { downloadFile, getDriveThumbnail, getFileMetadata, isOfficeMimeType, mimeTypeFromFileName, convertOfficeToPdf } from "@/lib/google-drive"
 
 export async function GET(req: NextRequest) {
     const cookieStore = await cookies()
@@ -19,20 +19,31 @@ export async function GET(req: NextRequest) {
     if (!fileId) return NextResponse.json({ error: 'fileId mancante' }, { status: 400 })
 
     try {
-        // I documenti Office vengono aperti nell'anteprima nativa di Google Docs/Sheets/Slides
-        // in sola lettura, a meno che non sia richiesto il download diretto (download=1). Il
-        // viewer generico di Drive (file/d/{id}/view) a volte fallisce con "Impossibile
-        // visualizzare l'anteprima del file" su questi formati, specie se caricati di recente.
+        // I documenti Office (Word, Excel, PowerPoint) si aprono come PDF: Drive ne fa una copia temporanea convertita
+        // e la elimina subito. L'anteprima di Google Docs/Sheets su questi file spesso non si apre («Impossibile aprire
+        // il file») e richiedeva di rendere il file visibile a chiunque abbia il link. Se la conversione non riesce
+        // il file viene scaricato com'e', per aprirlo sul PC.
+        let downloadInstead = forceDownload
         if (!forceDownload) {
-            const { mimeType: previewMimeType } = await getFileMetadata(fileId)
-            if (isOfficeMimeType(previewMimeType)) {
-                await ensureFileLinkShareable(fileId)
-                const nativeUrl = officeNativePreviewUrl(fileId, previewMimeType)
-                return NextResponse.redirect(nativeUrl || `https://drive.google.com/file/d/${fileId}/view`)
+            const meta = await getFileMetadata(fileId)
+            const officeType = isOfficeMimeType(meta.mimeType) ? meta.mimeType : (mimeTypeFromFileName(meta.name) ?? meta.mimeType)
+            if (isOfficeMimeType(officeType)) {
+                try {
+                    const pdf = await convertOfficeToPdf(fileId)
+                    const pdfName = meta.name.replace(/\.[^.]+$/, '') + '.pdf'
+                    return new NextResponse(new Uint8Array(pdf), {
+                        headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(pdfName)}` },
+                    })
+                } catch (convErr) {
+                    console.error('drive/download: conversione in PDF non riuscita, scarico il file originale', fileId, convErr)
+                    downloadInstead = true
+                }
             }
         }
 
-        const { buffer, mimeType, name } = await downloadFile(fileId)
+        const { buffer, mimeType: driveMimeType, name } = await downloadFile(fileId)
+        // File caricati con tipo vuoto: il tipo si ricava dall'estensione, cosi' il browser sa cos'e'
+        const mimeType = driveMimeType === 'application/octet-stream' ? (mimeTypeFromFileName(name) ?? driveMimeType) : driveMimeType
 
         // HEIC/HEIF non si vedono nei browser (tranne Safari): per la visualizzazione si serve
         // la versione grande (JPEG) generata da Drive. Il download diretto resta l'originale.
@@ -46,11 +57,14 @@ export async function GET(req: NextRequest) {
         }
         const hasExtension = !!requestedName && /\.[a-zA-Z0-9]{2,5}$/.test(requestedName)
         const fileName = hasExtension ? requestedName! : name
-        const disposition = forceDownload ? 'attachment' : 'inline'
+        const disposition = downloadInstead ? 'attachment' : 'inline'
+        // Versione solo ASCII del nome (per i browser vecchi): lettere accentate, virgolette e barre diventano «_»
+        const asciiName = Array.from(fileName).map(c => (c >= ' ' && c <= '~' && c !== '"' && c !== '\\') ? c : '_').join('')
         return new NextResponse(new Uint8Array(buffer), {
             headers: {
                 'Content-Type': mimeType,
-                'Content-Disposition': `${disposition}; filename="${encodeURIComponent(fileName)}"`,
+                // Nome con spazi e lettere accentate salvato correttamente (prima compariva come «Nome%20file.xlsx»)
+                'Content-Disposition': `${disposition}; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
             },
         })
     } catch (err: any) {

@@ -1,6 +1,9 @@
 "use client"
 
 import { PhoneSearchPortal } from "@/components/layout/mobile-actions";
+import { Printer } from "lucide-react"
+import { DocumentBulkBar, useDocSelection, printOne, downloadOne } from "@/components/documents/DocumentBulkBar"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -647,6 +650,10 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
 
   const askDelete = (doc: SiteDocument) => { setActiveDoc(doc); setDeleteOpen(true) }
 
+  const sel = useDocSelection()
+  const selectedDocs = shownDocs.filter(d => sel.ids.has(d.id))
+  const allShownSelected = shownDocs.length > 0 && shownDocs.every(d => sel.ids.has(d.id))
+
   const rowMenu = (doc: SiteDocument, siblings: SiteDocument[] = shownDocs) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -656,11 +663,8 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
         <DropdownMenuItem onClick={() => openDoc(doc, siblings)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>
-        {isDriveFile(doc) && (
-          <DropdownMenuItem onClick={() => window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank')}>
-            <Download className="mr-2 h-4 w-4" />Scarica
-          </DropdownMenuItem>
-        )}
+        <DropdownMenuItem onClick={() => printOne(doc)}><Printer className="mr-2 h-4 w-4" />Stampa</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => downloadOne(doc)}><Download className="mr-2 h-4 w-4" />Scarica</DropdownMenuItem>
         <DropdownMenuItem onClick={e => openEdit(doc, e as unknown as React.MouseEvent)}><Pencil className="mr-2 h-4 w-4" />Modifica</DropdownMenuItem>
         {docTypes.find(t => t.id === doc.documentTypeId)?.allowsFolders && (
           <DropdownMenuItem onClick={() => openMove([doc])}><FolderInput className="mr-2 h-4 w-4" />Sposta in cartella</DropdownMenuItem>
@@ -797,11 +801,14 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
                 </div>
               </PhoneSearchPortal>
 
+              <DocumentBulkBar docs={selectedDocs} onClear={sel.clear} />
+
               {/* Tabella (PC) */}
               <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
                 <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
                   <TableHeader>
                     <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                      <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : selectedDocs.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(shownDocs.map(d => d.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
                       <TableHead className={headCls}>{sortBtn("name", "Documento")}</TableHead>
                       <TableHead className={`w-44 ${headCls}`}>
                         <div className="flex items-center gap-1">
@@ -828,13 +835,14 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
                   <TableBody>
                     {pageRows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                        <TableCell colSpan={8} className="py-10 text-center text-slate-400 dark:text-slate-500">
                           <FileText className="mx-auto mb-2 h-12 w-12 opacity-20" />
                           Nessun documento con questi filtri
                         </TableCell>
                       </TableRow>
                     ) : pageRows.map(r => (
                       <TableRow key={r.id} className="cursor-pointer" onClick={() => openRow(r)}>
+                        <TableCell className="border-r py-2" onClick={e => e.stopPropagation()}>{r.kind === "doc" && <Checkbox checked={sel.ids.has(r.doc!.id)} onCheckedChange={() => sel.toggle(r.doc!.id)} aria-label="Seleziona documento" />}</TableCell>
                         <TableCell className="border-r py-2">
                           {r.kind === "collection" ? (
                             <div className="flex min-w-0 items-center gap-2">
