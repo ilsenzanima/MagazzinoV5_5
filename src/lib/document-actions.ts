@@ -118,3 +118,60 @@ export async function printDocuments(docs: DocLike[]): Promise<PrintResult> {
     }
     return result
 }
+
+// Foto ridimensionata (lato lungo max 1800 px) e ricompressa in JPEG: PDF leggeri anche con molte foto
+async function photoToJpeg(d: DocLike): Promise<{ data: string; w: number; h: number }> {
+    // Senza download=1 il server serve l'originale, o un JPEG per i file HEIC che i browser non leggono
+    const url = isDriveFile(d.fileUrl) ? `/api/drive/download?fileId=${encodeURIComponent(d.fileUrl)}` : await documentUrl(d)
+    const blob = await fetchBlob(url)
+    const bmp = await createImageBitmap(blob)
+    const k = Math.min(1, 1800 / Math.max(bmp.width, bmp.height))
+    const w = Math.round(bmp.width * k), h = Math.round(bmp.height * k)
+    const canvas = document.createElement("canvas")
+    canvas.width = w; canvas.height = h
+    const ctx = canvas.getContext("2d")!
+    ctx.fillStyle = "#fff"
+    ctx.fillRect(0, 0, w, h)
+    ctx.drawImage(bmp, 0, 0, w, h)
+    bmp.close()
+    return { data: canvas.toDataURL("image/jpeg", 0.85), w, h }
+}
+
+// Un PDF con le foto scelte, una per pagina A4 (orizzontale o verticale secondo la foto)
+export async function photosToPdf(docs: DocLike[]): Promise<{ blob: Blob; failed: string[] }> {
+    const { jsPDF } = await import("jspdf")
+    let pdf: InstanceType<typeof jsPDF> | null = null
+    const failed: string[] = []
+    for (const d of docs) {
+        try {
+            const img = await photoToJpeg(d)
+            const landscape = img.w > img.h
+            const orientation = landscape ? "l" : "p"
+            if (!pdf) pdf = new jsPDF({ orientation, unit: "mm", format: "a4" })
+            else pdf.addPage("a4", orientation)
+            const pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight()
+            const m = 10
+            const k = Math.min((pw - 2 * m) / img.w, (ph - 2 * m) / img.h)
+            const w = img.w * k, h = img.h * k
+            pdf.addImage(img.data, "JPEG", (pw - w) / 2, (ph - h) / 2, w, h)
+        } catch (e) {
+            console.error("Foto non inserita nel PDF", d.name, e)
+            failed.push(d.name)
+        }
+    }
+    if (!pdf) throw new Error("Nessuna foto utilizzabile")
+    return { blob: pdf.output("blob"), failed }
+}
+
+export async function downloadPhotosPdf(docs: DocLike[], fileName = "foto.pdf") {
+    const r = await photosToPdf(docs)
+    saveBlob(r.blob, fileName)
+    return r.failed
+}
+
+// Stampa le foto come un unico lavoro di stampa (una per pagina)
+export async function printPhotos(docs: DocLike[]) {
+    const r = await photosToPdf(docs)
+    await printBlob(r.blob, "pdf")
+    return r.failed
+}

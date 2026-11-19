@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ArrowLeft, Upload, Images, CheckSquare, FolderInput, Trash2, X } from "lucide-react"
+import { ArrowLeft, Upload, Images, CheckSquare, FolderInput, Trash2, X, Download, Printer, FileText, Loader2 } from "lucide-react"
+import { toast } from "sonner"
+import { downloadDocuments, downloadPhotosPdf, printPhotos } from "@/lib/document-actions"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { NotchActions, NotchButton, NotchSearch } from "@/components/ui/notch-tabs"
 import { FloatingAddButton } from "@/components/ui/floating-add-button"
@@ -83,6 +85,7 @@ export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState<SortKey>("recent")
   const phone = usePhone()
+  const [busy, setBusy] = useState<"print" | "pdf" | "zip" | null>(null)
 
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -116,6 +119,19 @@ export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack
     if (next.has(id)) next.delete(id); else next.add(id)
     return next
   })
+  const runAction = async (kind: "print" | "pdf" | "zip") => {
+    setBusy(kind)
+    const t = kind === "zip" ? null : toast.loading(kind === "print" ? "Preparo la stampa…" : "Creo il PDF…")
+    try {
+      const failed = kind === "print" ? await printPhotos(selectedDocs)
+        : kind === "pdf" ? await downloadPhotosPdf(selectedDocs, `${title || "foto"}.pdf`)
+        : (await downloadDocuments(selectedDocs), [] as string[])
+      if (failed.length > 0) toast.error(`Non inserite (${failed.length}): ${failed.join(", ")}`)
+    } catch (e) {
+      console.error(e)
+      toast.error("Operazione non riuscita")
+    } finally { if (t) toast.dismiss(t); setBusy(null) }
+  }
   const exitSelect = () => { setSelectMode(false); setSelected(new Set()) }
 
   const sortSelect = (
@@ -167,7 +183,16 @@ export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack
             />
             {selectedDocs.length > 0 ? `${selectedDocs.length} selezionate` : "Seleziona tutte"}
           </label>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" disabled={selectedDocs.length === 0 || busy !== null} onClick={() => runAction("print")}>
+              {busy === "print" ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Printer className="mr-1.5 h-4 w-4" />}Stampa
+            </Button>
+            <Button variant="outline" size="sm" disabled={selectedDocs.length === 0 || busy !== null} onClick={() => runAction("pdf")}>
+              {busy === "pdf" ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileText className="mr-1.5 h-4 w-4" />}PDF
+            </Button>
+            <Button variant="outline" size="sm" disabled={selectedDocs.length === 0 || busy !== null} onClick={() => runAction("zip")}>
+              {busy === "zip" ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}Scarica
+            </Button>
             <Button variant="outline" size="sm" disabled={selectedDocs.length === 0} onClick={() => onMoveSelected(selectedDocs)}>
               <FolderInput className="mr-1.5 h-4 w-4" />Sposta
             </Button>
