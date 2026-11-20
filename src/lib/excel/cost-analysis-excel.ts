@@ -1,15 +1,15 @@
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import type { CostAnalysisPdfInput } from '@/lib/pdf/cost-analysis-pdf';
-import { effectiveUnitPrice } from '@/lib/services/cost-analysis';
+import { effectiveUnitPrice, type CostAnalysisRow } from '@/lib/services/cost-analysis';
 
 const EUR_FMT = '"€ "#,##0.00';
 const NUM_FMT = '#,##0.00';
 
 // Larghezze colonne (in "wch", circa caratteri visibili) usate per stimare l'a capo automatico
-const COL_WCH = [38, 18, 16, 16, 16];
+const COL_WCH = [48, 18, 16, 18];
 const MERGED_B_E_WCH = COL_WCH.slice(1).reduce((s, w) => s + w, 0);
-const MERGED_A_C_WCH = COL_WCH.slice(0, 3).reduce((s, w) => s + w, 0);
+const MERGED_A_C_WCH = COL_WCH.slice(0, 2).reduce((s, w) => s + w, 0);
 const LINE_PT = 13;
 const BASE_ROW_PT = 16;
 
@@ -73,7 +73,7 @@ export async function generateCostAnalysisExcel(input: CostAnalysisPdfInput): Pr
     // xlsx-js-style is CJS-only: some ESM interop paths land the exports under `.default`.
     const XLSX = 'utils' in xlsxModule ? xlsxModule : (xlsxModule as unknown as { default: typeof xlsxModule }).default;
 
-    const COLS = 5;
+    const COLS = 4;
     const pad = (row: Cell[]) => { while (row.length < COLS) row.push(blank()); return row; };
     const aoa: Cell[][] = [];
     const rowHeights: number[] = [];
@@ -129,49 +129,61 @@ export async function generateCostAnalysisExcel(input: CostAnalysisPdfInput): Pr
     pushRow([]);
 
     // --- 5. Materiali da Magazzino ---
-    // Colonne: Articolo | Prezzo max acq. | Prezzo unit. | Qtà presunta | Tot. presunto
+    // Colonne: Articolo | Prezzo unit. | Qtà presunta | Tot. presunto
+    // Il prezzo unitario è quello impostato, altrimenti quello di acquisto
     const totMateriali = input.inventoryRows.reduce((s, r) => s + (effectiveUnitPrice(r) ?? 0) * r.qtyEstimated, 0);
     if (input.inventoryRows.length > 0) {
         pushRow([titleCell('Materiali da Magazzino')]);
-        pushRow(['Articolo', 'Prezzo max acq.', 'Prezzo unit.', 'Qtà presunta', 'Tot. presunto'].map(tableHdrCell));
+        pushRow(['Articolo', 'Prezzo unit.', 'Qtà presunta', 'Tot. presunto'].map(tableHdrCell));
         for (const r of input.inventoryRows) {
             const label = r.itemModel ? `${r.itemName} (${r.itemModel})` : r.itemName;
             const price = effectiveUnitPrice(r);
             const totEst = (price ?? 0) * r.qtyEstimated;
             pushRow([
                 dataCell(label),
-                r.maxPurchasePrice !== null ? numDataCell(r.maxPurchasePrice) : dataCell('N/D', true),
-                r.unitPrice !== null ? numDataCell(r.unitPrice) : dataCell('—', true),
+                price !== null ? numDataCell(price) : dataCell('—', true),
                 numDataCell(r.qtyEstimated, false),
                 price !== null ? numDataCell(totEst) : dataCell('—', true),
             ], estimateLines(label, COL_WCH[0]));
         }
-        pushRow([totalCell('Totale materiali'), totalCell(''), totalCell(''), totalCell(''), totalCell(totMateriali, true)]);
+        pushRow([totalCell('Totale materiali'), totalCell(''), totalCell(''), totalCell(totMateriali, true)]);
         pushRow([]);
     }
 
     // --- 6. Voci Generiche ---
-    // Stesse colonne di "Materiali" (con "Prezzo max acq." vuota) cosi' "Tot. presunto" resta allineato in colonna E
     const totGeneriche = input.genericRows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0);
-    if (input.genericRows.length > 0) {
-        pushRow([titleCell('Voci Generiche')]);
-        pushRow(['Voce', '', 'Prezzo unit.', 'Qtà presunta', 'Tot. presunto'].map(tableHdrCell));
-        for (const r of input.genericRows) {
+    const pushVoci = (rows: CostAnalysisRow[], header: string, totalLabel: string) => {
+        pushRow([tableHdrCell(header), tableHdrCell('Prezzo unit.'), tableHdrCell('Qtà presunta'), tableHdrCell('Tot. presunto')]);
+        for (const r of rows) {
             const totEst = (r.unitPrice ?? 0) * r.qtyEstimated;
             pushRow([
                 dataCell(r.itemName),
-                blank(),
                 r.unitPrice !== null ? numDataCell(r.unitPrice) : dataCell('—', true),
                 numDataCell(r.qtyEstimated, false),
                 r.unitPrice !== null ? numDataCell(totEst) : dataCell('—', true),
             ], estimateLines(r.itemName, COL_WCH[0]));
         }
-        pushRow([totalCell('Totale voci generiche'), totalCell(''), totalCell(''), totalCell(''), totalCell(totGeneriche, true)]);
+        pushRow([totalCell(totalLabel), totalCell(''), totalCell(''), totalCell(rows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0), true)]);
+    };
+    if (input.genericRows.length > 0) {
+        pushRow([titleCell('Voci Generiche')]);
+        pushVoci(input.genericRows, 'Voce', 'Totale voci generiche');
         pushRow([]);
     }
 
-    // --- 7. Riepilogo Prezzi ---
-    // "Valore" (equivalente del "Tot. presunto" delle tabelle sopra) resta allineato in colonna E
+    // --- 7. Trasporto e posa ---
+    const transportRows = input.transportRows ?? [];
+    const posaRows = input.posaRows ?? [];
+    if (transportRows.length > 0 || posaRows.length > 0) {
+        pushRow([titleCell('Trasporto e posa')]);
+        if (transportRows.length > 0) pushVoci(transportRows, 'Trasporto (A)', 'Totale trasporto (A)');
+        if (transportRows.length > 0 && posaRows.length > 0) pushRow([]);
+        if (posaRows.length > 0) pushVoci(posaRows, 'Posa (B)', 'Totale posa (B)');
+        pushRow([]);
+    }
+
+    // --- 8. Riepilogo Prezzi ---
+    // "Valore" (equivalente del "Tot. presunto" delle tabelle sopra) resta allineato in ultima colonna
     const { params } = input;
     const totBase = totMateriali + totGeneriche;
     const sfrido_delta = totBase * params.sfrido / 100;
@@ -186,7 +198,7 @@ export async function generateCostAnalysisExcel(input: CostAnalysisPdfInput): Pr
     const totaleFinale = conRicarico + marg_delta;
 
     pushRow([titleCell('Riepilogo Prezzi')]);
-    mergeRange(pushRow([tableHdrCell('Voce'), tableHdrCell(''), tableHdrCell(''), tableHdrCell('Incremento'), tableHdrCell('Valore')]), 0, 2);
+    mergeRange(pushRow([tableHdrCell('Voce'), tableHdrCell(''), tableHdrCell('Incremento'), tableHdrCell('Valore')]), 0, 1);
     const summaryRows: [string, string, number][] = [
         ['Tot. materiali + voci', '', totBase],
         [`+ Sfrido (${params.sfrido}%)`, `+€ ${fmt(sfrido_delta)}`, totListino],
@@ -197,9 +209,9 @@ export async function generateCostAnalysisExcel(input: CostAnalysisPdfInput): Pr
         [`+ Margine trattativa (${params.margineTrattativa}%)`, `+€ ${fmt(marg_delta)}`, totaleFinale],
     ];
     for (const [label, incremento, valore] of summaryRows) {
-        mergeRange(pushRow([dataCell(label), blank(), blank(), dataCell(incremento, true), numDataCell(valore)], estimateLines(label, MERGED_A_C_WCH)), 0, 2);
+        mergeRange(pushRow([dataCell(label), blank(), dataCell(incremento, true), numDataCell(valore)], estimateLines(label, MERGED_A_C_WCH)), 0, 1);
     }
-    pushRow([grandTotalCell('TOTALE FINALE'), grandTotalCell(''), grandTotalCell(''), grandTotalCell(''), grandTotalCell(totaleFinale, true)]);
+    pushRow([grandTotalCell('TOTALE FINALE'), grandTotalCell(''), grandTotalCell(''), grandTotalCell(totaleFinale, true)]);
 
     // --- Sheet setup ---
     const ws: Record<string, unknown> = {

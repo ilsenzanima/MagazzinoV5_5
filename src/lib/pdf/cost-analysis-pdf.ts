@@ -12,6 +12,9 @@ export interface CostAnalysisPdfInput {
     createdAt: string;
     inventoryRows: CostAnalysisRow[];
     genericRows: CostAnalysisRow[];
+    // Voci della sezione «Trasporto e posa»: la loro somma è già riportata in params.trasporto / params.posa
+    transportRows?: CostAnalysisRow[];
+    posaRows?: CostAnalysisRow[];
     params: CostAnalysisParams;
 }
 
@@ -160,28 +163,27 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
 
         autoTable(doc, {
             startY: currentY,
-            head: [['Articolo', 'Prezzo max acq.', 'Prezzo unit.', 'Qtà presunta', 'Tot. presunto']],
+            head: [['Articolo', 'Prezzo unit.', 'Qtà presunta', 'Tot. presunto']],
             body: input.inventoryRows.map(r => {
+                // Prezzo unitario impostato, altrimenti quello di acquisto
                 const price = effectiveUnitPrice(r);
                 return [
                     r.itemModel ? `${r.itemName} (${r.itemModel})` : r.itemName,
-                    r.maxPurchasePrice !== null ? `€ ${fmt(r.maxPurchasePrice)}` : 'N/D',
-                    fmtCell(r.unitPrice),
+                    fmtCell(price),
                     fmt(r.qtyEstimated),
                     price !== null ? `€ ${fmt(price * r.qtyEstimated)}` : '—',
                 ];
             }),
-            foot: [['Totale materiali', '', '', '', `€ ${fmt(totMateriali)}`]],
+            foot: [['Totale materiali', '', '', `€ ${fmt(totMateriali)}`]],
             theme: 'plain',
             styles: { fontSize: 8, cellPadding: 2.5, textColor: 50, lineColor: [230, 230, 230], lineWidth: 0.1 },
             headStyles: { fillColor: grayBg, textColor: 0, fontStyle: 'bold', lineColor: borderColor, lineWidth: 0.1 },
             footStyles: { fillColor: [30, 58, 95], textColor: 255, fontStyle: 'bold', lineWidth: 0 },
             columnStyles: {
                 0: { cellWidth: 'auto' },
-                1: { cellWidth: 30, halign: 'right' },
-                2: { cellWidth: 28, halign: 'right' },
-                3: { cellWidth: 25, halign: 'right' },
-                4: { cellWidth: 28, halign: 'right' },
+                1: { cellWidth: 28, halign: 'right' },
+                2: { cellWidth: 25, halign: 'right' },
+                3: { cellWidth: 28, halign: 'right' },
             },
             margin: { left: margin, right: margin },
         });
@@ -224,7 +226,49 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
         currentY = (doc as any).lastAutoTable.finalY + 6;
     }
 
-    // --- 6. Riepilogo Prezzi ---
+    // --- 6. Trasporto e posa ---
+    const transportRows = input.transportRows ?? [];
+    const posaRows = input.posaRows ?? [];
+    const sumRows = (rows: CostAnalysisRow[]) => rows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0);
+    if (transportRows.length > 0 || posaRows.length > 0) {
+        if (currentY > pageHeight - 40) { doc.addPage(); currentY = margin; }
+        doc.setFontSize(10);
+        doc.setTextColor(30);
+        doc.setFont("helvetica", "bold");
+        doc.text("Trasporto e posa", margin, currentY + 4);
+        currentY += 7;
+
+        const body: any[] = [];
+        const addGroup = (title: string, rows: CostAnalysisRow[]) => {
+            if (rows.length === 0) return;
+            body.push([{ content: title, colSpan: 4, styles: { fontStyle: 'bold', fillColor: [250, 250, 250] } }]);
+            for (const r of rows) {
+                body.push([r.itemName, fmtCell(r.unitPrice), fmt(r.qtyEstimated), r.unitPrice !== null ? `€ ${fmt(r.unitPrice * r.qtyEstimated)}` : '—']);
+            }
+            body.push([{ content: `Totale ${title.toLowerCase()}`, colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } }, { content: `€ ${fmt(sumRows(rows))}`, styles: { fontStyle: 'bold' } }]);
+        };
+        addGroup('Trasporto (A)', transportRows);
+        addGroup('Posa (B)', posaRows);
+
+        autoTable(doc, {
+            startY: currentY,
+            head: [['Voce', 'Prezzo unit.', 'Qtà presunta', 'Tot. presunto']],
+            body,
+            theme: 'plain',
+            styles: { fontSize: 8, cellPadding: 2.5, textColor: 50, lineColor: [230, 230, 230], lineWidth: 0.1 },
+            headStyles: { fillColor: grayBg, textColor: 0, fontStyle: 'bold', lineColor: borderColor, lineWidth: 0.1 },
+            columnStyles: {
+                0: { cellWidth: 'auto' },
+                1: { cellWidth: 28, halign: 'right' },
+                2: { cellWidth: 25, halign: 'right' },
+                3: { cellWidth: 28, halign: 'right' },
+            },
+            margin: { left: margin, right: margin },
+        });
+        currentY = (doc as any).lastAutoTable.finalY + 6;
+    }
+
+    // --- 7. Riepilogo Prezzi ---
     const { params } = input;
     const totBase = totMateriali + totGeneriche;
     const sfrido_delta = totBase * params.sfrido / 100;
@@ -270,7 +314,7 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
         margin: { left: margin, right: margin },
     });
 
-    // --- 7. Page numbering ---
+    // --- 8. Page numbering ---
     const pageCount = (doc.internal as any).getNumberOfPages();
     doc.setFontSize(8);
     doc.setTextColor(100);
