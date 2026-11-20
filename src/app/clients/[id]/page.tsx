@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { NotchTabs, NotchActions, NotchButton, NotchSearch } from "@/components/ui/notch-tabs";
+import { ActionsMenu } from "@/components/ui/actions-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -197,8 +198,10 @@ export default function ClientDetailPage() {
         >
           {canEdit && activeTab === "anagrafica" && (
             <NotchActions>
-              <NotchButton type="button" onClick={() => setIsEditDialogOpen(true)}><Pencil /> Modifica</NotchButton>
-              <NotchButton type="button" onClick={() => setIsDeleteDialogOpen(true)} className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white"><Trash2 /> Elimina</NotchButton>
+              <ActionsMenu items={[
+                { label: "Modifica", icon: <Pencil />, onClick: () => setIsEditDialogOpen(true) },
+                { label: "Elimina", icon: <Trash2 />, onClick: () => setIsDeleteDialogOpen(true), danger: true },
+              ]} />
             </NotchActions>
           )}
 

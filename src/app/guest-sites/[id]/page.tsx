@@ -3,6 +3,7 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Link from "next/link";
 import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
+import { ActionsMenu } from "@/components/ui/actions-menu";
 import { useState, useEffect, useRef, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -358,8 +359,10 @@ Note: Questo link consente di visualizzare in sola lettura i certificati di conf
                     }
                 >
                     <NotchActions>
-                        <NotchButton type="button" onClick={() => setEditingDetails(true)}><Pencil /> Modifica Info</NotchButton>
-                        <NotchButton type="button" onClick={() => setDeleteOpen(true)} className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white"><Trash2 /> Elimina Portale</NotchButton>
+                        <ActionsMenu items={[
+                            { label: "Modifica Info", icon: <Pencil />, onClick: () => setEditingDetails(true) },
+                            { label: "Elimina Portale", icon: <Trash2 />, onClick: () => setDeleteOpen(true), danger: true },
+                        ]} />
                     </NotchActions>
                 </NotchTabs>
             </div>

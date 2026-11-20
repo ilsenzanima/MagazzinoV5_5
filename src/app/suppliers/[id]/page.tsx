@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
+import { ActionsMenu } from "@/components/ui/actions-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ArrowLeft, Loader2, Save, Pencil, X, Trash2, Plus, Mail, Phone, Globe, FileText, Building2, Users, BarChart3 } from "lucide-react";
@@ -251,10 +252,10 @@ export default function SupplierDetailPage() {
           >
             {!isEditing && (
               <NotchActions>
-                <NotchButton type="button" onClick={() => setIsEditing(true)}><Pencil /> Modifica</NotchButton>
-                {!supplier.isTechnical && (
-                  <NotchButton type="button" onClick={() => setDeleteOpen(true)} className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white"><Trash2 /> Elimina</NotchButton>
-                )}
+                <ActionsMenu items={[
+                  { label: "Modifica", icon: <Pencil />, onClick: () => setIsEditing(true) },
+                  { label: "Elimina", icon: <Trash2 />, onClick: () => setDeleteOpen(true), danger: true, hidden: !!supplier.isTechnical },
+                ]} />
               </NotchActions>
             )}
           </NotchTabs>

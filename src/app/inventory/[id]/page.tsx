@@ -64,6 +64,7 @@ import { useAuth } from "@/components/auth-provider";
 import { Loader2, Pencil, X } from "lucide-react";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { NotchTabs, NotchActions, NotchButton, NotchHelp } from "@/components/ui/notch-tabs";
+import { ActionsMenu } from "@/components/ui/actions-menu";
 import { Layers, History, BarChart3 } from "lucide-react";
 import { ItemLots } from "@/components/inventory/ItemLots";
 import { ItemStats } from "@/components/inventory/ItemStats";
@@ -625,65 +626,52 @@ export default function InventoryDetailPage() {
                     </NotchButton>
                   </>
                 ) : (
-                  <>
-                    <NotchButton type="button" onClick={handleEdit}>
-                      <Pencil /> Modifica
-                    </NotchButton>
-                    {userRole === 'admin' && (
-                      <NotchButton
-                        type="button" onClick={() => setDeleteDialogOpen(true)}
-                        className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white"
-                      >
-                        <Trash2 /> Elimina
-                      </NotchButton>
-                    )}
-                  </>
+                  <ActionsMenu items={[
+                    { label: "Modifica", icon: <Pencil />, onClick: handleEdit },
+                    { label: "Elimina", icon: <Trash2 />, onClick: () => setDeleteDialogOpen(true), danger: true, hidden: userRole !== 'admin' },
+                  ]} />
                 )}
               </NotchActions>
             )}
           </NotchTabs>
         </div>
 
-        {/* Numeri principali */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {/* Numeri principali (schede compatte) */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
           <Card>
-            <CardContent className="space-y-2 p-4">
-              <div className="flex items-center justify-between">
-                <Label>Quantità disponibile</Label>
-                <span className={`rounded-md border px-2 py-0.5 text-xs font-bold ${status.color}`}>{status.label}</span>
+            <CardContent className="space-y-1.5 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs">Quantità disponibile</Label>
+                <span className={`rounded-md border px-1.5 py-0 text-[10px] font-bold ${status.color}`}>{status.label}</span>
               </div>
-              <div className="rounded-md border border-blue-100 bg-blue-50 p-3 text-center dark:border-blue-800 dark:bg-blue-900/30">
-                <div className="text-3xl font-bold text-blue-700 dark:text-blue-300">
-                  {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} <span className="text-sm font-normal text-blue-500 dark:text-blue-400">{item.unit}</span>
-                </div>
+              <div className="text-2xl font-bold leading-none text-blue-700 dark:text-blue-300">
+                {item.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} <span className="text-sm font-normal text-blue-500 dark:text-blue-400">{item.unit}</span>
               </div>
-              <div className="text-center text-xs text-slate-500 dark:text-slate-400">
+              <div className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
                 {item.coefficient !== 1
                   ? `${calculatedPieces > 0 ? calculatedPieces.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true }) : (item.quantity / item.coefficient).toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} pezzi fisici`
                   : `1 ${item.unit} = 1 pezzo`}
+                {jobUsage && (
+                  <> · {jobUsage.jobs > 0
+                    ? `in ${jobUsage.jobs} ${jobUsage.jobs === 1 ? 'commessa' : 'commesse'} (${jobUsage.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} ${item.unit})`
+                    : 'in nessuna commessa'}</>
+                )}
               </div>
-              {jobUsage && (
-                <div className="text-center text-xs text-slate-500 dark:text-slate-400">
-                  {jobUsage.jobs > 0
-                    ? `In ${jobUsage.jobs} ${jobUsage.jobs === 1 ? 'commessa' : 'commesse'} (${jobUsage.quantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} ${item.unit})`
-                    : 'In nessuna commessa'}
-                </div>
-              )}
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="space-y-2 p-4">
-              <Label>Da processare (note di carico)</Label>
-              <div className="flex flex-col gap-2 rounded-md border border-amber-100 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300"><ArrowUpRight className="h-3.5 w-3.5" /> Uscita</span>
+            <CardContent className="space-y-1.5 p-3">
+              <Label className="text-xs">Da processare (note di carico)</Label>
+              <div className="space-y-0.5 rounded-md border border-amber-100 bg-amber-50 px-2.5 py-1.5 dark:border-amber-800 dark:bg-amber-900/20">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1 text-amber-700 dark:text-amber-300"><ArrowUpRight className="h-3 w-3" /> Uscita</span>
                   <span className={`font-bold ${pendingQty.uscita > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-slate-400 dark:text-slate-500'}`}>
                     {pendingQty.uscita > 0 ? `${pendingQty.uscita.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} ${item.unit}` : '—'}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="flex items-center gap-1 text-green-700 dark:text-green-300"><ArrowDownRight className="h-3.5 w-3.5" /> Entrata</span>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1 text-green-700 dark:text-green-300"><ArrowDownRight className="h-3 w-3" /> Entrata</span>
                   <span className={`font-bold ${pendingQty.reso > 0 ? 'text-green-700 dark:text-green-300' : 'text-slate-400 dark:text-slate-500'}`}>
                     {pendingQty.reso > 0 ? `${pendingQty.reso.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} ${item.unit}` : '—'}
                   </span>
@@ -693,9 +681,9 @@ export default function InventoryDetailPage() {
           </Card>
 
           <Card>
-            <CardContent className="space-y-2 p-4">
-              <Label>Sui furgoni</Label>
-              <div className="flex items-center justify-between rounded-md border border-blue-100 bg-blue-50 p-3 text-sm dark:border-blue-800 dark:bg-blue-900/20">
+            <CardContent className="space-y-1.5 p-3">
+              <Label className="text-xs">Sui furgoni</Label>
+              <div className="flex items-center justify-between rounded-md border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-xs dark:border-blue-800 dark:bg-blue-900/20">
                 <Link href="/load-notes?vista=furgoni" className="text-blue-700 hover:underline dark:text-blue-300">Totale nei furgoni</Link>
                 <span className={`font-bold ${vanQty > 0 ? 'text-blue-700 dark:text-blue-300' : 'text-slate-400 dark:text-slate-500'}`}>
                   {vanQty > 0 ? `${vanQty.toLocaleString('it-IT', { maximumFractionDigits: 2, useGrouping: true })} ${item.unit}` : '—'}
@@ -706,21 +694,19 @@ export default function InventoryDetailPage() {
 
           {(userRole === 'admin' || userRole === 'operativo') && (
             <Card>
-              <CardContent className="space-y-2 p-4">
-                <Label>Valore stock attuale</Label>
-                <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-center dark:border-slate-700 dark:bg-muted">
-                  <div className="text-3xl font-bold text-slate-700 dark:text-slate-300">
-                    {stockValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR', useGrouping: true })}
-                  </div>
+              <CardContent className="space-y-1.5 p-3">
+                <Label className="text-xs">Valore stock attuale</Label>
+                <div className="text-2xl font-bold leading-none text-slate-700 dark:text-slate-300">
+                  {stockValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR', useGrouping: true })}
                 </div>
                 {lastPurchase && (
-                  <div className="text-center text-xs text-slate-500 dark:text-slate-400">
+                  <div className="text-[11px] leading-tight text-slate-500 dark:text-slate-400">
                     Ultimo acquisto: <span className="font-medium">{lastPurchase.price.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}/{item.unit}</span> del {new Date(lastPurchase.date).toLocaleDateString('it-IT')}
                   </div>
                 )}
                 {!isStockValueComplete && (
-                  <div className="flex items-center justify-center gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <div className="flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                     <span>Dati costo incompleti (valore parziale)</span>
                   </div>
                 )}
@@ -730,46 +716,38 @@ export default function InventoryDetailPage() {
 
           {(userRole === 'admin' || userRole === 'operativo') && (
             <Card>
-              <CardContent className="p-4">
-              {/* Audit Section - Visible only to admin/operativo */}
-              {(userRole === 'admin' || userRole === 'operativo') && (
-                <div className="space-y-3">
-                  <Label className="text-blue-600 font-semibold">Verifica Inventario (Reale)</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="number"
-                      value={realQtyInput}
-                      onChange={(e) => setRealQtyInput(e.target.value)}
-                      placeholder="Q.tà fisica"
-                      className="bg-white dark:bg-card"
-                    />
-                    <Button size="icon" variant="outline" onClick={handleUpdateRealQty} title="Salva quantità reale">
-                      <Save className="h-4 w-4" />
-                    </Button>
-                    {item.realQuantity !== null && item.realQuantity !== undefined && (
-                      <Button size="icon" variant="outline" onClick={handleResetRealQty} title="Resetta verifica" className="text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-500">
-                        <RotateCcw className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-
+              <CardContent className="space-y-1.5 p-3">
+                <Label className="text-xs font-semibold text-blue-600">Verifica Inventario (Reale)</Label>
+                <div className="flex gap-1.5">
+                  <Input
+                    type="number"
+                    value={realQtyInput}
+                    onChange={(e) => setRealQtyInput(e.target.value)}
+                    placeholder="Q.tà fisica"
+                    className="h-8 bg-white dark:bg-card"
+                  />
+                  <Button size="icon" variant="outline" className="h-8 w-8 shrink-0" onClick={handleUpdateRealQty} title="Salva quantità reale">
+                    <Save className="h-4 w-4" />
+                  </Button>
                   {item.realQuantity !== null && item.realQuantity !== undefined && (
-                    <div className={`text-sm p-2 rounded-md flex justify-between items-center ${(item.realQuantity - item.quantity) === 0
-                      ? "bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800"
-                      : "bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800"
-                      }`}>
-                      <span className="font-medium">Differenza:</span>
-                      <span className="font-bold">
-                        {item.realQuantity - item.quantity > 0 ? "+" : ""}
-                        {(item.realQuantity - item.quantity).toFixed(2).replace(/[.,]00$/, "")} {item.unit}
-                      </span>
-                    </div>
+                    <Button size="icon" variant="outline" onClick={handleResetRealQty} title="Resetta verifica" className="h-8 w-8 shrink-0 text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-500">
+                      <RotateCcw className="h-4 w-4" />
+                    </Button>
                   )}
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                    Visibile solo a Admin e Operativi. Indica discrepanze tra sistema e realtà.
-                  </p>
                 </div>
-              )}
+                {item.realQuantity !== null && item.realQuantity !== undefined && (
+                  <div className={`flex items-center justify-between rounded-md px-2 py-1 text-xs ${(item.realQuantity - item.quantity) === 0
+                    ? "border border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/30 dark:text-green-300"
+                    : "border border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300"
+                    }`}>
+                    <span className="font-medium">Differenza:</span>
+                    <span className="font-bold">
+                      {item.realQuantity - item.quantity > 0 ? "+" : ""}
+                      {(item.realQuantity - item.quantity).toFixed(2).replace(/[.,]00$/, "")} {item.unit}
+                    </span>
+                  </div>
+                )}
+                <p className="text-[10px] leading-tight text-slate-400 dark:text-slate-500">Solo Admin e Operativi: indica discrepanze tra sistema e realtà.</p>
               </CardContent>
             </Card>
           )}

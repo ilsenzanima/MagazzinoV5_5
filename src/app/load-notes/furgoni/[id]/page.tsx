@@ -7,6 +7,7 @@ import { ArrowLeft, Archive, ArrowRightLeft, Loader2, RotateCcw, Trash2 } from "
 import { toast } from "sonner";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
+import { ActionsMenu } from "@/components/ui/actions-menu";
 import { confirmDialog } from "@/components/ui/confirm-host";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -150,10 +151,12 @@ export default function VanDetailPage() {
                 </Link>
                 <NotchTabs title={van.name}>
                     <NotchActions>
-                        <NotchButton type="button" onClick={() => run(() => vansService.update(van.id, { archived: !van.archived }), "Impossibile aggiornare")}>
-                            {van.archived ? <><RotateCcw /> Riattiva</> : <><Archive /> Archivia</>}
-                        </NotchButton>
-                        <NotchButton type="button" onClick={deleteVan}><Trash2 /> Elimina</NotchButton>
+                        <ActionsMenu items={[
+                            van.archived
+                                ? { label: "Riattiva", icon: <RotateCcw />, onClick: () => run(() => vansService.update(van.id, { archived: !van.archived }), "Impossibile aggiornare") }
+                                : { label: "Archivia", icon: <Archive />, onClick: () => run(() => vansService.update(van.id, { archived: !van.archived }), "Impossibile aggiornare") },
+                            { label: "Elimina", icon: <Trash2 />, onClick: deleteVan, danger: true },
+                        ]} />
                     </NotchActions>
                 </NotchTabs>
 

@@ -3,6 +3,7 @@
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { confirmDialog } from "@/components/ui/confirm-host";
 import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
+import { ActionsMenu } from "@/components/ui/actions-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -856,12 +857,10 @@ export default function PurchaseDetailPage() {
                     >
                         {(userRole === 'admin' || userRole === 'operativo') && (
                             <NotchActions>
-                                <NotchButton type="button" onClick={() => setIsAddPopupOpen(true)}>
-                                    <Plus /> Aggiungi
-                                </NotchButton>
-                                <NotchButton type="button" onClick={() => setDeleteDialogOpen(true)} className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white">
-                                    <Trash2 /> Elimina
-                                </NotchButton>
+                                <ActionsMenu items={[
+                                    { label: "Aggiungi", icon: <Plus />, onClick: () => setIsAddPopupOpen(true) },
+                                    { label: "Elimina", icon: <Trash2 />, onClick: () => setDeleteDialogOpen(true), danger: true },
+                                ]} />
                             </NotchActions>
                         )}
                     </NotchTabs>

@@ -9,10 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, Loader2, Save, ArrowDownRight, ArrowUpRight, ShoppingBag, FileText, Calendar, Search, MoveRight, Repeat, Menu, Printer, Download, Pencil } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, Save, ArrowDownRight, ArrowUpRight, ShoppingBag, FileText, Calendar, Search, MoveRight, Repeat, Printer, Download, Pencil } from "lucide-react";
 import Link from "next/link";
 import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ActionsMenu } from "@/components/ui/actions-menu";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
@@ -41,6 +41,7 @@ interface MovementDetailContentProps {
 export default function MovementDetailContent({ initialMovement }: MovementDetailContentProps) {
     const { userRole } = useAuth();
     const router = useRouter();
+    const isStaff = userRole === 'admin' || userRole === 'operativo';
 
     const [loading, setLoading] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -343,26 +344,13 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                         </NotchButton>
                                     </>
                                 ) : (
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <NotchButton type="button" aria-label="Azioni della bolla"><Menu /> Azioni</NotchButton>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="min-w-52">
-                                            <DropdownMenuItem onClick={handlePrintNow}><Printer className="mr-2 h-4 w-4" />Stampa</DropdownMenuItem>
-                                            <DropdownMenuItem onClick={handlePrint}><Download className="mr-2 h-4 w-4" />Scarica PDF</DropdownMenuItem>
-                                            {(userRole === 'admin' || userRole === 'operativo') && (
-                                                <>
-                                                    <DropdownMenuSeparator />
-                                                    {items.length > 0 && movement.jobId && (
-                                                        <DropdownMenuItem onClick={handleToggleMoveMode}><MoveRight className="mr-2 h-4 w-4" />Sposta articoli</DropdownMenuItem>
-                                                    )}
-                                                    <DropdownMenuItem onClick={() => router.push(`/movements/${initialMovement.id}/edit`)}><Pencil className="mr-2 h-4 w-4" />Modifica</DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem onClick={() => setDeleteDialogOpen(true)} className="text-red-600 focus:text-red-600"><Trash2 className="mr-2 h-4 w-4" />Elimina</DropdownMenuItem>
-                                                </>
-                                            )}
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                                    <ActionsMenu items={[
+                                        { label: "Stampa", icon: <Printer />, onClick: handlePrintNow },
+                                        { label: "Scarica PDF", icon: <Download />, onClick: handlePrint },
+                                        { label: "Sposta articoli", icon: <MoveRight />, onClick: handleToggleMoveMode, hidden: !(isStaff && items.length > 0 && !!movement.jobId) },
+                                        { label: "Modifica", icon: <Pencil />, href: `/movements/${initialMovement.id}/edit`, hidden: !isStaff },
+                                        { label: "Elimina", icon: <Trash2 />, onClick: () => setDeleteDialogOpen(true), danger: true, hidden: !isStaff },
+                                    ]} />
                                 )}
                             </>
                         ) : (

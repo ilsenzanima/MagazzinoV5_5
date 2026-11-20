@@ -4,6 +4,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { confirmDialog } from "@/components/ui/confirm-host";
 import { Button } from "@/components/ui/button";
 import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
+import { ActionsMenu } from "@/components/ui/actions-menu";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -584,16 +585,10 @@ export default function InvoiceDetailPage() {
                                     </NotchButton>
                                 </>
                             ) : (
-                                <>
-                                    {canEdit && (
-                                        <NotchButton type="button" onClick={startEdit}><Pencil /> Modifica</NotchButton>
-                                    )}
-                                    {(userRole === 'admin' || userRole === 'operativo') && (
-                                        <NotchButton type="button" className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white" onClick={() => setDeleteDialogOpen(true)} disabled={deleting}>
-                                            {deleting ? <Loader2 className="animate-spin" /> : <Trash2 />} Elimina
-                                        </NotchButton>
-                                    )}
-                                </>
+                                <ActionsMenu items={[
+                                    { label: "Modifica", icon: <Pencil />, onClick: startEdit, hidden: !canEdit },
+                                    { label: "Elimina", icon: deleting ? <Loader2 className="animate-spin" /> : <Trash2 />, onClick: () => setDeleteDialogOpen(true), disabled: deleting, danger: true, hidden: !(userRole === 'admin' || userRole === 'operativo') },
+                                ]} />
                             )}
                         </NotchActions>
                     </NotchTabs>

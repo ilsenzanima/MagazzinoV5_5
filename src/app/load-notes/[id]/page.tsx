@@ -5,6 +5,7 @@ import { confirmDialog } from "@/components/ui/confirm-host";
 import { useParams, useRouter } from "next/navigation";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
+import { ActionsMenu } from "@/components/ui/actions-menu";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ArrowLeft, Edit, Trash2, Archive, RotateCcw, Loader2, Package, CheckCircle2, User } from "lucide-react";
@@ -137,19 +138,13 @@ export default function LoadNoteDetailPage() {
                         }
                     >
                         <NotchActions>
-                            <Link href={`/load-notes/${noteId}/edit`}>
-                                <NotchButton type="button"><Edit /> Modifica</NotchButton>
-                            </Link>
-                            <NotchButton
-                                type="button"
-                                onClick={handleToggleStatus}
-                                title={note.status === 'pending' ? "Cambia solo lo stato della nota, puoi sempre riaprirla" : undefined}
-                            >
-                                {note.status === 'pending' ? (<><Archive /> Archivia</>) : (<><RotateCcw /> Riapri</>)}
-                            </NotchButton>
-                            <NotchButton type="button" onClick={handleDelete} className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white">
-                                <Trash2 /> Elimina
-                            </NotchButton>
+                            <ActionsMenu items={[
+                                { label: "Modifica", icon: <Edit />, href: `/load-notes/${noteId}/edit` },
+                                note.status === 'pending'
+                                    ? { label: "Archivia", icon: <Archive />, onClick: handleToggleStatus }
+                                    : { label: "Riapri", icon: <RotateCcw />, onClick: handleToggleStatus },
+                                { label: "Elimina", icon: <Trash2 />, onClick: handleDelete, danger: true },
+                            ]} />
                         </NotchActions>
                     </NotchTabs>
                 </div>
