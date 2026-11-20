@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { NotchButton } from "@/components/ui/notch-tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -169,10 +170,10 @@ export function PurchaseDDTConformita({
                         Conformità associate al DDT
                     </CardTitle>
                     <div className="flex gap-2 shrink-0">
-                        <Button variant="outline" size="sm" onClick={() => openUpload()}>
-                            <Upload className="mr-2 h-4 w-4" />
+                        <NotchButton type="button" onClick={() => openUpload()}>
+                            <Upload />
                             <span className="hidden sm:inline">Carica</span>
-                        </Button>
+                        </NotchButton>
                     </div>
                 </CardHeader>
                 <CardContent>

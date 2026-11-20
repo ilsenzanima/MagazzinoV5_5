@@ -13,6 +13,12 @@ export function formatCurrency(value: number | null | undefined): string {
     return `€ ${n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: true })}`
 }
 
+// Prezzo unitario: da 2 a 5 decimali (i prezzi di viti e simili, es. 0,00959, non devono apparire arrotondati a 0,01)
+export function formatUnitPrice(value: number | null | undefined): string {
+    const n = value ?? 0
+    return `€ ${n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 5, useGrouping: true })}`
+}
+
 export function formatNumber(
     value: number | null | undefined,
     options: { minimumFractionDigits?: number; maximumFractionDigits?: number } = {}

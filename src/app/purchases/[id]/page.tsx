@@ -16,7 +16,7 @@ import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen, Edit, ChevronDown, ChevronRight, Receipt, ClipboardList, ExternalLink, Truck, CheckCircle2, Undo2, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Fragment, useState, useEffect } from "react";
+import { Fragment, useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
     suppliersApi,
@@ -31,7 +31,7 @@ import {
     PurchaseItem
 } from "@/lib/api";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
-import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog";
+import { PurchaseLineDialog, PurchaseLineResult } from "@/components/purchases/PurchaseLineDialog";
 import { PurchaseDocuments } from "@/components/purchases/details/PurchaseDocuments";
 import { PurchaseDDTConformita } from "@/components/purchases/details/PurchaseDDTConformita";
 import { useAuth } from "@/components/auth-provider";
@@ -81,6 +81,10 @@ export default function PurchaseDetailPage() {
     // Add Item State
     const [isAddPopupOpen, setIsAddPopupOpen] = useState(false); // New state for popup
     const [addingItem, setAddingItem] = useState(false);
+    // Elenco del modale «Aggiungi»: separato da `inventory`, che serve alle modifiche di riga (coefficiente)
+    const [lineItems, setLineItems] = useState<InventoryItem[] | null>(null);
+    const [lineItemsLoading, setLineItemsLoading] = useState(false);
+    const [reopenAdd, setReopenAdd] = useState(false);
     const [newItem, setNewItem] = useState({
         itemId: "",
         quantity: "",
@@ -343,21 +347,33 @@ export default function PurchaseDetailPage() {
         }));
     };
 
-    const handleAddItem = async () => {
-        if (!newItem.itemId || !newItem.quantity) {
-            alert("Compila i campi obbligatori (Articolo, Quantità)");
+    const handleLineSearch = useCallback(async (term: string) => {
+        setLineItemsLoading(true);
+        try {
+            const { items: found } = await inventoryApi.getPaginated({ page: 1, limit: 50, search: term });
+            setLineItems(found);
+        } catch (error) {
+            console.error("Failed to search items", error);
+            alert("Errore nella ricerca dei materiali. Riprova.");
+        } finally {
+            setLineItemsLoading(false);
+        }
+    }, []);
+
+    // Riga confermata dal modale (materiale, quantità e prezzo). La destinazione (commessa o magazzino) è quella
+    // dell'intestazione: la riga la segue sempre, come nella creazione di un nuovo acquisto.
+    const handleLineConfirm = async ({ item, amounts }: PurchaseLineResult, next: boolean) => {
+        if (addingItem) return;
+        const quantity = parseFloat(amounts.quantity);
+        if (!(quantity > 0)) {
+            alert("Inserisci una quantità maggiore di zero");
             return;
         }
-
-        if (newItem.isJob && !newItem.jobId) {
-            alert("Seleziona una commessa");
-            return;
-        }
-
         try {
             setAddingItem(true);
-            const priceVal = newItem.price ? parseFloat(newItem.price) : 0;
-            const piecesVal = newItem.pieces ? parseFloat(newItem.pieces) : undefined;
+            const priceVal = parseFloat(amounts.price);
+            const piecesVal = amounts.pieces ? parseFloat(amounts.pieces) : undefined;
+            const coefficient = item.coefficient ? Number(item.coefficient) : 1;
 
             // Se alcune righe hanno già il trasporto applicato, lo revochiamo prima di aggiungere
             if (items.some(i => i.transportApplied)) {
@@ -366,49 +382,19 @@ export default function PurchaseDetailPage() {
 
             await purchasesApi.addItem({
                 purchaseId: id,
-                itemId: newItem.itemId,
-                quantity: parseFloat(newItem.quantity),
-                pieces: piecesVal,
-                coefficient: newItem.coefficient,
-                price: priceVal,
-                // Se la commessa scelta e' la stessa dell'intestazione, lasciamo il job_id
-                // della riga vuoto (segue l'intestazione via COALESCE lato trigger): così,
-                // se in seguito si rimuove la commessa dall'intestazione, il materiale torna
-                // correttamente a magazzino invece di restare "agganciato" alla vecchia commessa.
-                // Solo una commessa diversa da quella d'intestazione va salvata esplicitamente
-                // sulla riga (assegnazione indipendente).
-                jobId: (newItem.isJob && newItem.jobId !== (purchase?.jobId || undefined)) ? newItem.jobId : undefined,
-                // Stesso criterio del job_id: se il magazzino scelto e' quello
-                // d'intestazione (o il principale in assenza di intestazione),
-                // lasciamo la riga senza warehouse_id proprio così segue
-                // l'intestazione via COALESCE lato vista "sede attuale".
-                warehouseId: (!newItem.isJob && newItem.warehouseId && newItem.warehouseId !== (purchase?.warehouseId || warehouses.find(w => w.isPrimary)?.id))
-                    ? newItem.warehouseId
-                    : undefined
+                itemId: item.id,
+                quantity,
+                pieces: piecesVal !== undefined && !isNaN(piecesVal) ? piecesVal : undefined,
+                coefficient,
+                price: isNaN(priceVal) ? 0 : priceVal,
             });
 
-            // Reload items
             const updatedItems = await purchasesApi.getItems(id);
             setItems(updatedItems);
 
-            // Reset form
-            const primaryWarehouseId = warehouses.find(w => w.isPrimary)?.id || "";
-            setNewItem({
-                itemId: "",
-                quantity: "",
-                pieces: "",
-                coefficient: 1,
-                price: "",
-                isJob: !!selectedHeaderJob,
-                jobId: selectedHeaderJob?.id || "",
-                warehouseId: primaryWarehouseId
-            });
-            // Keep selected job for line if header job is set
-            if (!selectedHeaderJob) {
-                setSelectedJobForLine(null);
-            } else {
-                setSelectedJobForLine(selectedHeaderJob);
-            }
+            // Il modale si chiude solo a riga salvata (se qualcosa va storto resta aperto con i dati inseriti)
+            setIsAddPopupOpen(false);
+            if (next) setReopenAdd(true);
         } catch (error: any) {
             console.error("Failed to add item", error);
             alert(`Errore durante l'aggiunta dell'articolo: ${error?.message || "riprova o contatta l'assistenza."}`);
@@ -416,6 +402,14 @@ export default function PurchaseDetailPage() {
             setAddingItem(false);
         }
     };
+
+    // «Aggiungi e continua»: dopo il salvataggio il modale si richiude e si riapre pulito sul materiale successivo
+    useEffect(() => {
+        if (reopenAdd && !isAddPopupOpen) {
+            setReopenAdd(false);
+            setIsAddPopupOpen(true);
+        }
+    }, [reopenAdd, isAddPopupOpen]);
 
     const handleDeleteItem = async () => {
         if (!itemToDelete) return;
@@ -878,18 +872,18 @@ export default function PurchaseDetailPage() {
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Informazioni Generali</CardTitle>
                             {(userRole === 'admin' || userRole === 'operativo') && !isEditingHeader && (
-                                <Button variant="ghost" size="sm" onClick={startEditingHeader}>
-                                    <Pen className="h-4 w-4 mr-1" /> Modifica
-                                </Button>
+                                <NotchButton type="button" onClick={startEditingHeader}>
+                                    <Pen /> Modifica
+                                </NotchButton>
                             )}
                             {isEditingHeader && (
                                 <div className="flex gap-2">
-                                    <Button variant="ghost" size="sm" onClick={cancelEditingHeader}>
+                                    <NotchButton type="button" onClick={cancelEditingHeader}>
                                         Annulla
-                                    </Button>
-                                    <Button size="sm" onClick={saveEditingHeader}>
-                                        <Save className="h-4 w-4 mr-1" /> Salva
-                                    </Button>
+                                    </NotchButton>
+                                    <NotchButton type="button" onClick={saveEditingHeader} className="border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white">
+                                        <Save /> Salva
+                                    </NotchButton>
                                 </div>
                             )}
                         </CardHeader>
@@ -2073,152 +2067,16 @@ export default function PurchaseDetailPage() {
                         </CardContent>
                     </Card>}
 
-                    <Dialog open={isAddPopupOpen} onOpenChange={setIsAddPopupOpen}>
-                        <DialogContent className="max-w-4xl">
-                            <DialogHeader>
-                                <DialogTitle>Aggiungi Materiale</DialogTitle>
-                            </DialogHeader>
-                            <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border dark:border-slate-700 space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                                    <div className="md:col-span-4 space-y-2">
-                                        <Label>Materiale</Label>
-                                        <div className="flex gap-2">
-                                            <Button
-                                                variant="outline"
-                                                className="w-full justify-start text-left font-normal"
-                                                onClick={() => setIsItemSelectorOpen(true)}
-                                            >
-                                                <Search className="mr-2 h-4 w-4" />
-                                                {selectedItemForLine ? (
-                                                    <span>{selectedItemForLine.name} ({selectedItemForLine.code})</span>
-                                                ) : (
-                                                    <span className="text-muted-foreground">Cerca materiale...</span>
-                                                )}
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    <div className="md:col-span-2 space-y-2">
-                                        <Label>Pezzi <span className="text-xs text-muted-foreground font-normal">(Coeff: {newItem.coefficient || 1})</span></Label>
-                                        <Input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={newItem.pieces}
-                                            onChange={(e) => handleNewItemPiecesChange(e.target.value)}
-                                            placeholder="0"
-                                        />
-                                    </div>
-
-                                    <div className="md:col-span-2 space-y-2">
-                                        <Label>Quantità {newItem.coefficient !== 1 ? '(Calc.)' : ''}</Label>
-                                        <Input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={newItem.quantity}
-                                            onChange={(e) => handleNewItemQuantityChange(e.target.value)}
-                                            placeholder="0.00"
-                                        />
-                                    </div>
-                                    <div className="md:col-span-2 space-y-2">
-                                        <Label>Prezzo Unit.</Label>
-                                        <Input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={newItem.price}
-                                            onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
-                                            placeholder="0"
-                                        />
-                                        <p className="text-[10px] text-amber-600 dark:text-amber-400 leading-tight">
-                                            Usa il totale riga ÷ quantità se hai solo il totale in fattura.
-                                        </p>
-                                    </div>
-                                    <div className="md:col-span-2 flex items-center gap-2 pb-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-xs ${!newItem.isJob ? "text-green-700 font-semibold" : "text-slate-400"}`}>
-                                                Magazzino
-                                            </span>
-                                            <Switch
-                                                id="isJobNew"
-                                                checked={newItem.isJob}
-                                                onCheckedChange={(c) => setNewItem({ ...newItem, isJob: c })}
-                                            />
-                                            <Label htmlFor="isJobNew" className={`cursor-pointer text-xs ${newItem.isJob ? "text-blue-700 font-semibold" : "text-slate-400"}`}>
-                                                Commessa
-                                            </Label>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {newItem.isJob && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
-                                        <div className="space-y-2">
-                                            <Label>Seleziona Commessa</Label>
-                                            <Button
-                                                variant="outline"
-                                                className="w-full justify-start text-left font-normal"
-                                                onClick={() => setIsJobSelectorOpen(true)}
-                                            >
-                                                <Search className="mr-2 h-4 w-4" />
-                                                {selectedJobForLine ? (
-                                                    <span>{selectedJobForLine.code} - {selectedJobForLine.description}</span>
-                                                ) : (
-                                                    <span className="text-muted-foreground">Scegli cantiere...</span>
-                                                )}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {!newItem.isJob && warehouses.length > 1 && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
-                                        <div className="space-y-2">
-                                            <Label>Magazzino di destinazione</Label>
-                                            <Select
-                                                value={newItem.warehouseId}
-                                                onValueChange={(v) => setNewItem({ ...newItem, warehouseId: v })}
-                                            >
-                                                <SelectTrigger className="w-full">
-                                                    <SelectValue placeholder="Magazzino principale" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {warehouses.map(w => (
-                                                        <SelectItem key={w.id} value={w.id}>
-                                                            {w.name}{w.isPrimary ? " (principale)" : ""}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
-                                                Se non e' il magazzino principale, l'etichetta mostrera' la sede dove si trova la merce.
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-
-                                <DialogFooter className="mt-4">
-                                    <Button variant="outline" onClick={() => setIsAddPopupOpen(false)}>
-                                        Annulla
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        onClick={async () => {
-                                            await handleAddItem();
-                                            // If successful, close dialog? handleAddItem doesn't return success status easily but it alerts on error.
-                                            // We can check if newItem is reset.
-                                            if (newItem.itemId === "") setIsAddPopupOpen(false);
-                                        }}
-                                        disabled={addingItem}
-                                    >
-                                        {addingItem ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-                                        Aggiungi Riga
-                                    </Button>
-                                </DialogFooter>
-                            </div>
-                        </DialogContent>
-                    </Dialog>
+                    {/* Aggiunta di una riga in due pagine (come nel nuovo acquisto): materiale, poi quantità e prezzo */}
+                    <PurchaseLineDialog
+                        open={isAddPopupOpen}
+                        onClose={() => setIsAddPopupOpen(false)}
+                        asOfDate={purchase?.deliveryNoteDate ? purchase.deliveryNoteDate.split('T')[0] : new Date().toISOString().slice(0, 10)}
+                        items={lineItems ?? inventory}
+                        onSearch={handleLineSearch}
+                        loading={lineItemsLoading}
+                        onConfirm={(result, next) => { void handleLineConfirm(result, next); }}
+                    />
 
                     <Dialog open={!!returnItem} onOpenChange={(open) => { if (!open) { setReturnItem(null); setIsEditingReturn(false); } }}>
                         <DialogContent className="max-w-lg">
@@ -2287,24 +2145,6 @@ export default function PurchaseDetailPage() {
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>
-
-                    <ItemSelectorDialog
-                        open={isItemSelectorOpen}
-                        onOpenChange={setIsItemSelectorOpen}
-                        items={inventory}
-                        onSelect={(item) => {
-                            setSelectedItemForLine(item);
-                            setNewItem(prev => ({
-                                ...prev,
-                                itemId: item.id,
-                                coefficient: item.coefficient ? Number(item.coefficient) : 1,
-                                pieces: "",
-                                quantity: "",
-                                price: item.price ? item.price.toString() : ""
-                            }));
-                            setIsItemSelectorOpen(false);
-                        }}
-                    />
 
                     <JobSelectorDialog
                         open={isJobSelectorOpen}

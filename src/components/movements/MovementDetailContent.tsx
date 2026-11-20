@@ -29,7 +29,7 @@ import MoveItemsDialog from "@/components/movements/MoveItemsDialog";
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 // jsPDF and autoTable are loaded dynamically on demand to reduce bundle size
 import { useAuth } from "@/components/auth-provider";
-import { formatCurrency } from "@/lib/utils/format";
+import { formatCurrency, formatUnitPrice } from "@/lib/utils/format";
 import { Switch } from "@/components/ui/switch";
 import { loadJobPriceMap } from "@/lib/services/job-price-lookup";
 import { purchaseAuditApi } from "@/lib/services/purchase-audit";
@@ -590,7 +590,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                             {canSeePrices && (
                                                 <>
                                                     <TableCell className="text-right font-medium text-slate-600 dark:text-slate-400">
-                                                        {formatCurrency(priceOf(item))}
+                                                        {formatUnitPrice(priceOf(item))}
                                                         {isJobPriced(item) && (
                                                             <span className="block text-[10px] font-normal text-blue-600 dark:text-blue-400">prezzo commessa</span>
                                                         )}
@@ -694,7 +694,7 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                                     {canSeePrices && (
                                         <div className="flex justify-between items-center border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
                                             <div className="text-xs text-slate-500 dark:text-slate-400">
-                                                {formatCurrency(priceOf(item))} / unità
+                                                {formatUnitPrice(priceOf(item))} / unità
                                                 {isJobPriced(item) && <span className="ml-1 text-blue-600 dark:text-blue-400">· prezzo commessa</span>}
                                             </div>
                                             <div className="font-bold text-slate-900 dark:text-slate-100">

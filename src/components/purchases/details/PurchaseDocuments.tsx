@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { confirmDialog } from "@/components/ui/confirm-host";
 import { Button } from "@/components/ui/button"
+import { NotchButton } from "@/components/ui/notch-tabs"
 import { FileText, Upload, Trash2, ExternalLink, Loader2, Camera } from "lucide-react"
 import { purchasesApi } from "@/lib/api"
 import { useState } from "react"
@@ -131,15 +132,14 @@ export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isO
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 py-4">
           <CardTitle className="text-base font-semibold">{isOrder ? "Documenti (Ordine)" : "Documenti (DDT / Fattura)"}</CardTitle>
           <div className="flex gap-2 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
+            <NotchButton
+              type="button"
               onClick={() => setShowScanner(true)}
               disabled={isUploading}
             >
-              <Camera className="mr-2 h-4 w-4" />
+              <Camera />
               <span className="hidden sm:inline">Scansiona</span>
-            </Button>
+            </NotchButton>
             <div className="relative">
               <input
                 type="file"
@@ -149,10 +149,10 @@ export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isO
                 disabled={isUploading}
                 accept=".pdf,.jpg,.jpeg,.png"
               />
-              <Button variant="outline" size="sm" disabled={isUploading}>
-                {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+              <NotchButton type="button" disabled={isUploading}>
+                {isUploading ? <Loader2 className="animate-spin" /> : <Upload />}
                 <span className="hidden sm:inline">{isUploading ? "Caricamento..." : "Carica"}</span>
-              </Button>
+              </NotchButton>
             </div>
           </div>
         </CardHeader>
