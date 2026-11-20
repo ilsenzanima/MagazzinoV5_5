@@ -166,6 +166,8 @@ export function TimelineChart({ tasks, taskLabel, isSummary, segments, barClass,
 
         (async () => {
             const { default: Gantt } = await import("frappe-gantt");
+            // Il componente può essere stato smontato (o ridisegnato) durante il caricamento della libreria
+            if (cancelled || !containerRef.current) return;
             const ganttTasks = tasks.map(t => ({
                 id: t.id,
                 name: taskLabel ? taskLabel(t) : t.name,
