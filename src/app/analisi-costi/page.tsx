@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { ListPageHeader } from "@/components/ui/list-page-header";
+import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, Calculator, Copy, Bookmark, BookmarkCheck, Trash2, Layers } from "lucide-react";
@@ -58,6 +59,11 @@ export default function AnalisiCostiArchivePage() {
   const [tplSource, setTplSource] = useState<ProposalCostAnalysisVersion | null>(null);
   const [tplName, setTplName] = useState("");
   const [tplNote, setTplNote] = useState("");
+
+  // Nuovo modello vuoto
+  const [newTplOpen, setNewTplOpen] = useState(false);
+  const [newTplName, setNewTplName] = useState("");
+  const [newTplNote, setNewTplNote] = useState("");
 
   const [deleteTarget, setDeleteTarget] = useState<ProposalCostAnalysisVersion | null>(null);
 
@@ -124,7 +130,8 @@ export default function AnalisiCostiArchivePage() {
     setBaseNote("");
     setDestKind(area === "templates" && ids.length > 1 ? "template" : "proposal");
     setDestId("");
-    setRefreshPrices(true);
+    // Dai modelli i prezzi vengono copiati così come sono; l'aggiornamento ad oggi si propone solo partendo da analisi create
+    setRefreshPrices(area === "created");
     setBaseOpen(true);
   };
 
@@ -165,6 +172,19 @@ export default function AnalisiCostiArchivePage() {
       setTplSource(null);
       await load();
     } catch { notify.error("Errore durante il salvataggio del modello"); }
+    finally { setCreating(false); }
+  };
+
+  const handleCreateTemplate = async () => {
+    const name = newTplName.trim();
+    if (!name) return;
+    try {
+      setCreating(true);
+      const v = await proposalCostAnalysisVersionsApi.createGeneric({ isTemplate: true }, name, newTplNote.trim() || null);
+      setNewTplOpen(false);
+      await load();
+      openVersion(v.id);
+    } catch { notify.error("Errore durante la creazione del modello"); }
     finally { setCreating(false); }
   };
 
@@ -307,6 +327,28 @@ export default function AnalisiCostiArchivePage() {
         </>
       )}
 
+      {/* Nuovo modello: solo nell'area Modelli */}
+      {isTpl && <FloatingAddButton onClick={() => { setNewTplName(""); setNewTplNote(""); setNewTplOpen(true); }} label="Nuovo modello" />}
+
+      <Dialog open={newTplOpen} onOpenChange={setNewTplOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nuovo modello</DialogTitle>
+            <DialogDescription>Crea un modello vuoto per una specifica occasione (es. una parete, una porta): poi riunendo più modelli ottieni una base per le nuove analisi.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <div className="space-y-1"><Label>Nome del modello *</Label><Input autoFocus value={newTplName} onChange={e => setNewTplName(e.target.value)} placeholder="Es. Parete EI120, Porta tagliafuoco…" /></div>
+            <div className="space-y-1"><Label>Nota</Label><Textarea value={newTplNote} onChange={e => setNewTplNote(e.target.value)} placeholder="Nota opzionale" /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNewTplOpen(false)}>Annulla</Button>
+            <Button onClick={handleCreateTemplate} disabled={!newTplName.trim() || creating} className="bg-blue-600 hover:bg-blue-700">
+              {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Crea e apri
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Usa come base / unisci */}
       <Dialog open={baseOpen} onOpenChange={setBaseOpen}>
         <DialogContent className="max-w-lg">
@@ -351,13 +393,15 @@ export default function AnalisiCostiArchivePage() {
                 />
               </div>
             )}
+            {area === "created" && (
             <div className="flex items-start gap-2 pt-1">
-              <Checkbox id="refresh-prices" checked={refreshPrices} onCheckedChange={v => setRefreshPrices(v === true)} className="mt-0.5" />
-              <label htmlFor="refresh-prices" className="cursor-pointer text-sm text-slate-600 dark:text-slate-300">
-                Aggiorna i prezzi d'acquisto di riferimento ad oggi
-                <span className="block text-xs text-slate-400">I prezzi unitari impostati a mano restano invariati e ti verranno segnalati.</span>
-              </label>
-            </div>
+                <Checkbox id="refresh-prices" checked={refreshPrices} onCheckedChange={v => setRefreshPrices(v === true)} className="mt-0.5" />
+                <label htmlFor="refresh-prices" className="cursor-pointer text-sm text-slate-600 dark:text-slate-300">
+                  Aggiorna i prezzi d'acquisto di riferimento ad oggi
+                  <span className="block text-xs text-slate-400">I prezzi unitari impostati a mano restano invariati e ti verranno segnalati.</span>
+                </label>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setBaseOpen(false)}>Annulla</Button>
