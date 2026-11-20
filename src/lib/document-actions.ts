@@ -72,17 +72,22 @@ function printBlob(blob: Blob, kind: "pdf" | "image"): Promise<void> {
         const frame = document.createElement("iframe")
         // Il frame ha dimensioni reali ma e' invisibile: con 0x0 Chrome non carica il visualizzatore PDF e non stampa nulla
         frame.style.cssText = "position:fixed;left:0;top:0;width:100vw;height:100vh;border:0;opacity:0;pointer-events:none;z-index:-1;"
-        const done = () => { setTimeout(() => { frame.remove(); URL.revokeObjectURL(url) }, 1000); resolve() }
+        let finished = false
+        const cleanup = () => { frame.remove(); URL.revokeObjectURL(url) }
+        // Il frame resta finche' la finestra di stampa e' aperta (alcuni browser la mostrano senza bloccare la pagina):
+        // si toglie alla chiusura dell'anteprima, con un limite di sicurezza
+        const done = () => { if (finished) return; finished = true; setTimeout(cleanup, 500); resolve() }
         frame.onload = () => {
             // Al PDF serve un attimo perche' il visualizzatore sia pronto
             setTimeout(() => {
                 try {
                     const w = frame.contentWindow!
+                    w.addEventListener("afterprint", done)
                     w.focus()
                     w.print()
-                    // I browser che non aspettano la chiusura della finestra di stampa: si dà tempo prima del file seguente
-                    setTimeout(done, 1500)
-                } catch (e) { frame.remove(); URL.revokeObjectURL(url); reject(e) }
+                    // Se il browser non segnala la chiusura, si prosegue comunque dopo un po'
+                    setTimeout(done, 120_000)
+                } catch (e) { cleanup(); reject(e) }
             }, kind === "pdf" ? 700 : 200)
         }
         // Per le immagini il frame si considera caricato solo dopo l'immagine, quindi si stampa a immagine pronta
@@ -98,27 +103,73 @@ function printBlob(blob: Blob, kind: "pdf" | "image"): Promise<void> {
 export interface PrintResult { printed: number; skipped: string[] }
 
 // Stampa uno o più documenti senza aprirli: PDF e immagini direttamente, Word/Excel/PowerPoint dopo la conversione
-// in PDF fatta sul server. I formati che non si possono stampare vengono elencati in `skipped`.
+// in PDF fatta sul server. Più documenti vengono uniti in un solo PDF: una sola finestra di stampa, un solo annulla.
+// I formati che non si possono stampare vengono elencati in `skipped`.
 export async function printDocuments(docs: DocLike[]): Promise<PrintResult> {
     const result: PrintResult = { printed: 0, skipped: [] }
+    const parts: Blob[] = []
+    const imageParts = new Map<number, DocLike>()
     for (const d of docs) {
         const ext = extOf(d)
         try {
             if (ext === "pdf") {
-                await printBlob(await fetchBlob(await documentUrl(d)), "pdf")
+                parts.push(await fetchBlob(await documentUrl(d)))
             } else if (IMAGES.has(ext)) {
-                await printBlob(await fetchBlob(await documentUrl(d)), "image")
+                imageParts.set(parts.length, d)
+                parts.push(new Blob())
             } else if (OFFICE.has(ext) && isDriveFile(d.fileUrl)) {
-                await printBlob(await fetchBlob(`/api/drive/pdf?fileId=${encodeURIComponent(d.fileUrl)}`), "pdf")
+                parts.push(await fetchBlob(`/api/drive/pdf?fileId=${encodeURIComponent(d.fileUrl)}`))
             } else {
                 result.skipped.push(d.name)
                 continue
             }
-            result.printed++
         } catch (e) {
             console.error("Stampa non riuscita", d.name, e)
             result.skipped.push(d.name)
         }
+    }
+    if (parts.length === 0) return result
+
+    let toPrint: Blob
+    if (parts.length === 1 && imageParts.size === 0) {
+        toPrint = parts[0]
+    } else {
+        const { PDFDocument } = await import("pdf-lib")
+        const out = await PDFDocument.create()
+        let added = 0
+        for (let i = 0; i < parts.length; i++) {
+            try {
+                const img = imageParts.get(i)
+                if (img) {
+                    const j = await photoToJpeg(img)
+                    const jpg = await out.embedJpg(await (await fetch(j.data)).arrayBuffer())
+                    const landscape = j.w > j.h
+                    const [pw, ph] = landscape ? [842, 595] : [595, 842]
+                    const k = Math.min((pw - 40) / j.w, (ph - 40) / j.h)
+                    const page = out.addPage([pw, ph])
+                    page.drawImage(jpg, { x: (pw - j.w * k) / 2, y: (ph - j.h * k) / 2, width: j.w * k, height: j.h * k })
+                } else {
+                    const src = await PDFDocument.load(await parts[i].arrayBuffer(), { ignoreEncryption: true })
+                    const pages = await out.copyPages(src, src.getPageIndices())
+                    pages.forEach(pg => out.addPage(pg))
+                }
+                added++
+            } catch (e) {
+                console.error("Documento non unito alla stampa", i, e)
+                result.skipped.push(imageParts.get(i)?.name ?? `documento ${i + 1}`)
+            }
+        }
+        if (added === 0) return result
+        result.printed = added
+        toPrint = new Blob([await out.save() as BlobPart], { type: "application/pdf" })
+    }
+    try {
+        await printBlob(toPrint, "pdf")
+        if (result.printed === 0) result.printed = parts.length
+    } catch (e) {
+        console.error("Stampa non riuscita", e)
+        result.skipped.push(...docs.map(d => d.name))
+        result.printed = 0
     }
     return result
 }
