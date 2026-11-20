@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  Plus, Loader2, FileText, ArrowDownRight, ArrowUpRight, ShoppingBag, Truck, Calendar, Printer, Recycle, Repeat,
+  Plus, Loader2, FileText, ArrowDownRight, ArrowUpRight, ShoppingBag, Truck, Calendar, Printer, Download, Recycle, Repeat,
   ArrowUp, ArrowDown, ArrowUpDown,
 } from "lucide-react";
 import { PaginationControls } from "@/components/ui/pagination-controls";
@@ -79,22 +79,40 @@ function SortArrow({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
   return dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />;
 }
 
-// Stampa rapida: scarica il PDF della bolla senza aprirla
+// Scorciatoie: stampa o scarica il PDF della bolla senza aprirla
+async function loadFullNote(movement: DeliveryNote) {
+  const fullNote = await deliveryNotesApi.getById(movement.id);
+  const grouped = new Map<string, DeliveryNoteItem>();
+  fullNote.items?.forEach(item => {
+    const existing = grouped.get(item.inventoryId);
+    grouped.set(item.inventoryId, existing ? { ...existing, quantity: existing.quantity + item.quantity } : { ...item });
+  });
+  return { fullNote, items: Array.from(grouped.values()) };
+}
+
 async function quickPrint(e: React.MouseEvent, movement: DeliveryNote) {
   e.preventDefault();
   e.stopPropagation();
   try {
-    const fullNote = await deliveryNotesApi.getById(movement.id);
-    const grouped = new Map<string, DeliveryNoteItem>();
-    fullNote.items?.forEach(item => {
-      const existing = grouped.get(item.inventoryId);
-      grouped.set(item.inventoryId, existing ? { ...existing, quantity: existing.quantity + item.quantity } : { ...item });
-    });
-    const { generateDeliveryNotePDF } = await import('@/lib/pdf/delivery-note-pdf');
-    await generateDeliveryNotePDF(fullNote, Array.from(grouped.values()));
+    const { fullNote, items } = await loadFullNote(movement);
+    const { printDeliveryNotePDF } = await import('@/lib/pdf/delivery-note-pdf');
+    await printDeliveryNotePDF(fullNote, items);
   } catch (error) {
     console.error("Failed to print", error);
     notify.error("Errore durante la stampa");
+  }
+}
+
+async function quickDownload(e: React.MouseEvent, movement: DeliveryNote) {
+  e.preventDefault();
+  e.stopPropagation();
+  try {
+    const { fullNote, items } = await loadFullNote(movement);
+    const { generateDeliveryNotePDF } = await import('@/lib/pdf/delivery-note-pdf');
+    await generateDeliveryNotePDF(fullNote, items);
+  } catch (error) {
+    console.error("Failed to download", error);
+    notify.error("Errore durante il download");
   }
 }
 
@@ -372,14 +390,24 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                       <span className="line-clamp-2" title={m.itemNames?.join(', ')}>{m.itemNames?.join(', ') || <span className="text-slate-300">—</span>}</span>
                     </TableCell>
                     <TableCell className="py-2 text-center">
-                      {!m.isDraft && <button
-                        onClick={(e) => quickPrint(e, m)}
-                        className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-700"
-                        title="Stampa rapida"
-                        aria-label="Stampa rapida"
-                      >
-                        <Printer className="h-4 w-4" />
-                      </button>}
+                      {!m.isDraft && <div className="flex items-center justify-center gap-0.5">
+                        <button
+                          onClick={(e) => quickPrint(e, m)}
+                          className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-700"
+                          title="Stampa"
+                          aria-label="Stampa"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={(e) => quickDownload(e, m)}
+                          className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-700"
+                          title="Scarica PDF"
+                          aria-label="Scarica PDF"
+                        >
+                          <Download className="h-4 w-4" />
+                        </button>
+                      </div>}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -410,14 +438,24 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                           {format(new Date(movement.date), 'dd MMMM yyyy', { locale: it })}
                         </p>
                       </div>
-                      {!movement.isDraft && <button
-                        onClick={(e) => quickPrint(e, movement)}
-                        className="shrink-0 rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-700"
-                        title="Stampa rapida"
-                        aria-label="Stampa rapida"
-                      >
-                        <Printer className="h-4 w-4" />
-                      </button>}
+                      {!movement.isDraft && <div className="flex shrink-0 items-center">
+                        <button
+                          onClick={(e) => quickPrint(e, movement)}
+                          className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-700"
+                          title="Stampa"
+                          aria-label="Stampa"
+                        >
+                          <Printer className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={(e) => quickDownload(e, movement)}
+                          className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-700"
+                          title="Scarica PDF"
+                          aria-label="Scarica PDF"
+                        >
+                          <Download className="h-4 w-4" />
+                        </button>
+                      </div>}
                     </div>
 
                     <div className="space-y-2 text-xs sm:text-sm">

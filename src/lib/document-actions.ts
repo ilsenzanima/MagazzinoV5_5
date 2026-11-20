@@ -230,3 +230,6 @@ export async function printPhotos(docs: DocLike[]) {
     await printBlob(r.blob, "pdf")
     return r.failed
 }
+
+// Stampa un PDF gia' pronto (es. la bolla) senza scaricarlo
+export const printPdfBlob = (blob: Blob) => printBlob(blob, "pdf")

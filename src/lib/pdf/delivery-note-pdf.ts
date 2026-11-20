@@ -397,3 +397,15 @@ export async function generateDeliveryNotePdfBlob(
     const { doc } = await buildDeliveryNotePdfDoc(movement, groupedItems);
     return doc.output('blob');
 }
+
+/**
+ * Apre la finestra di stampa per la bolla, senza scaricare il file
+ */
+export async function printDeliveryNotePDF(
+    movement: DeliveryNote,
+    groupedItems: DeliveryNoteItem[]
+): Promise<void> {
+    const blob = await generateDeliveryNotePdfBlob(movement, groupedItems);
+    const { printPdfBlob } = await import('@/lib/document-actions');
+    await printPdfBlob(blob);
+}

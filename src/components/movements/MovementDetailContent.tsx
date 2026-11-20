@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Trash2, Loader2, Save, ArrowDownRight, ArrowUpRight, ShoppingBag, FileText, Calendar, Search, MoveRight, Repeat } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, Save, ArrowDownRight, ArrowUpRight, ShoppingBag, FileText, Calendar, Search, MoveRight, Repeat, Menu, Printer, Download, Pencil } from "lucide-react";
 import Link from "next/link";
 import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
@@ -182,6 +183,18 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
         await generateDeliveryNotePDF(movement, groupedItems);
     };
 
+    // Stampa: apre la finestra di stampa senza scaricare il file
+    const handlePrintNow = async () => {
+        if (!movement) return;
+        try {
+            const { printDeliveryNotePDF } = await import('@/lib/pdf/delivery-note-pdf');
+            await printDeliveryNotePDF(movement, groupedItems);
+        } catch (error) {
+            console.error("Failed to print", error);
+            notify.error("Errore durante la stampa");
+        }
+    };
+
     const handleDelete = async () => {
         try {
             setLoading(true);
@@ -322,32 +335,34 @@ export default function MovementDetailContent({ initialMovement }: MovementDetai
                     <NotchActions>
                         {!isEditing ? (
                             <>
-                                <NotchButton type="button" onClick={handlePrint}>
-                                    <FileText /> Stampa Bolla
-                                </NotchButton>
-                                {(userRole === 'admin' || userRole === 'operativo') && (
+                                {isMoveMode ? (
                                     <>
-                                        {items.length > 0 && movement.jobId && (
-                                            isMoveMode ? (
-                                                <>
-                                                    <NotchButton type="button" onClick={handleCancelMoveMode}>Annulla selezione</NotchButton>
-                                                    <NotchButton type="button" onClick={handleToggleMoveMode} disabled={selectedItemIds.size === 0} className="border-amber-600 bg-amber-600 text-white hover:bg-amber-700 hover:text-white [&_svg]:text-white">
-                                                        <MoveRight /> Conferma selezione{selectedItemIds.size > 0 ? ` (${selectedItemIds.size})` : ""}
-                                                    </NotchButton>
-                                                </>
-                                            ) : (
-                                                <NotchButton type="button" onClick={handleToggleMoveMode}>
-                                                    <MoveRight /> Sposta Articoli
-                                                </NotchButton>
-                                            )
-                                        )}
-                                        <Link href={`/movements/${initialMovement.id}/edit`}>
-                                            <NotchButton type="button">Modifica</NotchButton>
-                                        </Link>
-                                        <NotchButton type="button" onClick={() => setDeleteDialogOpen(true)} className="border-red-700 bg-red-600 text-white hover:bg-red-700 hover:text-white [&_svg]:text-white">
-                                            <Trash2 /> Elimina
+                                        <NotchButton type="button" onClick={handleCancelMoveMode}>Annulla selezione</NotchButton>
+                                        <NotchButton type="button" onClick={handleToggleMoveMode} disabled={selectedItemIds.size === 0} className="border-amber-600 bg-amber-600 text-white hover:bg-amber-700 hover:text-white [&_svg]:text-white">
+                                            <MoveRight /> Conferma selezione{selectedItemIds.size > 0 ? ` (${selectedItemIds.size})` : ""}
                                         </NotchButton>
                                     </>
+                                ) : (
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <NotchButton type="button" aria-label="Azioni della bolla"><Menu /> Azioni</NotchButton>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="min-w-52">
+                                            <DropdownMenuItem onClick={handlePrintNow}><Printer className="mr-2 h-4 w-4" />Stampa</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={handlePrint}><Download className="mr-2 h-4 w-4" />Scarica PDF</DropdownMenuItem>
+                                            {(userRole === 'admin' || userRole === 'operativo') && (
+                                                <>
+                                                    <DropdownMenuSeparator />
+                                                    {items.length > 0 && movement.jobId && (
+                                                        <DropdownMenuItem onClick={handleToggleMoveMode}><MoveRight className="mr-2 h-4 w-4" />Sposta articoli</DropdownMenuItem>
+                                                    )}
+                                                    <DropdownMenuItem onClick={() => router.push(`/movements/${initialMovement.id}/edit`)}><Pencil className="mr-2 h-4 w-4" />Modifica</DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={() => setDeleteDialogOpen(true)} className="text-red-600 focus:text-red-600"><Trash2 className="mr-2 h-4 w-4" />Elimina</DropdownMenuItem>
+                                                </>
+                                            )}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 )}
                             </>
                         ) : (
