@@ -8,11 +8,13 @@ type PurchaseRow = { purchase_items: { price: number | null; quantity: number | 
 export default async function DashboardPage() {
   const supabase = await createClient();
 
-  const startOfMonth = new Date(
-    new Date().getFullYear(),
-    new Date().getMonth(),
-    1
-  ).toISOString();
+  // Il mese si conta dalla data del documento (non da quando e' stato inserito): i documenti storici caricati
+  // adesso non devono gonfiare i numeri del mese.
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const startOfMonth = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+  const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const startOfNextMonth = `${next.getFullYear()}-${pad(next.getMonth() + 1)}-01`;
 
   const [
     monthDDTCountResult,
@@ -27,7 +29,8 @@ export default async function DashboardPage() {
     supabase
       .from("delivery_notes")
       .select("id", { count: "exact", head: true })
-      .gte("created_at", startOfMonth),
+      .gte("date", startOfMonth)
+      .lt("date", startOfNextMonth),
 
     // Acquisti del mese (count + totale valore)
     supabase
@@ -35,7 +38,8 @@ export default async function DashboardPage() {
       .select("id, purchase_items(price, quantity)")
       .eq("order_type", "purchase")
       .is("deleted_at", null)
-      .gte("created_at", startOfMonth),
+      .gte("delivery_note_date", startOfMonth)
+      .lt("delivery_note_date", startOfNextMonth),
 
     // Articoli in scorta minima (via RPC già esistente)
     supabase.rpc("get_dashboard_stats"),
