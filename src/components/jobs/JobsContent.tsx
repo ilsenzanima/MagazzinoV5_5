@@ -414,10 +414,8 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                           {job.startDate ? `dal ${formatDate(job.startDate)}` : ""}{job.startDate && job.endDate && " "}{job.endDate ? `al ${formatDate(job.endDate)}` : ""}
                         </div>
                       )}
-                      {(job.cig || job.cup) && (
-                        <div className="mt-0.5 truncate text-[11px] text-slate-400">
-                          {job.cig && <>CIG {job.cig}</>}{job.cig && job.cup && " · "}{job.cup && <>CUP {job.cup}</>}
-                        </div>
+                      {job.description && (
+                        <div className="mt-0.5 line-clamp-2 text-[11px] text-slate-400" title={job.description}>{job.description}</div>
                       )}
                     </TableCell>
                     <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">
@@ -456,7 +454,7 @@ export default function JobsContent({ initialJobs, initialTotal }: JobsContentPr
                     <div className="min-w-0">
                       <div className="mb-1 font-mono text-xs text-slate-500 dark:text-muted-foreground">{job.code}</div>
                       <CardTitle className="break-words text-base font-bold text-slate-800 dark:text-white" title={job.name}>{job.name}</CardTitle>
-                      <p className="line-clamp-1 text-xs text-slate-500 dark:text-slate-400">{job.description}</p>
+                      <p className="whitespace-pre-line break-words text-xs text-slate-500 dark:text-slate-400">{job.description}</p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
                       {job.status === 'active' && (
