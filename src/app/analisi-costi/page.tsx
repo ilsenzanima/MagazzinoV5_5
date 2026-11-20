@@ -22,6 +22,7 @@ import { jobsApi, Job } from "@/lib/api";
 import { proposalCostAnalysisVersionsApi, ProposalCostAnalysisVersion } from "@/lib/services/proposal-cost-analysis";
 import { costAnalysisArchiveApi, ArchiveTarget } from "@/lib/services/cost-analysis-archive";
 import { ProposalAnalisiCosti } from "@/components/clients/detail/ProposalAnalisiCosti";
+import { InlineNote } from "@/components/ui/table-bits";
 import { useHistoryStep } from "@/hooks/useHistoryStep";
 import { useAuth } from "@/components/auth-provider";
 import { notify } from "@/lib/notify";
@@ -188,6 +189,17 @@ export default function AnalisiCostiArchivePage() {
     finally { setCreating(false); }
   };
 
+  // Nota di un modello modificabile direttamente dalla tabella
+  const handleSaveNote = async (v: ProposalCostAnalysisVersion, note: string) => {
+    const prev = v.note;
+    setVersions(list => list.map(x => x.id === v.id ? { ...x, note: note || null } : x));
+    try { await proposalCostAnalysisVersionsApi.update(v.id, { note: note || null }); }
+    catch {
+      setVersions(list => list.map(x => x.id === v.id ? { ...x, note: prev } : x));
+      notify.error("Errore durante il salvataggio della nota");
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     try {
@@ -294,9 +306,9 @@ export default function AnalisiCostiArchivePage() {
                         </span>
                         {src && <div className="text-[11px] text-slate-400">Creata da: {src.name}</div>}
                       </TableCell>
-                      <TableCell className="border-r py-2 text-sm">
+                      <TableCell className="border-r py-2 text-sm" onClick={isTpl ? (e => e.stopPropagation()) : undefined}>
                         {isTpl
-                          ? (v.note || <span className="text-slate-300">—</span>)
+                          ? <InlineNote value={v.note ?? ""} onSave={note => handleSaveNote(v, note)} />
                           : <>
                               <div className="text-blue-700 dark:text-blue-400">{r.main}</div>
                               {r.sub && <div className="text-[11px] text-slate-400">{r.sub}</div>}
