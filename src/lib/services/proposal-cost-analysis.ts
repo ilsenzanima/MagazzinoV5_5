@@ -13,12 +13,18 @@ export interface ProposalCostAnalysisVersion {
     note: string | null;
     createdAt: string;
     updatedAt: string;
+    // Modello riutilizzabile: nessuna offerta né commessa (vedi archivio analisi costi)
+    isTemplate: boolean;
+    // Analisi o modello da cui questa è stata creata (se ancora esiste)
+    sourceVersionId: string | null;
 }
 
 const mapVersion = (db: any): ProposalCostAnalysisVersion => ({
     id: db.id,
     proposalId: db.proposal_id,
     jobId: db.job_id,
+    isTemplate: db.is_template === true,
+    sourceVersionId: db.source_version_id ?? null,
     name: db.name,
     note: db.note,
     createdAt: db.created_at,
@@ -61,6 +67,36 @@ export const proposalCostAnalysisVersionsApi = {
             .order('created_at', { ascending: false });
         if (error) throw error;
         return (data || []).map(mapVersion);
+    },
+
+    // Tutte le analisi (di offerte, commesse e modelli) per l'archivio
+    getAll: async (): Promise<ProposalCostAnalysisVersion[]> => {
+        const { data, error } = await supabase
+            .from('proposal_cost_analysis_versions')
+            .select('*')
+            .order('created_at', { ascending: false });
+        if (error) throw error;
+        return (data || []).map(mapVersion);
+    },
+
+    // Crea una versione vuota per un'offerta, una commessa o un modello
+    createGeneric: async (
+        owner: { proposalId?: string | null; jobId?: string | null; isTemplate?: boolean },
+        name: string, note?: string | null, sourceVersionId?: string | null
+    ): Promise<ProposalCostAnalysisVersion> => {
+        const { data, error } = await supabase
+            .from('proposal_cost_analysis_versions')
+            .insert({
+                proposal_id: owner.isTemplate ? null : owner.proposalId ?? null,
+                job_id: owner.isTemplate ? null : owner.jobId ?? null,
+                is_template: !!owner.isTemplate,
+                source_version_id: sourceVersionId ?? null,
+                name, note: note || null,
+            })
+            .select()
+            .single();
+        if (error) throw error;
+        return mapVersion(data);
     },
 
     getById: async (id: string): Promise<ProposalCostAnalysisVersion> => {

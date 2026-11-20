@@ -39,6 +39,7 @@ import {
   PanelLeftOpen,
   Store,
   CalendarDays,
+  Calculator,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/components/auth-provider";
@@ -213,6 +214,12 @@ export function Sidebar({ className, onLinkClick, collapsed = false, onToggleCol
           icon: FileText,
           href: "/proposals",
           active: pathname === "/proposals",
+        }] : []),
+        ...(userRole === "admin" || userRole === "operativo" ? [{
+          label: "Archivio analisi costi",
+          icon: Calculator,
+          href: "/analisi-costi",
+          active: pathname === "/analisi-costi",
         }] : []),
       ]
     },

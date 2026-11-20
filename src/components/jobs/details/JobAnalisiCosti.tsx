@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { NotchTabs, NotchActions, NotchButton } from "@/components/ui/notch-tabs"
-import { Loader2, PlusCircle, X, Package, FileText, Calculator, Info, Upload } from "lucide-react"
+import { Loader2, PlusCircle, X, Package, FileText, Calculator, Info, Upload, Truck } from "lucide-react"
 import { firstMovementDates } from '@/lib/utils/first-movement-dates'
 import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams, JobPriceAlert, effectiveUnitPrice } from "@/lib/services/cost-analysis"
 import { clientProposalsApi } from "@/lib/services/client-proposals"
@@ -328,6 +328,9 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
 
     const inventoryRows = useMemo(() => rows.filter(r => r.type === 'inventory'), [rows])
     const genericRows = useMemo(() => rows.filter(r => r.type === 'generic'), [rows])
+    // Voci di trasporto e posa copiate dall'offerta (sola consultazione)
+    const transportRows = useMemo(() => rows.filter(r => r.type === 'transport'), [rows])
+    const posaRows = useMemo(() => rows.filter(r => r.type === 'posa'), [rows])
 
     // ── Load ──────────────────────────────────────────────────────────────────
     const loadRows = async () => {
@@ -519,6 +522,40 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
                     )}
                 </CardContent>
             </Card>
+
+            {(transportRows.length > 0 || posaRows.length > 0) && (
+                <Card>
+                    <div className="flex items-center gap-3 p-4 border-b">
+                        <Truck className="h-5 w-5 text-amber-600" />
+                        <span className="flex-1 font-semibold text-slate-800 dark:text-slate-100">Trasporto e posa</span>
+                    </div>
+                    <CardContent className="pt-3 pb-4 px-4 space-y-4">
+                        {([['Trasporto (A)', transportRows], ['Posa (B)', posaRows]] as const).map(([title, list]) => list.length > 0 && (
+                            <div key={title}>
+                                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">{title}</p>
+                                <table className="w-full text-sm">
+                                    <tbody>
+                                        {list.map(r => (
+                                            <tr key={r.id} className="border-b border-slate-100 dark:border-slate-800">
+                                                <td className="p-2">{r.itemName}</td>
+                                                <td className="p-2 text-right font-mono text-xs text-slate-500">{r.unitPrice !== null ? `€ ${fmt(r.unitPrice)}` : '—'} × {fmt(r.qtyEstimated)}</td>
+                                                <td className="p-2 text-right font-mono text-xs font-medium">€ {fmt((r.unitPrice ?? 0) * r.qtyEstimated)}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                    <tfoot>
+                                        <tr className="font-semibold">
+                                            <td colSpan={2} className="p-2 text-slate-600 dark:text-slate-400">Totale {title.toLowerCase()}</td>
+                                            <td className="p-2 text-right font-mono text-blue-700 dark:text-blue-300">€ {fmt(list.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0))}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        ))}
+                        <p className="text-xs text-slate-400">Voci copiate dall'analisi costi dell'offerta, per consultazione. Si modificano dall'analisi costi di origine.</p>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Voci Generiche e Riepilogo Prezzi: nascoste per ora, basta mettere SHOW_PRICE_SUMMARY a true */}
             {SHOW_PRICE_SUMMARY && (

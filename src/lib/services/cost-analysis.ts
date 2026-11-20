@@ -20,7 +20,8 @@ const DEFAULT_PARAMS: Omit<CostAnalysisParams, 'jobId'> = {
 export interface CostAnalysisRow {
     id: string;
     jobId: string;
-    type: 'inventory' | 'generic';
+    // 'transport' e 'posa' esistono solo nelle analisi costi dell'offerta (sezione «Trasporto e posa»)
+    type: 'inventory' | 'generic' | 'transport' | 'posa';
     itemId: string | null;
     itemName: string;
     itemModel: string;
@@ -187,7 +188,8 @@ export const costAnalysisApi = {
         const merged = new Map<string, CostAnalysisRow>();
         for (let i = versions.length - 1; i >= 0; i--) {
             for (const r of rowsPerVersion[i]) {
-                const key = r.type === 'inventory' && r.itemId ? `inv:${r.itemId}` : `gen:${r.itemName.trim().toLowerCase()}`;
+                // Le voci di trasporto e posa restano specificate anche in commessa
+                const key = r.type === 'inventory' && r.itemId ? `inv:${r.itemId}` : `${r.type}:${r.itemName.trim().toLowerCase()}`;
                 const current = merged.get(key);
                 if (!current || (r.unitPrice ?? -Infinity) >= (current.unitPrice ?? -Infinity)) {
                     merged.set(key, r);

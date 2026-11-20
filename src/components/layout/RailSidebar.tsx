@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation"
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ComponentType } from "react"
 import {
   LayoutDashboard, Package, ClipboardList, BarChart3, Settings, ShoppingCart, Truck, Users, Building2, HardHat,
-  Calendar, CalendarDays, FileText, ShieldCheck, GanttChartSquare, UserCircle, LogOut, Wrench, Briefcase,
+  Calendar, CalendarDays, FileText, ShieldCheck, GanttChartSquare, UserCircle, LogOut, Wrench, Briefcase, Calculator,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -121,6 +121,7 @@ function RailSidebar() {
       { key: "jobs", label: "Commesse", icon: Briefcase, href: "/jobs", active: is("/jobs") },
       { key: "anagrafiche", label: "Committenti e fornitori", icon: Users, href: "/anagrafiche", active: is("/anagrafiche", "/clients", "/suppliers") },
       ...(staff ? [{ key: "proposals", label: "Offerte generali", icon: FileText, href: "/proposals", active: pathname === "/proposals" }] : []),
+      ...(staff ? [{ key: "analisi-costi", label: "Archivio analisi costi", icon: Calculator, href: "/analisi-costi", active: is("/analisi-costi") }] : []),
     ],
     ...(staff ? [[{ key: "report", label: "Report", icon: BarChart3, href: "/reports", active: is("/report-analisi", "/reports") }]] : []),
   ]
