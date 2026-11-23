@@ -200,17 +200,31 @@ export async function generateCostAnalysisExcel(input: CostAnalysisPdfInput): Pr
 
     pushRow([titleCell('Riepilogo Prezzi')]);
     mergeRange(pushRow([tableHdrCell('Voce'), tableHdrCell(''), tableHdrCell('Incremento'), tableHdrCell('Valore')]), 0, 1);
-    const summaryRows: [string, string, number][] = [
+    // Il quarto elemento indica una riga di subtotale (come nel riepilogo a schermo)
+    const summaryRows: [string, string, number, boolean?][] = [
         ['Tot. materiali + voci', '', totBase],
         [`+ Sfrido (${params.sfrido}%)`, `+€ ${fmt(sfrido_delta)}`, totListino],
+        ['TOT materiali listino', '', totListino, true],
         [`- Sconto (${params.sconto}%)`, `-€ ${fmt(sconto_delta)}`, totSconto],
+        ['TOT materiali sconto', '', totSconto, true],
         ['+ Trasporto (A)', `+€ ${fmt(params.trasporto)}`, costoFranco],
+        ['Costo franco', '', costoFranco, true],
         ['+ Posa (B)', `+€ ${fmt(params.posa)}`, costoTot],
+        ['Costo TOT (TC)', '', costoTot, true],
         [`+ Ricarico (${params.ricarico}%)`, `+€ ${fmt(ric_delta)}`, conRicarico],
         [`+ Margine trattativa (${params.margineTrattativa}%)`, `+€ ${fmt(marg_delta)}`, totaleFinale],
     ];
-    for (const [label, incremento, valore] of summaryRows) {
-        mergeRange(pushRow([dataCell(label), blank(), dataCell(incremento, true), numDataCell(valore)], estimateLines(label, MERGED_A_C_WCH)), 0, 1);
+    const subFill = { patternType: 'solid', fgColor: { rgb: 'FFF5F7FA' } };
+    for (const [label, incremento, valore, isSub] of summaryRows) {
+        const row = isSub
+            ? [
+                cell(label, { fill: subFill, font: { bold: true, sz: 9 }, alignment: { vertical: 'center' } }),
+                cell('', { fill: subFill }),
+                cell('', { fill: subFill }),
+                cell(valore, { fill: subFill, font: { bold: true, sz: 9 }, numFmt: EUR_FMT, alignment: { horizontal: 'right', vertical: 'center' } }),
+            ]
+            : [dataCell(label), blank(), dataCell(incremento, true), numDataCell(valore)];
+        mergeRange(pushRow(row, estimateLines(label, MERGED_A_C_WCH)), 0, 1);
     }
     pushRow([grandTotalCell('TOTALE FINALE'), grandTotalCell(''), grandTotalCell(''), grandTotalCell(totaleFinale, true)]);
 

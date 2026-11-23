@@ -283,12 +283,24 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
     const marg_delta = conRicarico * params.margineTrattativa / 100;
     const totaleFinale = conRicarico + marg_delta;
 
-    if (currentY > pageHeight - 60) { doc.addPage(); currentY = margin; }
+    // Il riepilogo non va spezzato su due pagine: se non ci sta intero passa a una pagina nuova
+    // (lo spazio rimasto in fondo alla pagina precedente resta vuoto).
+    // Altezza stimata: titolo + intestazione + 11 righe + totale, circa 9 mm l'una
+    const summaryHeight = 7 + 13 * 9;
+    if (currentY + summaryHeight > pageHeight - 15) { doc.addPage(); currentY = margin; }
     doc.setFontSize(10);
     doc.setTextColor(30);
     doc.setFont("helvetica", "bold");
     doc.text("Riepilogo Prezzi", margin, currentY + 4);
     currentY += 7;
+
+    // Riga di subtotale, come nel riepilogo a schermo
+    const subStyle = { fontStyle: 'bold' as const, fillColor: [245, 247, 250] as [number, number, number] };
+    const subRow = (label: string, value: number) => [
+        { content: label, styles: subStyle },
+        { content: '', styles: subStyle },
+        { content: `€ ${fmt(value)}`, styles: subStyle },
+    ];
 
     autoTable(doc, {
         startY: currentY,
@@ -296,9 +308,13 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
         body: [
             ['Tot. materiali + voci', '', `€ ${fmt(totBase)}`],
             [`+ Sfrido (${params.sfrido}%)`, `+€ ${fmt(sfrido_delta)}`, `€ ${fmt(totListino)}`],
+            subRow('TOT materiali listino', totListino),
             [`- Sconto (${params.sconto}%)`, `-€ ${fmt(sconto_delta)}`, `€ ${fmt(totSconto)}`],
+            subRow('TOT materiali sconto', totSconto),
             [`+ Trasporto (A)`, `+€ ${fmt(params.trasporto)}`, `€ ${fmt(costoFranco)}`],
+            subRow('Costo franco', costoFranco),
             [`+ Posa (B)`, `+€ ${fmt(params.posa)}`, `€ ${fmt(costoTot)}`],
+            subRow('Costo TOT (TC)', costoTot),
             [`+ Ricarico (${params.ricarico}%)`, `+€ ${fmt(ric_delta)}`, `€ ${fmt(conRicarico)}`],
             [`+ Margine trattativa (${params.margineTrattativa}%)`, `+€ ${fmt(marg_delta)}`, `€ ${fmt(totaleFinale)}`],
         ],
