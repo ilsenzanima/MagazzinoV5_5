@@ -2,6 +2,7 @@ import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { effectiveUnitPrice, type CostAnalysisRow, type CostAnalysisParams } from '@/lib/services/cost-analysis';
 import type { Client } from '@/lib/types';
+import { costAnalysisFileName } from '@/lib/cost-analysis-filename';
 
 const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 , useGrouping: true});
 
@@ -324,11 +325,18 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
     }
 
     // --- Filename ---
-    const today = format(new Date(), 'yyyyMMdd');
-    const slug = (s: string) => (s || '').replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').substring(0, 30);
-    const filename = `${slug(input.proposalTitle) || 'Offerta'}_${slug(input.versionName) || 'AnalisiCosti'}_${today}.pdf`;
+    // Nome completo dell'analisi (non più accorciato a 30 caratteri senza simboli)
+    const filename = costAnalysisFileName(input, 'pdf');
 
     return { doc, filename };
+}
+
+/**
+ * Genera il PDF di un'analisi costi senza scaricarlo (per stampa e scarichi multipli)
+ */
+export async function generateCostAnalysisPdfBlob(input: CostAnalysisPdfInput): Promise<{ blob: Blob; filename: string }> {
+    const { doc, filename } = await buildCostAnalysisPdfDoc(input);
+    return { blob: doc.output('blob') as Blob, filename };
 }
 
 /**

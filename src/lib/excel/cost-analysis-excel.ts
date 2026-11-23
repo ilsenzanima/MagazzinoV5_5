@@ -1,6 +1,7 @@
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import type { CostAnalysisPdfInput } from '@/lib/pdf/cost-analysis-pdf';
+import { costAnalysisFileName } from '@/lib/cost-analysis-filename';
 import { effectiveUnitPrice, type CostAnalysisRow } from '@/lib/services/cost-analysis';
 
 const EUR_FMT = '"€ "#,##0.00';
@@ -231,9 +232,7 @@ export async function generateCostAnalysisExcel(input: CostAnalysisPdfInput): Pr
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Analisi Costi');
 
-    const today = format(new Date(), 'yyyyMMdd');
-    const slug = (s: string) => (s || '').replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').substring(0, 30);
-    const filename = `${slug(input.proposalTitle) || 'Offerta'}_${slug(input.versionName) || 'AnalisiCosti'}_${today}.xlsx`;
+    const filename = costAnalysisFileName(input, 'xlsx');
 
     XLSX.writeFile(wb, filename);
 }

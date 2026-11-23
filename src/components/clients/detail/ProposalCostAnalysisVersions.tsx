@@ -7,7 +7,10 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
-import { Loader2, Calculator, Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Loader2, Calculator, Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpDown, Download, Printer } from "lucide-react"
+import { clientProposalsApi } from "@/lib/services/client-proposals"
+import { buildExportInputs, downloadCostAnalysesPdf, printCostAnalysesPdf } from "@/lib/cost-analysis-export"
 import { proposalCostAnalysisVersionsApi, ProposalCostAnalysisVersion } from "@/lib/services/proposal-cost-analysis"
 import { notify } from "@/lib/notify"
 import { useHistoryStep } from "@/hooks/useHistoryStep"
@@ -50,6 +53,29 @@ export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel }: Pr
     const [saving, setSaving] = useState(false)
 
     const [deleteTarget, setDeleteTarget] = useState<ProposalCostAnalysisVersion | null>(null)
+
+    // Selezione multipla per scaricare/stampare più analisi in una volta
+    const [selected, setSelected] = useState<Set<string>>(new Set())
+    const [exporting, setExporting] = useState(false)
+    const toggleSelected = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+    const runExport = async (list: ProposalCostAnalysisVersion[], mode: 'download' | 'print') => {
+        if (list.length === 0) return
+        try {
+            setExporting(true)
+            let proposalTitle = jobLabel ?? ''
+            let clientId: string | null = null
+            if (proposalId) {
+                const p = await clientProposalsApi.getById(proposalId).catch(() => null)
+                proposalTitle = p?.title ?? ''
+                clientId = p?.clientId ?? null
+            }
+            const inputs = await buildExportInputs(list, () => ({ proposalTitle, clientId }))
+            if (mode === 'download') await downloadCostAnalysesPdf(inputs)
+            else await printCostAnalysesPdf(inputs)
+        } catch { notify.error(mode === 'download' ? "Errore durante il download del PDF" : "Errore durante la stampa") }
+        finally { setExporting(false) }
+    }
 
     const load = async () => {
         try {
@@ -113,6 +139,7 @@ export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel }: Pr
         try {
             await proposalCostAnalysisVersionsApi.delete(deleteTarget.id)
             setVersions(prev => prev.filter(v => v.id !== deleteTarget.id))
+            setSelected(prev => { const n = new Set(prev); n.delete(deleteTarget.id); return n })
             notify.success("Analisi costi eliminata")
         } catch { notify.error("Errore durante l'eliminazione") }
         finally { setDeleteTarget(null) }
@@ -138,6 +165,19 @@ export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel }: Pr
                 <NotchSearch value={search} onChange={setSearch} placeholder="Cerca analisi costi" />
             </NotchActions>
 
+            {selected.size > 0 && (
+                <div className="flex flex-wrap items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-900/40 dark:bg-blue-950/20">
+                    <span className="font-medium text-blue-900 dark:text-blue-200">{selected.size} selezionat{selected.size === 1 ? 'a' : 'e'}</span>
+                    <Button size="sm" variant="outline" disabled={exporting} onClick={() => runExport(versions.filter(v => selected.has(v.id)), 'download')}>
+                        {exporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}Scarica PDF
+                    </Button>
+                    <Button size="sm" variant="outline" disabled={exporting} onClick={() => runExport(versions.filter(v => selected.has(v.id)), 'print')}>
+                        <Printer className="h-4 w-4 mr-1" />Stampa
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Deseleziona</Button>
+                </div>
+            )}
+
             {loading ? (
                 <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
             ) : sorted.length === 0 ? (
@@ -148,15 +188,25 @@ export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel }: Pr
                 <Table className="border-collapse">
                     <TableHeader>
                         <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                            <TableHead className="w-10 border-r">
+                                <Checkbox
+                                    aria-label="Seleziona tutte"
+                                    checked={sorted.length > 0 && sorted.every(v => selected.has(v.id))}
+                                    onCheckedChange={c => setSelected(c ? new Set(sorted.map(v => v.id)) : new Set())}
+                                />
+                            </TableHead>
                             <TableHead className="w-1/3 border-r text-xs font-semibold uppercase tracking-wide text-slate-600"><button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">Nome{sortIcon('name')}</button></TableHead>
                             <TableHead className="border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Nota</TableHead>
                             <TableHead className="w-36 border-r text-xs font-semibold uppercase tracking-wide text-slate-600"><button type="button" onClick={() => toggleSort('date')} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">Creata il{sortIcon('date')}</button></TableHead>
-                            <TableHead className="w-24" />
+                            <TableHead className="w-36" />
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {sorted.map(v => (
                             <TableRow key={v.id} className="group cursor-pointer" onClick={() => setOpenVersionId(v.id)}>
+                                <TableCell className="border-r py-2" onClick={e => e.stopPropagation()}>
+                                    <Checkbox checked={selected.has(v.id)} onCheckedChange={() => toggleSelected(v.id)} aria-label={`Seleziona ${v.name}`} />
+                                </TableCell>
                                 <TableCell className="border-r py-2">
                                     <span className="flex items-center gap-2 font-medium text-slate-900 dark:text-white"><Calculator className="h-4 w-4 shrink-0 text-emerald-600" />{v.name}</span>
                                 </TableCell>
@@ -164,6 +214,8 @@ export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel }: Pr
                                 <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{new Date(v.createdAt).toLocaleDateString('it-IT')}</TableCell>
                                 <TableCell className="py-2">
                                     <div className="flex items-center justify-end gap-1">
+                                        <button disabled={exporting} onClick={e => { e.stopPropagation(); runExport([v], 'download') }} title="Scarica PDF" className="p-1 text-slate-400 hover:text-blue-600 disabled:opacity-40"><Download className="h-4 w-4" /></button>
+                                        <button disabled={exporting} onClick={e => { e.stopPropagation(); runExport([v], 'print') }} title="Stampa" className="p-1 text-slate-400 hover:text-blue-600 disabled:opacity-40"><Printer className="h-4 w-4" /></button>
                                         <button onClick={e => { e.stopPropagation(); openEdit(v) }} title="Modifica" className="p-1 text-slate-400 hover:text-blue-600"><Pencil className="h-4 w-4" /></button>
                                         <button onClick={e => { e.stopPropagation(); setDeleteTarget(v) }} title="Elimina" className="p-1 text-slate-400 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
                                     </div>
