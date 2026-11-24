@@ -5,8 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-    Building2, CalendarDays, Calendar, ClipboardList, FileText, History, LayoutDashboard, LogOut,
-    Package, QrCode, Search, Settings, ShieldCheck, ShoppingCart, Store, Truck, Users, Wrench, X, Zap, HardHat, LayoutGrid,
+    Building2, CalendarDays, Calendar, ClipboardList, History, LayoutDashboard, LogOut,
+    Package, Search, Settings, ShieldCheck, ShoppingCart, Store, Truck, Users, Wrench, X, Zap, HardHat, LayoutGrid,
 } from "lucide-react";
 import { useAuth } from "@/components/auth-provider";
 import { useMobileSearch, useRegisteredActions, useRegisteredNavSection } from "./mobile-actions";
@@ -40,12 +40,26 @@ const NAV_ITEMS: NavItem[] = [
 ];
 const RECENT_KEY = "mobile-recent-pages";
 
-// Azioni sempre disponibili dal tasto centrale
-const GLOBAL_ACTIONS = [
-    { label: "Nuovo movimento", href: "/movements/new", icon: <Truck className="h-5 w-5" /> },
-    { label: "Scansiona / Inventario", href: "/inventory", icon: <QrCode className="h-5 w-5" /> },
-    { label: "Nuova nota di carico", href: "/load-notes/new", icon: <FileText className="h-5 w-5" /> },
-];
+// Tiene il pannello a schermo ancora per un po' dopo la chiusura, così può animarsi anche in uscita
+function usePresence(open: boolean, ms = 320) {
+    const [mounted, setMounted] = useState(open);
+    const [shown, setShown] = useState(false);
+    useEffect(() => {
+        if (open) {
+            setMounted(true);
+            let r2 = 0;
+            const r1 = requestAnimationFrame(() => { r2 = requestAnimationFrame(() => setShown(true)); });
+            return () => { cancelAnimationFrame(r1); cancelAnimationFrame(r2); };
+        }
+        setShown(false);
+        const t = setTimeout(() => setMounted(false), ms);
+        return () => clearTimeout(t);
+    }, [open, ms]);
+    return { mounted, shown };
+}
+
+// Animazione dei pannelli Naviga e Cerca: salgono dalla barra e vi rientrano
+const panelMotion = (shown: boolean) => cn("transition-[transform,opacity]", shown ? "translate-y-0 opacity-100 duration-[450ms] ease-out" : "translate-y-[60%] opacity-0 duration-300 ease-in");
 
 const baseOf = (path: string | null) => "/" + (path?.split("/")[1] ?? "");
 
@@ -61,7 +75,11 @@ export function MobileNavBar() {
     // Pulsanti della fascia della pagina: contati per il badge, e il menu si chiude dopo aver premuto un pulsante semplice
     useEffect(() => {
         if (!actionsSlot) return;
-        const count = () => setSlotCount(actionsSlot.children.length);
+        const count = () => {
+            const kids = Array.from(actionsSlot.children) as HTMLElement[];
+            kids.forEach((k, i) => k.style.setProperty("--i", String(i)));
+            setSlotCount(kids.length);
+        };
         count();
         const mo = new MutationObserver(count);
         mo.observe(actionsSlot, { childList: true });
@@ -106,45 +124,45 @@ export function MobileNavBar() {
     const current = baseOf(pathname);
     const shownRecents = recents.filter(p => p !== current && items.some(i => i.href === p)).slice(0, 4);
 
-    // Menu flottante: prima le azioni della pagina, poi quelle sempre disponibili (senza doppioni)
+    // Menu flottante: solo le azioni della pagina
     const dial: { key: string; label: string; href?: string; onClick?: () => void; icon: ReactNode; page: boolean }[] = [
         ...pageActions.map(a => ({ key: a.id, label: a.label, href: a.href, onClick: a.onClick, icon: a.icon ?? <Zap className="h-5 w-5" />, page: true })),
-        ...GLOBAL_ACTIONS.filter(g => !pageActions.some(a => a.href === g.href)).map(g => ({ key: g.href, label: g.label, href: g.href, onClick: undefined, icon: g.icon, page: false })),
     ];
+
+    const navP = usePresence(navOpen);
+    const searchP = usePresence(searchOpen);
+    const backdropP = usePresence(dialOpen || navOpen || searchOpen, 300);
+    const total = slotCount + dial.length;
 
     const sideButton = "flex h-full flex-1 flex-col items-center justify-center gap-1 text-slate-300 transition-colors active:text-white";
 
     return (
         <>
-            {/* Menu flottante delle azioni */}
-            {(dialOpen || navOpen || searchOpen) && (
-                <>
-                    <button type="button" aria-label="Chiudi" onClick={() => { setDialOpen(false); setNavOpen(false); setSearchOpen(false); }}
-                        className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-[1px] animate-in fade-in duration-200 lg:hidden" />
-                </>
+            {/* Sfondo scuro dietro ai menu: sfuma in entrata e in uscita */}
+            {backdropP.mounted && (
+                <button type="button" aria-label="Chiudi" onClick={() => { setDialOpen(false); setNavOpen(false); setSearchOpen(false); }}
+                    className={cn("fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-[1px] transition-opacity duration-300 lg:hidden", backdropP.shown ? "opacity-100" : "opacity-0")} />
             )}
 
-            {/* Menu flottante: sempre montato, cosi' i pulsanti della pagina restano al loro posto */}
-            <div className={cn("fixed inset-x-0 z-50 max-h-[calc(100dvh-13rem)] overflow-y-auto px-4 py-1 scrollbar-hide lg:hidden", !dialOpen && "hidden")}
-                style={{ bottom: "calc(6.5rem + env(safe-area-inset-bottom))" }}>
+            {/* Menu flottante: sempre montato, cosi' i pulsanti della pagina restano al loro posto. Il riquadro non cattura i tocchi: solo i pulsanti */}
+            <div data-open={dialOpen} className="dial-wrap fixed inset-x-0 z-50 max-h-[calc(100dvh-13rem)] overflow-y-auto px-4 py-1 scrollbar-hide lg:hidden"
+                style={{ bottom: "calc(6.5rem + env(safe-area-inset-bottom))", "--n": total } as React.CSSProperties}>
                 <div className="mx-auto flex max-w-sm flex-col-reverse gap-3">
-                    <div ref={mobile?.setActionsSlot} className="flex flex-col items-center gap-2 empty:hidden" />
+                    <div ref={mobile?.setActionsSlot} className="dial-slot flex flex-col items-center gap-3 empty:hidden" />
                     <ul className="flex flex-col-reverse gap-3">
                         {dial.map((a, i) => {
                             const inner = (
-                                <span className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-3">
-                                    <span className="justify-self-end rounded-full bg-white px-3 py-1.5 text-sm font-medium text-slate-800 shadow-md">{a.label}</span>
-                                    <span className={cn("grid h-12 w-12 place-items-center rounded-full text-white shadow-lg [&_svg]:h-5 [&_svg]:w-5", a.page ? "bg-blue-600" : "bg-slate-700")}>{a.icon}</span>
-                                    <span />
-                                </span>
+                                <>
+                                    <span className="dial-ico">{a.icon}</span>
+                                    <span>{a.label}</span>
+                                </>
                             );
-                            const cls = "block w-full";
                             return (
-                                <li key={a.key}>
+                                <li key={a.key} className="dial-item" style={{ "--i": slotCount + i } as React.CSSProperties}>
                                     {a.href ? (
-                                        <Link href={a.href} prefetch={false} onClick={() => setDialOpen(false)} className={cls}>{inner}</Link>
+                                        <Link href={a.href} prefetch={false} onClick={() => setDialOpen(false)} className="dial-pill">{inner}</Link>
                                     ) : (
-                                        <button type="button" className={cls} onClick={() => { setDialOpen(false); a.onClick?.(); }}>{inner}</button>
+                                        <button type="button" className="dial-pill" onClick={() => { setDialOpen(false); a.onClick?.(); }}>{inner}</button>
                                     )}
                                 </li>
                             );
@@ -156,8 +174,8 @@ export function MobileNavBar() {
             {/* Barra: fascia scura con incavo al centro che accoglie il cerchio */}
             <div className="fixed inset-x-0 bottom-0 z-50 lg:hidden">
                 {/* Menu Naviga: la fascia stessa che sale, stessa tinta della barra */}
-                {navOpen && (
-                    <div className="relative -mb-[38px] max-h-[calc(100dvh-9rem)] overflow-y-auto overscroll-contain rounded-t-3xl bg-slate-800 px-4 pb-[50px] pt-5 text-slate-100 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] animate-in slide-in-from-bottom-6 fade-in duration-200">
+                {navP.mounted && (
+                    <div className={cn("relative -mb-[38px] max-h-[calc(100dvh-9rem)] overflow-y-auto overscroll-contain rounded-t-3xl bg-slate-800 px-4 pb-[50px] pt-5 text-slate-100 shadow-[0_-8px_24px_rgba(0,0,0,0.35)]", panelMotion(navP.shown))}>
                         {navSection && (
                             <div className="mb-4 space-y-3">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{navSection.title}</p>
@@ -228,7 +246,7 @@ export function MobileNavBar() {
                         )}
                     </div>
                 )}
-                {searchOpen && <MobileSearchSheet onClose={() => setSearchOpen(false)} />}
+                {searchP.mounted && <MobileSearchSheet onClose={() => setSearchOpen(false)} className={panelMotion(searchP.shown)} />}
                 <div className="relative flex h-16 items-stretch">
                     <button type="button" onClick={() => { setDialOpen(false); setSearchOpen(false); setNavOpen(o => !o); }} className={cn(sideButton, "bg-slate-800")} aria-label={navOpen ? "Chiudi il menu" : "Naviga tra le pagine"} aria-expanded={navOpen}>
                         {navOpen ? <X className="h-5 w-5" /> : <LayoutGrid className="h-5 w-5" />}
@@ -240,8 +258,8 @@ export function MobileNavBar() {
                     </svg>
 
                     <button type="button" onClick={() => { setNavOpen(false); setSearchOpen(false); setDialOpen(o => !o); }} aria-label={dialOpen ? "Chiudi le azioni" : "Azioni"} aria-expanded={dialOpen}
-                        className={cn("absolute left-1/2 top-0 grid h-14 w-14 -translate-x-1/2 -translate-y-[22px] place-items-center rounded-full bg-blue-600 text-white shadow-lg ring-4 ring-slate-800/10 transition-all active:scale-95", (navOpen || searchOpen) && "pointer-events-none scale-50 opacity-0")}>
-                        <span className={cn("transition-transform duration-200", dialOpen && "rotate-90")}>
+                        className={cn("absolute left-1/2 top-0 grid h-14 w-14 -translate-x-1/2 -translate-y-[22px] place-items-center rounded-full bg-blue-600 text-white shadow-lg ring-4 ring-slate-800/10 transition-all duration-300 active:scale-95", (navOpen || searchOpen) && "pointer-events-none scale-50 opacity-0")}>
+                        <span className={cn("transition-transform duration-300", dialOpen && "rotate-180")}>
                             {dialOpen ? <X className="h-6 w-6" /> : <Zap className="h-6 w-6" />}
                         </span>
                         {!dialOpen && pageActions.length + slotCount > 0 && (

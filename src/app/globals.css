@@ -400,3 +400,83 @@ div[class~="border"]:has(> [data-slot="table-container"]):not([data-slot="card"]
   0%, 18% { transform: translateX(0); }
   82%, 100% { transform: translateX(var(--shift)); }
 }
+
+/* Menu «Azioni» da telefono: pulsanti a pillola tutti uguali (icona tonda + nome) che salgono dal tasto centrale a cascata e rientrano al contrario */
+.dial-wrap {
+  pointer-events: none;
+  visibility: hidden;
+  transition: visibility 0s linear calc(var(--n, 1) * 40ms + 380ms);
+}
+.dial-wrap[data-open="true"] {
+  visibility: visible;
+  transition-delay: 0s;
+}
+.dial-item,
+.dial-slot > * {
+  --o: calc(var(--i, 0) * 55ms);
+  --c: calc((var(--n, 1) - 1 - var(--i, 0)) * 40ms);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(calc(var(--i, 0) * 3.6rem + 2.5rem)) scale(0.6);
+  transition: transform 0.38s cubic-bezier(0.5, 0, 0.75, 0), opacity 0.25s ease-in;
+  transition-delay: var(--c);
+}
+.dial-wrap[data-open="true"] .dial-item,
+.dial-wrap[data-open="true"] .dial-slot > * {
+  pointer-events: auto;
+  opacity: 1;
+  transform: none;
+  transition: transform 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.15), opacity 0.3s ease-out;
+  transition-delay: var(--o);
+}
+.dial-pill,
+.dial-slot > :is(button, a) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  height: 3rem;
+  width: min(17rem, 100%);
+  margin-inline: auto;
+  padding: 0.25rem 1.25rem;
+  border: 0;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #ffffff, #e6edfb);
+  color: #1e293b;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: left;
+  line-height: 1.1;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.35), inset 0 1px 0 #fff, inset 0 -3px 4px rgba(15, 23, 42, 0.1);
+}
+.dial-slot > :is(button, a):hover {
+  background: linear-gradient(135deg, #ffffff, #e6edfb);
+  color: #1e293b;
+}
+.dial-pill:has(> .dial-ico),
+.dial-slot > :is(button, a):has(> svg:first-child) {
+  padding-left: 0.25rem;
+}
+.dial-ico,
+.dial-slot > :is(button, a) > svg:first-child {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0.6rem;
+  border-radius: 9999px;
+  color: #fff;
+  background: radial-gradient(circle at 32% 24%, #60a5fa, #2563eb 62%);
+  box-shadow: 0 3px 6px rgba(15, 23, 42, 0.35), inset 0 2px 3px rgba(255, 255, 255, 0.45), inset 0 -3px 5px rgba(0, 0, 0, 0.25);
+}
+.dial-ico > svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.dial-slot > :is(button, a) > svg:last-child:not(:first-child) {
+  margin-left: auto;
+  width: 1rem;
+  height: 1rem;
+  color: #64748b;
+}
