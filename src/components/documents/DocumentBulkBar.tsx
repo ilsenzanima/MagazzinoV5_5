@@ -1,9 +1,9 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { Download, Loader2, Printer, X } from "lucide-react"
+import { Download, Printer } from "lucide-react"
 import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
+import { SelectionBar, BulkButton } from "@/components/ui/row-actions"
 import { DocLike, downloadDocuments, printDocuments } from "@/lib/document-actions"
 
 // Selezione dei documenti in tabella
@@ -56,17 +56,9 @@ export function DocumentBulkBar({ docs, onClear }: { docs: DocLike[]; onClear: (
     }
 
     return (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm dark:border-blue-900 dark:bg-blue-950/30">
-            <span className="font-medium text-blue-800 dark:text-blue-200">{docs.length} {docs.length === 1 ? "documento selezionato" : "documenti selezionati"}</span>
-            <div className="ml-auto flex flex-wrap items-center gap-2">
-                <Button size="sm" variant="outline" disabled={busy !== null} onClick={print}>
-                    {busy === "print" ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Printer className="mr-1.5 h-4 w-4" />}Stampa
-                </Button>
-                <Button size="sm" variant="outline" disabled={busy !== null} onClick={download}>
-                    {busy === "download" ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Download className="mr-1.5 h-4 w-4" />}Scarica{docs.length > 1 ? " (zip)" : ""}
-                </Button>
-                <Button size="sm" variant="ghost" onClick={onClear} aria-label="Deseleziona"><X className="h-4 w-4" /></Button>
-            </div>
-        </div>
+        <SelectionBar count={docs.length} singular="documento selezionato" plural="documenti selezionati" onClear={onClear}>
+            <BulkButton icon={<Printer />} busy={busy === "print"} disabled={busy !== null} onClick={print}>Stampa</BulkButton>
+            <BulkButton icon={<Download />} busy={busy === "download"} disabled={busy !== null} onClick={download}>Scarica{docs.length > 1 ? " (zip)" : ""}</BulkButton>
+        </SelectionBar>
     )
 }
