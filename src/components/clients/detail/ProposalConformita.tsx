@@ -188,7 +188,7 @@ export function ProposalConformita({ proposalId }: Props) {
                             </TableHead>
                             <TableHead className={`w-36 ${head}`}>Marca</TableHead>
                             <TableHead className={`w-[28%] ${head}`}>Nota</TableHead>
-                            <TableHead className="w-24" />
+                            <TableHead className="w-20" />
                         </TableRow>
                     </TableHeader>
                     <TableBody>

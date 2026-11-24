@@ -199,7 +199,7 @@ export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel, onEd
                             <TableHead className="w-1/3 border-r text-xs font-semibold uppercase tracking-wide text-slate-600"><button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">Nome{sortIcon('name')}</button></TableHead>
                             <TableHead className="border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Nota</TableHead>
                             <TableHead className="w-36 border-r text-xs font-semibold uppercase tracking-wide text-slate-600"><button type="button" onClick={() => toggleSort('date')} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">Creata il{sortIcon('date')}</button></TableHead>
-                            <TableHead className="w-36" />
+                            <TableHead className="w-20" />
                         </TableRow>
                     </TableHeader>
                     <TableBody>

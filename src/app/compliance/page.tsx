@@ -639,7 +639,7 @@ function ComplianceContent() {
                                     <TableHead className={`w-64 ${headCls}`}>Note</TableHead>
                                     <TableHead className={`w-28 ${headCls}`}>Bolla</TableHead>
                                     <TableHead className={`w-28 ${headCls}`}>{sortBtn("date", "Data")}</TableHead>
-                                    <TableHead className="w-24" />
+                                    <TableHead className="w-28" />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
