@@ -758,7 +758,7 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                                     <TableHead className={`w-28 ${TABLE_HEAD_CLS}`}>{sortBtn("date", "Data")}</TableHead>
                                     <TableHead className={`w-28 ${TABLE_HEAD_CLS}`}>{sortBtn("size", "Dimensione")}</TableHead>
                                     <TableHead className={`w-[20%] ${TABLE_HEAD_CLS}`}>Nota</TableHead>
-                                    <TableHead className="w-12" />
+                                    <TableHead className="w-20" />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1272,7 +1272,7 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
                                         </div>
                                     </TableHead>
                                     <TableHead className={`w-[24%] ${TABLE_HEAD_CLS}`}>Nota</TableHead>
-                                    <TableHead className="w-12" />
+                                    <TableHead className="w-20" />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>

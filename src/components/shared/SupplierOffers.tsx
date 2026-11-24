@@ -350,7 +350,7 @@ export function SupplierOffers({ jobId, proposalId, jobLabel, inStrip }: Props) 
                                     </TableHead>
                                     <TableHead className={`w-28 ${TABLE_HEAD_CLS}`}>{sortBtn("date", "Data")}</TableHead>
                                     <TableHead className={`w-[28%] ${TABLE_HEAD_CLS}`}>Nota</TableHead>
-                                    <TableHead className="w-12" />
+                                    <TableHead className="w-20" />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>

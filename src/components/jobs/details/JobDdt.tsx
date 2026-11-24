@@ -215,7 +215,7 @@ function DdtTable({ rows: allRows, onOpenNote, onOpenUrl, onDisassociate }: {
               </TableHead>
               <TableHead className={`w-28 ${TABLE_HEAD_CLS}`}>{sortBtn("date", "Data", "desc")}</TableHead>
               <TableHead className={TABLE_HEAD_CLS}>Materiali</TableHead>
-              <TableHead className="w-16" />
+              <TableHead className="w-20" />
             </TableRow>
           </TableHeader>
           <TableBody>

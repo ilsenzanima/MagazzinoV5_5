@@ -378,7 +378,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                     />
                   </TableHead>
                   <TableHead className={headCls}>Articoli</TableHead>
-                  <TableHead className="w-16" />
+                  <TableHead className="w-20" />
                 </TableRow>
               </TableHeader>
               <TableBody>

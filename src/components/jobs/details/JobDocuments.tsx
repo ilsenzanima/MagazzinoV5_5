@@ -837,7 +837,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
                       <TableHead className={`w-28 ${headCls}`}>{sortBtn("date", "Data")}</TableHead>
                       <TableHead className={`w-28 ${headCls}`}>{sortBtn("size", "Dimensione")}</TableHead>
                       <TableHead className={`w-[22%] ${headCls}`}>Nota</TableHead>
-                      <TableHead className="w-12" />
+                      <TableHead className="w-20" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
