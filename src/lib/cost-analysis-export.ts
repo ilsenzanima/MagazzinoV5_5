@@ -72,12 +72,12 @@ export async function printCostAnalysesPdf(inputs: CostAnalysisPdfInput[]): Prom
     if (inputs.length === 0) return;
     const { printPdfBlob } = await import('@/lib/document-actions');
     const pdfs = await buildPdfs(inputs);
-    if (pdfs.length === 1) { await printPdfBlob(pdfs[0].blob); return; }
+    if (pdfs.length === 1) { void printPdfBlob(pdfs[0].blob).catch(e => console.error("Stampa non riuscita", e)); return; }
     const { PDFDocument } = await import('pdf-lib');
     const out = await PDFDocument.create();
     for (const p of pdfs) {
         const src = await PDFDocument.load(await p.blob.arrayBuffer(), { ignoreEncryption: true });
         (await out.copyPages(src, src.getPageIndices())).forEach(pg => out.addPage(pg));
     }
-    await printPdfBlob(new Blob([await out.save() as BlobPart], { type: 'application/pdf' }));
+    void printPdfBlob(new Blob([await out.save() as BlobPart], { type: 'application/pdf' })).catch(e => console.error("Stampa non riuscita", e));
 }

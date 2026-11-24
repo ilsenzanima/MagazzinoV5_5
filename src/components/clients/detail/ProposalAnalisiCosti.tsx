@@ -400,7 +400,7 @@ export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionN
     }
 
     const handlePrint = async () => {
-        try { setPrinting(true); const { blob } = await generateCostAnalysisPdfBlob(exportInput()); await printPdfBlob(blob) }
+        try { setPrinting(true); const { blob } = await generateCostAnalysisPdfBlob(exportInput()); void printPdfBlob(blob).catch(e => console.error("Stampa non riuscita", e)) }
         catch { notify.error("Errore durante la stampa") }
         finally { setPrinting(false) }
     }
