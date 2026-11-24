@@ -756,6 +756,7 @@ export function JobCommessaDocuments({ jobId, jobLabel }: JobCommessaDocumentsPr
           title={collection.title}
           docs={collection.docs}
           onBack={closeCollection}
+          backLabel="Documenti Commessa"
           onMoveSelected={docs => openMove(docs)}
           onDeleteSelected={docs => { setBulkDeleteDocs(docs); setBulkDeleteOpen(true) }}
           onAdd={() => openUpload({ typeId: openCollection!.typeId, folderId: openCollection!.folderId })}

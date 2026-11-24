@@ -607,7 +607,7 @@ function NewPurchaseContent() {
           <BlockBrowserBack />
             <div className="pb-10">
                 <div className="mb-6">
-                    <Link href={fromOrderIds.length > 0 ? "/purchases?tab=ordini" : isOrder ? "/purchases?tab=ordini" : "/purchases"} className="flex items-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 mb-2">
+                    <Link href={fromOrderIds.length > 0 ? "/purchases?tab=ordini" : isOrder ? "/purchases?tab=ordini" : "/purchases"} className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 mb-2">
                         <ArrowLeft className="h-4 w-4 mr-1" />
                         {fromOrderIds.length > 0 ? "Torna agli Ordini" : isOrder ? "Torna agli Ordini" : "Torna agli Acquisti"}
                     </Link>

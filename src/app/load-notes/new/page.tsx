@@ -255,7 +255,7 @@ export default function NewLoadNotePage() {
           <BlockBrowserBack />
             <div className="pb-10 overflow-hidden">
                 <div className="mb-6">
-                    <Link href="/load-notes" className="flex items-center text-muted-foreground hover:text-foreground mb-2">
+                    <Link href="/load-notes" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2">
                         <ArrowLeft className="h-4 w-4 mr-1" />
                         Torna alle Note
                     </Link>

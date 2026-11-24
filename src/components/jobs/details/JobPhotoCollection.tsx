@@ -3,11 +3,11 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ArrowLeft, Upload, Images, CheckSquare, FolderInput, Trash2, X, Download, Printer, FileText, Loader2 } from "lucide-react"
+import { Upload, FolderInput, Trash2, X, Download, Printer, FileText, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { downloadDocuments, downloadPhotosPdf, printPhotos } from "@/lib/document-actions"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { NotchActions, NotchButton, NotchSearch } from "@/components/ui/notch-tabs"
+import { NotchActions, NotchSearch, NotchTabs, NotchBack } from "@/components/ui/notch-tabs"
 import { FloatingAddButton } from "@/components/ui/floating-add-button"
 import { PhoneSearchPortal, usePhone } from "@/components/layout/mobile-actions"
 import { format } from "date-fns"
@@ -76,11 +76,12 @@ interface JobPhotoCollectionProps<T extends PhotoDocLike> {
   menu: (doc: T) => ReactNode
   onMoveSelected: (docs: T[]) => void
   onDeleteSelected: (docs: T[]) => void
+  // false quando la pagina ha già la sua striscia scura (es. Conformità): ricerca e pulsanti vanno in quella
+  withStrip?: boolean
 }
 
 // Pagina di una raccolta di foto (un tipo, o una cartella di quel tipo)
-export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack, backLabel = "Documenti Cantiere", onAdd, onOpen, menu, onMoveSelected, onDeleteSelected }: JobPhotoCollectionProps<T>) {
-  const [selectMode, setSelectMode] = useState(false)
+export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack, backLabel = "Documenti Cantiere", onAdd, onOpen, menu, onMoveSelected, onDeleteSelected, withStrip = true }: JobPhotoCollectionProps<T>) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState<SortKey>("recent")
@@ -114,6 +115,7 @@ export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack
 
   const selectedDocs = shown.filter(d => selected.has(d.id))
   const allSelected = shown.length > 0 && selectedDocs.length === shown.length
+  const selecting = selected.size > 0
   const toggle = (id: string) => setSelected(prev => {
     const next = new Set(prev)
     if (next.has(id)) next.delete(id); else next.add(id)
@@ -132,7 +134,7 @@ export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack
       toast.error("Operazione non riuscita")
     } finally { if (t) toast.dismiss(t); setBusy(null) }
   }
-  const exitSelect = () => { setSelectMode(false); setSelected(new Set()) }
+  const exitSelect = () => setSelected(new Set())
 
   const sortSelect = (
     <Select value={sort} onValueChange={v => setSort(v as SortKey)}>
@@ -145,40 +147,23 @@ export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack
     </Select>
   )
 
-  return (
+  const body = (
     <div className="space-y-4">
-      {/* Ricerca, ordinamento e selezione stanno nella striscia in alto (su telefono: Cerca e Azioni della barra in basso) */}
+      {/* Ricerca e ordinamento stanno nella striscia in alto (su telefono: Cerca e Azioni della barra in basso) */}
       <NotchSearch value={search} onChange={setSearch} placeholder="Cerca per nome o nota..." />
       {phone
         ? <PhoneSearchPortal title={title}>{sortSelect}</PhoneSearchPortal>
         : <NotchActions>{sortSelect}</NotchActions>}
-      {docs.length > 0 && !selectMode && (
-        <NotchActions>
-          <NotchButton type="button" onClick={() => setSelectMode(true)}>
-            <CheckSquare />Seleziona
-          </NotchButton>
-        </NotchActions>
-      )}
+      <NotchBack onClick={onBack}>{backLabel}</NotchBack>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="sm" className="-ml-2 text-slate-600" onClick={onBack}>
-          <ArrowLeft className="mr-1.5 h-4 w-4" />{backLabel}
-        </Button>
-      </div>
+      <p className="text-sm text-slate-500">{search.trim() ? `${shown.length} di ${docs.length} foto` : `${docs.length} foto`}</p>
 
-      <div className="flex items-baseline gap-3">
-        <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-800 dark:text-slate-100">
-          <Images className="h-5 w-5 text-blue-600" />{title}
-        </h2>
-        <span className="text-sm text-slate-500">{search.trim() ? `${shown.length} di ${docs.length} foto` : `${docs.length} foto`}</span>
-      </div>
-
-      {selectMode && (
+      {selecting && (
         <div className="sticky top-2 z-10 flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 shadow-sm dark:border-blue-900 dark:bg-slate-900">
           <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
             <Checkbox
-              checked={allSelected}
-              onCheckedChange={v => setSelected(v ? new Set(shown.map(d => d.id)) : new Set())}
+              checked={allSelected ? true : selecting ? "indeterminate" : false}
+              onCheckedChange={v => setSelected(v === true ? new Set(shown.map(d => d.id)) : new Set())}
               aria-label="Seleziona tutte"
             />
             {selectedDocs.length > 0 ? `${selectedDocs.length} selezionate` : "Seleziona tutte"}
@@ -217,18 +202,16 @@ export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack
                 <button
                   type="button"
                   className="block w-full"
-                  onClick={() => (selectMode ? toggle(doc.id) : onOpen(doc))}
+                  onClick={() => (selecting ? toggle(doc.id) : onOpen(doc))}
                   title={doc.notes ? `${doc.name} — ${doc.notes}` : doc.name}
                 >
                   <PhotoThumb doc={doc} className={`aspect-square w-full transition-opacity ${isSel ? "opacity-80" : ""}`} />
                 </button>
-                {selectMode ? (
-                  <div className="pointer-events-none absolute left-1.5 top-1.5 rounded bg-white/90 p-0.5 shadow-sm">
-                    <Checkbox checked={isSel} aria-label={`Seleziona ${doc.name}`} />
-                  </div>
-                ) : (
-                  <div className="absolute right-1 top-1 rounded-md bg-white/90 shadow-sm dark:bg-slate-900/90">{menu(doc)}</div>
-                )}
+                {/* Casella sempre visibile sull'icona: basta spuntare una foto per selezionare */}
+                <div className={`absolute left-1.5 top-1.5 rounded bg-white/90 p-0.5 shadow-sm ${isSel ? "" : "opacity-90 hover:opacity-100"}`}>
+                  <Checkbox checked={isSel} onCheckedChange={() => toggle(doc.id)} aria-label={`Seleziona ${doc.name}`} />
+                </div>
+                <div className="absolute right-1 top-1 rounded-md bg-white/90 shadow-sm dark:bg-slate-900/90">{menu(doc)}</div>
                 <div className="px-2 py-1.5">
                   <p className="truncate text-xs font-medium text-slate-800 dark:text-slate-100">{doc.name}</p>
                   <p className="truncate text-[11px] text-slate-500">
@@ -244,4 +227,6 @@ export function JobPhotoCollection<T extends PhotoDocLike>({ title, docs, onBack
       <FloatingAddButton onClick={onAdd} label="Aggiungi foto" icon={<Upload className="h-6 w-6" />} />
     </div>
   )
+
+  return withStrip ? <NotchTabs title={title}>{body}</NotchTabs> : body
 }

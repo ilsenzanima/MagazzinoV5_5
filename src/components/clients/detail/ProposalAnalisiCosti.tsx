@@ -5,9 +5,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, PlusCircle, X, Download, Package, FileText, Calculator, ArrowLeft, Truck, Save, Undo2, Search, Printer, Zap, ChevronDown, HardHat } from "lucide-react"
+import { Loader2, PlusCircle, X, Download, Package, FileText, Calculator, Truck, Save, Undo2, Search, Printer, Zap, ChevronDown, HardHat } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { NotchActions, NotchButton } from "@/components/ui/notch-tabs"
+import { NotchActions, NotchButton, NotchBack } from "@/components/ui/notch-tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { proposalCostAnalysisApi } from "@/lib/services/proposal-cost-analysis"
 import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams, effectiveUnitPrice } from "@/lib/services/cost-analysis"
@@ -474,10 +474,8 @@ export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionN
                 </DropdownMenu>
             </NotchActions>
 
-            <div className="flex flex-wrap items-center gap-3">
-                <Button size="sm" variant="ghost" onClick={handleBack}><ArrowLeft className="h-4 w-4 mr-1" />Torna alle versioni</Button>
-                {dirty && <span className="text-xs text-amber-600 dark:text-amber-400">Modifiche non salvate · PDF, Excel e stampa le includono</span>}
-            </div>
+            <NotchBack onClick={handleBack}>Torna alle versioni</NotchBack>
+            {dirty && <p className="text-xs text-amber-600 dark:text-amber-400">Modifiche non salvate · PDF, Excel e stampa le includono</p>}
 
             <Card>
                 <div className="flex items-center gap-3 p-4 border-b">

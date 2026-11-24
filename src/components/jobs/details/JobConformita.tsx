@@ -701,6 +701,7 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                 <JobPhotoCollection
                     title={collection.title}
                     backLabel="Conformità Personalizzata"
+                    withStrip={false}
                     docs={collection.docs}
                     onBack={closeCollection}
                     onMoveSelected={list => openMove(list)}
