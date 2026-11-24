@@ -21,6 +21,17 @@ import { supabase } from "@/lib/supabase"
 import { leaveRequestsApi } from "@/lib/api"
 import { AGENDA_KINDS, AgendaInput, AgendaItem, AgendaKind, agendaApi, getAutoItems, kindInfo, todayIso } from "@/lib/services/agenda"
 
+// Un pulsante di creazione per ogni tipo di voce
+const NEW_ACTIONS: { kind: AgendaKind; label: string }[] = [
+  { kind: "appuntamento", label: "Nuovo appuntamento" },
+  { kind: "scadenza", label: "Nuova scadenza" },
+  { kind: "consegna", label: "Nuova consegna materiale" },
+  { kind: "visita", label: "Nuova visita medica" },
+  { kind: "corso", label: "Nuovo corso" },
+  { kind: "permesso", label: "Nuovo permesso / ferie" },
+  { kind: "nota", label: "Nuova nota" },
+]
+
 const headCls = "text-xs font-semibold uppercase tracking-wide text-slate-600"
 
 const emptyForm = (): AgendaInput => ({
@@ -106,7 +117,7 @@ function AgendaContent() {
 
   const overdueCount = open.filter(i => (i.endDate ?? i.date) < todayIso()).length
 
-  const openCreate = () => { setEditingId(null); setForm(emptyForm()); setDialogOpen(true) }
+  const openCreate = (kind: AgendaKind = "appuntamento") => { setEditingId(null); setForm({ ...emptyForm(), kind }); setDialogOpen(true) }
   const openEdit = (i: AgendaItem) => {
     setEditingId(i.id)
     setForm({ title: i.title, kind: i.kind, date: i.date, time: i.time, endDate: i.endDate, location: i.location, notes: i.notes, workerId: i.workerId, jobId: i.jobId, remindDaysBefore: i.remindDaysBefore })
@@ -248,7 +259,7 @@ function AgendaContent() {
         </Table>
       </div>
 
-      <FloatingAddButton onClick={openCreate} label="Nuova voce" />
+      <FloatingAddButton actions={NEW_ACTIONS.map(a => ({ label: a.label, onClick: () => openCreate(a.kind) }))} />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
