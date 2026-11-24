@@ -13,10 +13,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
-import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen, Edit, ChevronDown, ChevronRight, Receipt, ClipboardList, ExternalLink, Truck, CheckCircle2, Undo2, RotateCcw } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Loader2, AlertTriangle, Save, Search, X, Pen, Edit, ChevronDown, ChevronRight, Receipt, ClipboardList, ExternalLink, Truck, CheckCircle2, Undo2, RotateCcw, Upload, Camera } from "lucide-react";
 import Link from "next/link";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Fragment, useState, useEffect, useCallback } from "react";
+import { Fragment, useState, useEffect, useCallback, useRef } from "react";
+import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { useParams, useRouter } from "next/navigation";
 import {
     suppliersApi,
@@ -32,7 +33,7 @@ import {
 } from "@/lib/api";
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { PurchaseLineDialog, PurchaseLineResult } from "@/components/purchases/PurchaseLineDialog";
-import { PurchaseDocuments } from "@/components/purchases/details/PurchaseDocuments";
+import { PurchaseDocuments, type PurchaseDocumentsHandle } from "@/components/purchases/details/PurchaseDocuments";
 import { PurchaseDDTConformita } from "@/components/purchases/details/PurchaseDDTConformita";
 import { useAuth } from "@/components/auth-provider";
 import { formatCurrency } from "@/lib/utils/format";
@@ -120,6 +121,7 @@ export default function PurchaseDetailPage() {
 
     // Edit Header State
     const [isEditingHeader, setIsEditingHeader] = useState(false);
+    const docsRef = useRef<PurchaseDocumentsHandle>(null);
     const [editNumber, setEditNumber] = useState("");
     const [editDate, setEditDate] = useState("");
     const [editSupplierId, setEditSupplierId] = useState("");
@@ -1137,6 +1139,8 @@ export default function PurchaseDetailPage() {
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <PurchaseDocuments
+                            ref={docsRef}
+                            canDelete={isEditingHeader}
                             purchaseId={id}
                             documentUrls={purchase.documentUrls}
                             onUpdate={loadData}
@@ -2161,6 +2165,15 @@ export default function PurchaseDetailPage() {
                     />
                 </div >
             </div >
+            {(userRole === 'admin' || userRole === 'operativo') && !isEditingHeader && (
+                <FloatingAddButton
+                    icon={<Upload className="h-6 w-6" />}
+                    actions={[
+                        { label: "Carica documento", onClick: () => docsRef.current?.openPicker() },
+                        { label: "Scansiona documento", onClick: () => docsRef.current?.openScanner() },
+                    ]}
+                />
+            )}
         </DashboardLayout >
 
         <ConfirmDeleteDialog

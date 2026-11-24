@@ -3,10 +3,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { confirmDialog } from "@/components/ui/confirm-host";
 import { Button } from "@/components/ui/button"
-import { NotchButton } from "@/components/ui/notch-tabs"
-import { FileText, Upload, Trash2, ExternalLink, Loader2, Camera } from "lucide-react"
+import { FileText, Trash2, ExternalLink, Loader2 } from "lucide-react"
 import { purchasesApi } from "@/lib/api"
-import { useState } from "react"
+import { forwardRef, useImperativeHandle, useRef, useState } from "react"
 import { DocumentScanner } from "@/components/ui/document-scanner"
 import { notify } from "@/lib/notify"
 import { createClient } from "@/lib/supabase/client"
@@ -20,9 +19,16 @@ interface PurchaseDocumentsProps {
   onUpdate: () => void;
   isOrder?: boolean;
   supplierName?: string;
+  // L'eliminazione compare solo in modifica
+  canDelete?: boolean;
 }
 
-export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isOrder = false, supplierName }: PurchaseDocumentsProps) {
+// Carica e scansiona si avviano da fuori (pulsante flottante a pillole)
+export interface PurchaseDocumentsHandle { openPicker: () => void; openScanner: () => void }
+
+export const PurchaseDocuments = forwardRef<PurchaseDocumentsHandle, PurchaseDocumentsProps>(function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isOrder = false, supplierName, canDelete = false }, ref) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  useImperativeHandle(ref, () => ({ openPicker: () => inputRef.current?.click(), openScanner: () => setShowScanner(true) }));
   const supabase = createClient();
   const [isUploading, setIsUploading] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
@@ -131,30 +137,16 @@ export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isO
       >
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 py-4">
           <CardTitle className="text-base font-semibold">{isOrder ? "Documenti (Ordine)" : "Documenti (DDT / Fattura)"}</CardTitle>
-          <div className="flex gap-2 shrink-0">
-            <NotchButton
-              type="button"
-              onClick={() => setShowScanner(true)}
-              disabled={isUploading}
-            >
-              <Camera />
-              <span className="hidden sm:inline">Scansiona</span>
-            </NotchButton>
-            <div className="relative">
-              <input
-                type="file"
-                multiple
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                onChange={handleFileUpload}
-                disabled={isUploading}
-                accept=".pdf,.jpg,.jpeg,.png"
-              />
-              <NotchButton type="button" disabled={isUploading}>
-                {isUploading ? <Loader2 className="animate-spin" /> : <Upload />}
-                <span className="hidden sm:inline">{isUploading ? "Caricamento..." : "Carica"}</span>
-              </NotchButton>
-            </div>
-          </div>
+          <input
+            ref={inputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={handleFileUpload}
+            disabled={isUploading}
+            accept=".pdf,.jpg,.jpeg,.png"
+          />
+          {isUploading && <span className="flex items-center text-xs text-slate-500"><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Caricamento...</span>}
         </CardHeader>
         <CardContent>
           {uploadingFiles.length > 0 && (
@@ -187,7 +179,7 @@ export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isO
                       </button>
                     </div>
                   </div>
-                  <Button
+                  {canDelete && <Button
                     variant="ghost"
                     size="icon"
                     className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 flex-shrink-0"
@@ -195,7 +187,7 @@ export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isO
                     disabled={deletingIndex !== null}
                   >
                     {deletingIndex === index ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                  </Button>
+                  </Button>}
                 </div>
               ))}
             </div>
@@ -203,7 +195,7 @@ export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isO
             <div className="text-center py-6 text-slate-400 dark:text-slate-500 border-2 border-dashed dark:border-slate-600 rounded-md bg-slate-50/50 dark:bg-slate-800/50">
               <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
               <p className="text-sm">
-                {isDragging ? "Rilascia i file qui..." : "Trascina qui uno o più file o usa il pulsante Carica"}
+                {isDragging ? "Rilascia i file qui..." : "Trascina qui uno o più file o usa il pulsante + in basso"}
               </p>
             </div>
           )}
@@ -217,4 +209,4 @@ export function PurchaseDocuments({ purchaseId, documentUrls = [], onUpdate, isO
       />
     </>
   );
-}
+});

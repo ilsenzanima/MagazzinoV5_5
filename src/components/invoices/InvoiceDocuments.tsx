@@ -3,9 +3,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { confirmDialog } from "@/components/ui/confirm-host";
 import { Button } from "@/components/ui/button"
-import { FileText, Upload, Trash2, ExternalLink, Loader2 } from "lucide-react"
+import { FileText, Trash2, ExternalLink, Loader2 } from "lucide-react"
 import { invoicesApi } from "@/lib/api"
-import { useState } from "react"
+import { forwardRef, useImperativeHandle, useRef, useState } from "react"
 import { notify } from "@/lib/notify"
 import { createClient } from "@/lib/supabase/client"
 import { deleteDriveFileIfApplicable } from "@/lib/services/utils"
@@ -22,9 +22,14 @@ interface InvoiceDocumentsProps {
   field?: 'document_urls' | 'credit_note_document_urls';
   kind?: 'invoice' | 'credit_note';
   title?: string;
+  // L'eliminazione compare solo quando la fattura è in modifica
+  canDelete?: boolean;
 }
 
-export function InvoiceDocuments({
+// Il caricamento si avvia da fuori (pulsante flottante a pillole)
+export interface InvoiceDocumentsHandle { openPicker: () => void }
+
+export const InvoiceDocuments = forwardRef<InvoiceDocumentsHandle, InvoiceDocumentsProps>(function InvoiceDocuments({
   invoiceId,
   documentUrls = [],
   onUpdate,
@@ -32,7 +37,10 @@ export function InvoiceDocuments({
   field = 'document_urls',
   kind = 'invoice',
   title = 'Documenti Fattura',
-}: InvoiceDocumentsProps) {
+  canDelete = false,
+}, ref) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  useImperativeHandle(ref, () => ({ openPicker: () => inputRef.current?.click() }));
   const supabase = createClient();
   const [isUploading, setIsUploading] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
@@ -125,20 +133,16 @@ export function InvoiceDocuments({
     >
       <CardHeader className="flex flex-row items-center justify-between py-4">
         <CardTitle className="text-base font-semibold">{title}</CardTitle>
-        <div className="relative">
-          <input
-            type="file"
-            multiple
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-            onChange={handleFileUpload}
-            disabled={isUploading}
-            accept=".pdf,.jpg,.jpeg,.png"
-          />
-          <Button variant="outline" size="sm" disabled={isUploading}>
-            {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-            <span className="hidden sm:inline">{isUploading ? "Caricamento..." : "Carica"}</span>
-          </Button>
-        </div>
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={handleFileUpload}
+          disabled={isUploading}
+          accept=".pdf,.jpg,.jpeg,.png"
+        />
+        {isUploading && <span className="flex items-center text-xs text-slate-500"><Loader2 className="mr-1.5 h-4 w-4 animate-spin" />Caricamento...</span>}
       </CardHeader>
       <CardContent>
         {uploadingFiles.length > 0 && (
@@ -171,7 +175,7 @@ export function InvoiceDocuments({
                     </button>
                   </div>
                 </div>
-                <Button
+                {canDelete && <Button
                   variant="ghost"
                   size="icon"
                   className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 flex-shrink-0"
@@ -179,7 +183,7 @@ export function InvoiceDocuments({
                   disabled={deletingIndex !== null}
                 >
                   {deletingIndex === index ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                </Button>
+                </Button>}
               </div>
             ))}
           </div>
@@ -187,11 +191,11 @@ export function InvoiceDocuments({
           <div className="text-center py-6 text-slate-400 dark:text-slate-500 border-2 border-dashed dark:border-slate-600 rounded-md bg-slate-50/50 dark:bg-slate-800/50">
             <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p className="text-sm">
-              {isDragging ? "Rilascia i file qui..." : "Trascina qui uno o più file o usa il pulsante Carica"}
+              {isDragging ? "Rilascia i file qui..." : "Trascina qui uno o più file o usa il pulsante + in basso"}
             </p>
           </div>
         )}
       </CardContent>
     </Card>
   );
-}
+});

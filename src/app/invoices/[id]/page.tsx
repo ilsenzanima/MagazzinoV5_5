@@ -10,20 +10,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
     ArrowLeft, FileText, Calendar, User, Loader2, ExternalLink,
-    Trash2, ChevronDown, ChevronRight, Pencil, X, Save, Plus, Lock, Unlock, Truck, CheckCircle2, Undo2
+    Trash2, Upload, Pencil, X, Save, Plus, Lock, Unlock, Truck, CheckCircle2, Undo2
 } from "lucide-react";
 import Link from "next/link";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { invoicesApi, purchasesApi, suppliersApi, supplierGroupsApi, Invoice, Supplier } from "@/lib/api";
 import { useAuth } from "@/components/auth-provider";
 import { notify } from "@/lib/notify";
-import { InvoiceDocuments } from "@/components/invoices/InvoiceDocuments";
+import { InvoiceDocuments, type InvoiceDocumentsHandle } from "@/components/invoices/InvoiceDocuments";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldTip } from "@/components/ui/field-tip";
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import { formatCurrency } from "@/lib/utils/format";
+import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 
 // ── Inline editable price row ─────────────────────────────────────────────────
@@ -319,7 +320,8 @@ export default function InvoiceDetailPage() {
     const [loading, setLoading] = useState(true);
     const [deleting, setDeleting] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const [expandedPurchases, setExpandedPurchases] = useState<Set<string>>(new Set());
+    const invoiceDocsRef = useRef<InvoiceDocumentsHandle>(null);
+    const creditDocsRef = useRef<InvoiceDocumentsHandle>(null);
 
     // Edit header state
     const [isEditing, setIsEditing] = useState(false);
@@ -502,14 +504,6 @@ export default function InvoiceDetailPage() {
         }
     };
 
-    const togglePurchase = (purchaseId: string) => {
-        setExpandedPurchases(prev => {
-            const next = new Set(prev);
-            next.has(purchaseId) ? next.delete(purchaseId) : next.add(purchaseId);
-            return next;
-        });
-    };
-
     const handleDelete = async () => {
         try {
             setDeleting(true);
@@ -595,6 +589,7 @@ export default function InvoiceDetailPage() {
                 </div>
 
                 <div className="space-y-6">
+                    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
                     {/* ── Dati fattura ── */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between py-4">
@@ -672,8 +667,11 @@ export default function InvoiceDetailPage() {
                         </CardContent>
                     </Card>
 
+                    <div className="space-y-6">
                     {/* ── Documenti ── */}
                     <InvoiceDocuments
+                        ref={invoiceDocsRef}
+                        canDelete={isEditing}
                         invoiceId={id}
                         documentUrls={invoice.documentUrls}
                         onUpdate={load}
@@ -682,6 +680,8 @@ export default function InvoiceDetailPage() {
 
                     {/* ── Documenti Nota di Credito (reso al fornitore), separati dalla fattura ── */}
                     <InvoiceDocuments
+                        ref={creditDocsRef}
+                        canDelete={isEditing}
                         invoiceId={id}
                         documentUrls={invoice.creditNoteDocumentUrls}
                         onUpdate={load}
@@ -690,6 +690,8 @@ export default function InvoiceDetailPage() {
                         kind="credit_note"
                         title="Documenti Nota di Credito"
                     />
+                    </div>
+                    </div>
 
                     {/* ── Bolle collegate ── */}
                     <Card>
@@ -706,171 +708,130 @@ export default function InvoiceDetailPage() {
                             </div>
                         )}
                         <CardContent className="p-0">
-                            {/* Bolle attuali */}
+                            {/* Bolle attuali: una scheda per bolla, tabellata come le altre bolle */}
                             {linkedPurchases.length > 0 ? (
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b text-slate-500">
-                                            <th className="w-8 py-2 pl-4"></th>
-                                            <th className="text-left py-2 px-2">Numero Bolla</th>
-                                            {canSeeAmounts && <th className="text-right py-2 px-4">Importo</th>}
-                                            <th className="w-10 py-2 px-2"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {linkedPurchases.map((p) => {
-                                            const isExpanded = expandedPurchases.has(p.id);
-                                            const hasItems = p.items && p.items.length > 0;
-                                            return (
-                                                <Fragment key={p.id}>
-                                                    <tr
-                                                        className={`border-b hover:bg-slate-50 dark:hover:bg-slate-800 ${hasItems && !isEditing ? 'cursor-pointer' : ''}`}
-                                                        onClick={() => !isEditing && hasItems && togglePurchase(p.id)}
-                                                    >
-                                                        <td className="py-2.5 pl-4">
-                                                            {!isEditing && hasItems && (
-                                                                isExpanded
-                                                                    ? <ChevronDown className="h-4 w-4 text-slate-400" />
-                                                                    : <ChevronRight className="h-4 w-4 text-slate-400" />
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2.5 px-2 font-medium">
-                                            {p.deliveryNoteNumber}
-                                            {p.deliveryNoteDate && (
-                                                <span className="ml-1.5 text-xs font-normal text-slate-400">
-                                                    ({new Date(p.deliveryNoteDate).toLocaleDateString('it-IT')})
-                                                </span>
-                                            )}
-                                            {p.hasReturn && (
-                                                <span title="Bolla con materiale reso al fornitore" className="ml-1.5 inline-block align-middle">
-                                                    <Undo2 className="h-3.5 w-3.5 text-amber-600 inline" />
-                                                </span>
-                                            )}
-                                        </td>
-                                                        {canSeeAmounts && (
-                                                            <td className="py-2.5 px-4 text-right">
-                                                                {p.totalAmount !== undefined ? formatCurrency(p.totalAmount) : '—'}
-                                                            </td>
+                                <div className="space-y-5 px-4 pb-4">
+                                    {linkedPurchases.map((p) => {
+                                        const allApplied = !!p.items?.length && p.items.every(i => i.transportApplied);
+                                        const someApplied = !!p.items?.some(i => i.transportApplied);
+                                        const isApplying = applyingTransport[p.id];
+                                        return (
+                                            <div key={p.id} className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+                                                <div className="flex items-center justify-between gap-3 bg-slate-100 px-4 py-3 dark:bg-slate-800">
+                                                    <div className="flex items-baseline gap-2">
+                                                        <span className="text-base font-semibold text-slate-900 dark:text-white">Bolla {p.deliveryNoteNumber}</span>
+                                                        {p.deliveryNoteDate && (
+                                                            <span className="text-sm text-slate-500">del {new Date(p.deliveryNoteDate).toLocaleDateString('it-IT')}</span>
                                                         )}
-                                                        <td className="py-2.5 px-2">
-                                                            {isEditing ? (
-                                                                <button
-                                                                    title="Rimuovi collegamento bolla"
-                                                                    className="text-red-400 hover:text-red-600"
-                                                                    onClick={async () => {
-                                                                        if (!await confirmDialog(`Rimuovere il collegamento alla bolla "${p.deliveryNoteNumber || 'senza numero'}"?\nLa bolla non verrà eliminata, verrà solo scollegata da questa fattura.`)) return;
-                                                                        setToRemove(prev => { const n = new Set(prev); n.add(p.id); return n; });
-                                                                    }}
-                                                                >
-                                                                    <X className="h-4 w-4" />
-                                                                </button>
-                                                            ) : (
-                                                                <Link href={`/purchases/${p.id}`} className="text-blue-500 hover:text-blue-700">
-                                                                    <ExternalLink className="h-3.5 w-3.5" />
-                                                                </Link>
-                                                            )}
-                                                        </td>
-                                                    </tr>
+                                                        {p.hasReturn && (
+                                                            <span title="Bolla con materiale reso al fornitore"><Undo2 className="inline h-4 w-4 text-amber-600" /></span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center gap-4">
+                                                        {canSeeAmounts && (
+                                                            <span className="text-base font-semibold">{p.totalAmount !== undefined ? formatCurrency(p.totalAmount) : '—'}</span>
+                                                        )}
+                                                        {isEditing ? (
+                                                            <button
+                                                                title="Rimuovi collegamento bolla"
+                                                                className="text-red-400 hover:text-red-600"
+                                                                onClick={async () => {
+                                                                    if (!await confirmDialog(`Rimuovere il collegamento alla bolla "${p.deliveryNoteNumber || 'senza numero'}"?\nLa bolla non verrà eliminata, verrà solo scollegata da questa fattura.`)) return;
+                                                                    setToRemove(prev => { const n = new Set(prev); n.add(p.id); return n; });
+                                                                }}
+                                                            >
+                                                                <X className="h-5 w-5" />
+                                                            </button>
+                                                        ) : (
+                                                            <Link href={`/purchases/${p.id}`} title="Apri la bolla" className="text-blue-500 hover:text-blue-700">
+                                                                <ExternalLink className="h-4 w-4" />
+                                                            </Link>
+                                                        )}
+                                                    </div>
+                                                </div>
 
-                                                    {/* Dropdown articoli con prezzi editabili */}
-                                                    {isExpanded && !isEditing && hasItems && (() => {
-                                                        const allApplied = p.items!.every(i => i.transportApplied);
-                                                        const someApplied = p.items!.some(i => i.transportApplied);
-                                                        const isApplying = applyingTransport[p.id];
-                                                        return (
-                                                        <tr key={`${p.id}-items`} className="border-b bg-slate-50 dark:bg-slate-800/50">
-                                                            <td colSpan={canSeeAmounts ? 4 : 3} className="py-2 px-4">
-                                                                <table className="w-full text-xs">
-                                                                    <thead>
-                                                                        <tr className="text-slate-400 border-b border-slate-200 dark:border-slate-700">
-                                                                            <th className="text-left py-1">Articolo</th>
-                                                                            <th className="text-right py-1 w-16">Qtà</th>
-                                                                            {canSeeAmounts && <><th className="text-left py-1 w-32 pl-2">Prezzo Unit.</th><th className="text-left py-1 w-32 pl-2">Totale Riga</th><th className="w-10"></th></>}
-                                                                        </tr>
-                                                                    </thead>
-                                                                    <tbody>
-                                                                        {p.items!.map((item) => (
-                                                                            <Fragment key={item.id}>
-                                                                                <ItemPriceRow
-                                                                                    item={item}
-                                                                                    canEdit={canSeeAmounts}
-                                                                                    onSaved={syncTotalAfterItemEdit}
-                                                                                />
-                                                                                {item.returnedAt && (
-                                                                                    <ReturnPriceRow
-                                                                                        item={item}
-                                                                                        canEdit={canSeeAmounts}
-                                                                                        onSaved={syncTotalAfterItemEdit}
-                                                                                    />
-                                                                                )}
-                                                                            </Fragment>
-                                                                        ))}
-                                                                    </tbody>
-                                                                </table>
-
-                                                                {/* Sezione trasporto per questa bolla */}
-                                                                {canSeeAmounts && (
-                                                                    <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 flex items-center gap-3 flex-wrap">
-                                                                        <Truck className="h-4 w-4 text-amber-500 shrink-0" />
-                                                                        <span className="text-xs font-medium text-slate-600 dark:text-slate-300 shrink-0">Costo Trasporto:</span>
-                                                                        {allApplied ? (
-                                                                            <>
-                                                                                <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                                                                                    <CheckCircle2 className="h-3.5 w-3.5" />
-                                                                                    Applicato ({formatCurrency(p.transportCost ?? 0)})
-                                                                                </span>
-                                                                                <Button
-                                                                                    size="sm"
-                                                                                    variant="ghost"
-                                                                                    className="h-7 text-xs text-slate-500 hover:text-slate-700"
-                                                                                    disabled={isApplying}
-                                                                                    onClick={() => handleResetTransport(p.id)}
-                                                                                >
-                                                                                    {isApplying
-                                                                                        ? <Loader2 className="h-3 w-3 animate-spin" />
-                                                                                        : "Modifica"}
-                                                                                </Button>
-                                                                            </>
-                                                                        ) : (
-                                                                            <>
-                                                                                <div className="flex items-center gap-1">
-                                                                                    <span className="text-slate-400 text-xs">€</span>
-                                                                                    <input
-                                                                                        type="number"
-                                                                                        min="0"
-                                                                                        step="0.01"
-                                                                                        className="h-7 w-24 rounded border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 text-right text-xs"
-                                                                                        placeholder="0.00"
-                                                                                        value={transportInputs[p.id] ?? ""}
-                                                                                        onChange={e => setTransportInputs(prev => ({ ...prev, [p.id]: e.target.value }))}
-                                                                                    />
-                                                                                </div>
-                                                                                <Button
-                                                                                    size="sm"
-                                                                                    className="h-7 text-xs bg-amber-500 hover:bg-amber-600 text-white"
-                                                                                    disabled={isApplying || !(parseFloat(transportInputs[p.id] ?? "0") > 0)}
-                                                                                    onClick={() => handleApplyTransport(p.id)}
-                                                                                >
-                                                                                    {isApplying
-                                                                                        ? <Loader2 className="h-3 w-3 animate-spin" />
-                                                                                        : "Applica a tutte le righe"}
-                                                                                </Button>
-                                                                                {someApplied && !allApplied && (
-                                                                                    <span className="text-xs text-amber-600">Applicato parzialmente</span>
-                                                                                )}
-                                                                            </>
+                                                {p.items && p.items.length > 0 ? (
+                                                    <div className="overflow-x-auto">
+                                                        <table className="w-full text-sm">
+                                                            <thead>
+                                                                <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700">
+                                                                    <th className="px-4 py-2.5 text-left font-semibold">Articolo</th>
+                                                                    <th className="w-20 py-2.5 text-right font-semibold">Qtà</th>
+                                                                    {canSeeAmounts && <><th className="w-40 py-2.5 pl-3 text-right font-semibold">Prezzo Unit.</th><th className="w-36 py-2.5 pl-3 text-right font-semibold">Totale Riga</th><th className="w-12"></th></>}
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="[&_td]:text-sm [&_td:first-child]:pl-4">
+                                                                {p.items.map((item) => (
+                                                                    <Fragment key={item.id}>
+                                                                        <ItemPriceRow
+                                                                            item={item}
+                                                                            canEdit={canSeeAmounts && !isEditing}
+                                                                            onSaved={syncTotalAfterItemEdit}
+                                                                        />
+                                                                        {item.returnedAt && (
+                                                                            <ReturnPriceRow
+                                                                                item={item}
+                                                                                canEdit={canSeeAmounts && !isEditing}
+                                                                                onSaved={syncTotalAfterItemEdit}
+                                                                            />
                                                                         )}
-                                                                    </div>
+                                                                    </Fragment>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                ) : (
+                                                    <p className="py-4 text-center text-sm text-slate-400">Nessun articolo in questa bolla</p>
+                                                )}
+
+                                                {/* Trasporto per questa bolla */}
+                                                {canSeeAmounts && !isEditing && !!p.items?.length && (
+                                                    <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
+                                                        <Truck className="h-4 w-4 shrink-0 text-amber-500" />
+                                                        <span className="shrink-0 text-sm font-medium text-slate-600 dark:text-slate-300">Costo Trasporto:</span>
+                                                        {allApplied ? (
+                                                            <>
+                                                                <span className="flex items-center gap-1 text-sm font-medium text-green-600">
+                                                                    <CheckCircle2 className="h-4 w-4" />
+                                                                    Applicato ({formatCurrency(p.transportCost ?? 0)})
+                                                                </span>
+                                                                <Button size="sm" variant="ghost" className="h-8 text-sm text-slate-500 hover:text-slate-700" disabled={isApplying} onClick={() => handleResetTransport(p.id)}>
+                                                                    {isApplying ? <Loader2 className="h-3 w-3 animate-spin" /> : "Modifica"}
+                                                                </Button>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="text-sm text-slate-400">€</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        step="0.01"
+                                                                        className="h-8 w-28 rounded border border-slate-200 bg-white px-2 text-right text-sm dark:border-slate-600 dark:bg-slate-800"
+                                                                        placeholder="0.00"
+                                                                        value={transportInputs[p.id] ?? ""}
+                                                                        onChange={e => setTransportInputs(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                                                    />
+                                                                </div>
+                                                                <Button
+                                                                    size="sm"
+                                                                    className="h-8 bg-amber-500 text-sm text-white hover:bg-amber-600"
+                                                                    disabled={isApplying || !(parseFloat(transportInputs[p.id] ?? "0") > 0)}
+                                                                    onClick={() => handleApplyTransport(p.id)}
+                                                                >
+                                                                    {isApplying ? <Loader2 className="h-3 w-3 animate-spin" /> : "Applica a tutte le righe"}
+                                                                </Button>
+                                                                {someApplied && !allApplied && (
+                                                                    <span className="text-sm text-amber-600">Applicato parzialmente</span>
                                                                 )}
-                                                            </td>
-                                                        </tr>
-                                                        );
-                                                    })()}
-                                                </Fragment>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             ) : (
                                 <p className="text-center py-6 text-slate-400 text-sm">Nessuna bolla collegata</p>
                             )}
@@ -912,6 +873,15 @@ export default function InvoiceDetailPage() {
                     </Card>
                 </div>
             </div>
+            {canEdit && !isEditing && (
+                <FloatingAddButton
+                    icon={<Upload className="h-6 w-6" />}
+                    actions={[
+                        { label: "Carica documento fattura", onClick: () => invoiceDocsRef.current?.openPicker() },
+                        { label: "Carica nota di credito", onClick: () => creditDocsRef.current?.openPicker() },
+                    ]}
+                />
+            )}
         </DashboardLayout>
 
         <ConfirmDeleteDialog
