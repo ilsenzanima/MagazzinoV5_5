@@ -6,6 +6,11 @@ import { FloatingAddButton } from "@/components/ui/floating-add-button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import { RowActionsButton } from "@/components/ui/row-actions"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DocumentBulkBar, useDocSelection, printOne, downloadOne } from "@/components/documents/DocumentBulkBar"
+import { Printer, Download } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -142,6 +147,12 @@ export function ProposalConformita({ proposalId }: Props) {
             .sort((x, y) => dir * nameOf(x).localeCompare(nameOf(y), 'it', { numeric: true }))
     }, [associations, search, typeFilter, sortDir])
     const head = "border-r text-xs font-semibold uppercase tracking-wide text-slate-600"
+    // Selezione multipla dei documenti con file: resta anche cambiando ricerca o filtro
+    const sel = useDocSelection()
+    const toDoc = (a: (typeof associations)[number]) => ({ id: a.id, name: nameOf(a) || a.document?.name || "documento", fileUrl: a.document?.fileUrl || "" })
+    const withFile = shown.filter(a => a.document?.fileUrl)
+    const selectedDocs = associations.filter(a => a.document?.fileUrl && sel.ids.has(a.id)).map(toDoc)
+    const allShownSelected = withFile.length > 0 && withFile.every(a => sel.ids.has(a.id))
 
     return (
         <NotchTabs title="Conformità">
@@ -153,15 +164,18 @@ export function ProposalConformita({ proposalId }: Props) {
             {loading ? (
                 <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>
             ) : (
+                <>
+                <DocumentBulkBar docs={selectedDocs} onClear={sel.clear} />
                 <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
                     <TableHeader>
                         <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                            <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : selectedDocs.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(withFile.map(a => a.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
                             <TableHead className={head}>
                                 <button type="button" onClick={() => setSortDir(d => (d === 'asc' ? 'desc' : 'asc'))} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">
                                     Documento{sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
                                 </button>
                             </TableHead>
-                            <TableHead className={`w-48 ${head}`}>
+                            <TableHead className={`w-40 ${head}`}>
                                 <Select value={typeFilter} onValueChange={setTypeFilter}>
                                     <SelectTrigger aria-label="Filtra per tipo" className="h-7 min-w-0 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
                                         <SelectValue>{typeFilter === 'all' ? 'Tipo' : typeFilter}</SelectValue>
@@ -172,15 +186,15 @@ export function ProposalConformita({ proposalId }: Props) {
                                     </SelectContent>
                                 </Select>
                             </TableHead>
-                            <TableHead className={`w-36 ${head}`}>Marca</TableHead>
-                            <TableHead className={`w-[28%] ${head}`}>Nota</TableHead>
-                            <TableHead className="w-24" />
+                            <TableHead className={`w-28 ${head}`}>Marca</TableHead>
+                            <TableHead className={`w-[24%] ${head}`}>Nota</TableHead>
+                            <TableHead className="w-[4.5rem]" />
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {shown.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                                <TableCell colSpan={6} className="py-10 text-center text-slate-400 dark:text-slate-500">
                                     {associations.length === 0
                                         ? "Nessun documento di conformità associato. Quando l'offerta diventa commessa, i documenti associati qui verranno collegati anche alla commessa."
                                         : "Nessun documento corrisponde ai filtri."}
@@ -190,6 +204,7 @@ export function ProposalConformita({ proposalId }: Props) {
                             const doc = assoc.document
                             return (
                                 <TableRow key={assoc.id} className={doc?.fileUrl ? "cursor-pointer" : ""} onClick={() => doc?.fileUrl && openDoc(doc.fileUrl)}>
+                                    <TableCell className="border-r py-2" onClick={e => e.stopPropagation()}>{doc?.fileUrl && <Checkbox checked={sel.ids.has(assoc.id)} onCheckedChange={() => sel.toggle(assoc.id)} aria-label="Seleziona documento" />}</TableCell>
                                     <TableCell className="border-r py-2">
                                         <span className="flex items-center gap-2 font-medium text-slate-900 dark:text-white">
                                             <ShieldCheck className="h-4 w-4 shrink-0 text-green-600" />
@@ -203,14 +218,23 @@ export function ProposalConformita({ proposalId }: Props) {
                                     <TableCell className="truncate border-r py-2 text-sm text-slate-600 dark:text-slate-300">{doc?.brandName || <span className="text-slate-300">—</span>}</TableCell>
                                     <TableCell className="truncate border-r py-2 text-sm text-slate-500" title={assoc.customNotes || undefined}>{assoc.customNotes || <span className="text-slate-300">—</span>}</TableCell>
                                     <TableCell className="py-2" onClick={e => e.stopPropagation()}>
-                                        <div className="flex items-center justify-end gap-0.5">
-                                            <button type="button" title="Personalizza" onClick={() => {
-                                                setEditing(assoc)
-                                                setEditName(assoc.customName || "")
-                                                setEditNotes(assoc.customNotes || "")
-                                                setEditOpen(true)
-                                            }} className="p-1 text-slate-400 hover:text-blue-600"><Pencil className="h-4 w-4" /></button>
-                                            <button type="button" title="Disassocia" onClick={() => { setToDisassociate(assoc); setDisassociateOpen(true) }} className="p-1 text-slate-400 hover:text-red-600"><Unlink className="h-4 w-4" /></button>
+                                        <div className="flex items-center justify-end">
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild><RowActionsButton aria-label="Azioni documento" /></DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    {doc?.fileUrl && <DropdownMenuItem onClick={() => openDoc(doc.fileUrl)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>}
+                                                    {doc?.fileUrl && <DropdownMenuItem onClick={() => printOne(toDoc(assoc))}><Printer className="mr-2 h-4 w-4" />Stampa</DropdownMenuItem>}
+                                                    {doc?.fileUrl && <DropdownMenuItem onClick={() => downloadOne(toDoc(assoc))}><Download className="mr-2 h-4 w-4" />Scarica</DropdownMenuItem>}
+                                                    <DropdownMenuItem onClick={() => {
+                                                        setEditing(assoc)
+                                                        setEditName(assoc.customName || "")
+                                                        setEditNotes(assoc.customNotes || "")
+                                                        setEditOpen(true)
+                                                    }}><Pencil className="mr-2 h-4 w-4" />Personalizza</DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem onClick={() => { setToDisassociate(assoc); setDisassociateOpen(true) }} className="text-red-600 focus:text-red-600"><Unlink className="mr-2 h-4 w-4" />Disassocia</DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </div>
                                     </TableCell>
                                 </TableRow>
@@ -218,6 +242,7 @@ export function ProposalConformita({ proposalId }: Props) {
                         })}
                     </TableBody>
                 </Table>
+                </>
             )}
 
             <FloatingAddButton onClick={() => setSearchOpen(true)} label="Associa documento" icon={<Link2 className="h-6 w-6" />} showOnMobile />

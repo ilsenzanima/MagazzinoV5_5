@@ -4,6 +4,7 @@ import { PhoneSearchPortal } from "@/components/layout/mobile-actions";
 import { Printer } from "lucide-react"
 import { DocumentBulkBar, useDocSelection, printOne, downloadOne } from "@/components/documents/DocumentBulkBar"
 import { Checkbox } from "@/components/ui/checkbox"
+import { RowActionsButton } from "@/components/ui/row-actions"
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -38,7 +39,7 @@ import { PhotoGallery, PhotoGalleryImage, isImageFileType } from "@/components/u
 import { resolveDocumentDisplayUrl } from "@/lib/resolve-document-url"
 import { jobSiteTypeNotesApi } from "@/lib/services/job-site-type-notes"
 import { PaginationControls } from "@/components/ui/pagination-controls"
-import { NotchTabs, NotchHelp, NotchSearch } from "@/components/ui/notch-tabs"
+import { NotchTabs, NotchHelp, NotchSearch, NotchActions, NotchButton } from "@/components/ui/notch-tabs"
 import { FloatingAddButton } from "@/components/ui/floating-add-button"
 import { JobPhotoCollection, PhotoThumb } from "./JobPhotoCollection"
 
@@ -651,15 +652,22 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
   const askDelete = (doc: SiteDocument) => { setActiveDoc(doc); setDeleteOpen(true) }
 
   const sel = useDocSelection()
-  const selectedDocs = shownDocs.filter(d => sel.ids.has(d.id))
-  const allShownSelected = shownDocs.length > 0 && shownDocs.every(d => sel.ids.has(d.id))
+  // Documenti dei risultati filtrati: foto delle raccolte incluse
+  const visibleDocs = sorted.flatMap(r => (r.kind === "doc" ? [r.doc] : r.docs))
+  // Resta selezionato anche quel che il filtro nasconde: si puo' filtrare, spuntare, cambiare filtro e spuntare ancora
+  const selectedDocs = documents.filter(d => sel.ids.has(d.id))
+  const allShownSelected = visibleDocs.length > 0 && visibleDocs.every(d => sel.ids.has(d.id))
+  const rowDocs = (r: TableRowData) => (r.kind === "doc" ? [r.doc] : r.docs)
+  const rowChecked = (r: TableRowData): boolean | "indeterminate" => {
+    const ds = rowDocs(r)
+    const n = ds.filter(d => sel.ids.has(d.id)).length
+    return n === 0 ? false : n === ds.length ? true : "indeterminate"
+  }
 
   const rowMenu = (doc: SiteDocument, siblings: SiteDocument[] = shownDocs) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" aria-label="Azioni documento" onClick={e => e.stopPropagation()}>
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
+        <RowActionsButton aria-label="Azioni documento" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
         <DropdownMenuItem onClick={() => openDoc(doc, siblings)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>
@@ -680,9 +688,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
   const collectionMenu = (r: CollectionRow) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" aria-label="Azioni raccolta" onClick={e => e.stopPropagation()}>
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
+        <RowActionsButton aria-label="Azioni raccolta" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
         <DropdownMenuItem onClick={() => showCollection({ typeId: r.typeId, folderId: r.folder?.id ?? null })}><Images className="mr-2 h-4 w-4" />Apri raccolta</DropdownMenuItem>
@@ -782,14 +788,16 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
             <>
               {/* Ricerca e comandi */}
               <div className="flex flex-wrap items-center gap-2 empty:hidden">
+                {docTypes.some(t => t.allowsFolders) && (
+                  <NotchActions>
+                    <NotchButton onClick={() => openNewFolder(filterType?.allowsFolders ? filterType.id : undefined)}>
+                      <FolderPlus />Nuova cartella
+                    </NotchButton>
+                  </NotchActions>
+                )}
                 <NotchSearch value={search} onChange={v => { setSearch(v); setPage(1) }} placeholder="Cerca per nome o nota" />
                 {anyFilterActive && (
                   <Button variant="ghost" className="shrink-0 text-xs text-slate-600" onClick={resetFilters}>Azzera filtri</Button>
-                )}
-                {docTypes.some(t => t.allowsFolders) && (
-                  <Button variant="outline" size="sm" onClick={() => openNewFolder(filterType?.allowsFolders ? filterType.id : undefined)}>
-                    <FolderPlus className="mr-1.5 h-4 w-4" />Nuova cartella
-                  </Button>
                 )}
               </div>
 
@@ -808,9 +816,9 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
                 <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
                   <TableHeader>
                     <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
-                      <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : selectedDocs.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(shownDocs.map(d => d.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
+                      <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : selectedDocs.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(visibleDocs.map(d => d.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
                       <TableHead className={headCls}>{sortBtn("name", "Documento")}</TableHead>
-                      <TableHead className={`w-44 ${headCls}`}>
+                      <TableHead className={`w-36 ${headCls}`}>
                         <div className="flex items-center gap-1">
                           <div className="min-w-0 flex-1">{typeSelect(selectCls)}</div>
                           <button type="button" aria-label="Ordina per tipo" onClick={() => toggleSort("type")} className="shrink-0 text-slate-500 hover:text-slate-900">
@@ -818,7 +826,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
                           </button>
                         </div>
                       </TableHead>
-                      <TableHead className={`w-44 ${headCls}`}>
+                      <TableHead className={`w-36 ${headCls}`}>
                         <div className="flex items-center gap-1">
                           <div className="min-w-0 flex-1">{folderSelect(selectCls)}</div>
                           <button type="button" aria-label="Ordina per cartella" onClick={() => toggleSort("folder")} className="shrink-0 text-slate-500 hover:text-slate-900">
@@ -826,10 +834,10 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
                           </button>
                         </div>
                       </TableHead>
-                      <TableHead className={`w-28 ${headCls}`}>{sortBtn("date", "Data")}</TableHead>
-                      <TableHead className={`w-28 ${headCls}`}>{sortBtn("size", "Dimensione")}</TableHead>
-                      <TableHead className={`w-[22%] ${headCls}`}>Nota</TableHead>
-                      <TableHead className="w-12" />
+                      <TableHead className={`w-24 ${headCls}`}>{sortBtn("date", "Data")}</TableHead>
+                      <TableHead className={`w-24 ${headCls}`}>{sortBtn("size", "Dimensione")}</TableHead>
+                      <TableHead className={`w-[18%] ${headCls}`}>Nota</TableHead>
+                      <TableHead className="w-[4.5rem]" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -842,7 +850,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
                       </TableRow>
                     ) : pageRows.map(r => (
                       <TableRow key={r.id} className="cursor-pointer" onClick={() => openRow(r)}>
-                        <TableCell className="border-r py-2" onClick={e => e.stopPropagation()}>{r.kind === "doc" && <Checkbox checked={sel.ids.has(r.doc!.id)} onCheckedChange={() => sel.toggle(r.doc!.id)} aria-label="Seleziona documento" />}</TableCell>
+                        <TableCell className="border-r py-2" onClick={e => e.stopPropagation()}>{rowDocs(r).length > 0 && <Checkbox checked={rowChecked(r)} onCheckedChange={v => sel.setAll(rowDocs(r).map(d => d.id), v === true)} aria-label={r.kind === "doc" ? "Seleziona documento" : "Seleziona tutte le foto della cartella"} />}</TableCell>
                         <TableCell className="border-r py-2">
                           {r.kind === "collection" ? (
                             <div className="flex min-w-0 items-center gap-2">

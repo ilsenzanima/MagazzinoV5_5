@@ -1,5 +1,6 @@
 "use client"
 
+import { RowActionsButton } from "@/components/ui/row-actions"
 import { useState, useEffect, useRef, useMemo } from "react"
 import { Printer } from "lucide-react"
 import { DocumentBulkBar, useDocSelection, printOne, downloadOne } from "@/components/documents/DocumentBulkBar"
@@ -490,9 +491,7 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
     const rowMenu = (doc: SiteDocument, siblings: SiteDocument[] = shownDocs) => (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" aria-label="Azioni documento" onClick={e => e.stopPropagation()}>
-                    <MoreHorizontal className="h-4 w-4" />
-                </Button>
+                <RowActionsButton aria-label="Azioni documento" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
                 <DropdownMenuItem onClick={() => openDocument(doc, siblings)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>
@@ -513,9 +512,7 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
     const collectionMenu = (r: Row) => (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" aria-label="Azioni raccolta" onClick={e => e.stopPropagation()}>
-                    <MoreHorizontal className="h-4 w-4" />
-                </Button>
+                <RowActionsButton aria-label="Azioni raccolta" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
                 <DropdownMenuItem onClick={() => showCollection({ typeId: r.typeId, folderId: r.folder?.id ?? null })}><Images className="mr-2 h-4 w-4" />Apri raccolta</DropdownMenuItem>
@@ -584,7 +581,7 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
                                     <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : selectedDocs.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(shownDocs.map(d => d.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
                                     <TableHead className={headCls}>{sortBtn('name', 'Documento')}</TableHead>
-                                    <TableHead className={`w-44 ${headCls}`}>
+                                    <TableHead className={`w-36 ${headCls}`}>
                                         <Select value={typeFilter} onValueChange={v => { setTypeFilter(v); setFolderFilter('all'); setPage(1) }}>
                                             <SelectTrigger aria-label="Filtra per tipo" className="h-7 min-w-0 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
                                                 <SelectValue>{typeFilter === 'all' ? 'Tipo' : typeFilter === UNTYPED_KEY ? 'Senza tipo' : docTypes.find(t => t.id === typeFilter)?.name}</SelectValue>
@@ -596,7 +593,7 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                                             </SelectContent>
                                         </Select>
                                     </TableHead>
-                                    <TableHead className={`w-44 ${headCls}`}>
+                                    <TableHead className={`w-36 ${headCls}`}>
                                         <Select value={folderFilter} onValueChange={v => { setFolderFilter(v); setPage(1) }}>
                                             <SelectTrigger aria-label="Filtra per cartella" className="h-7 min-w-0 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
                                                 <SelectValue>{folderFilter === 'all' ? 'Cartella' : folderFilter === 'root' ? 'Senza cartella' : folders.find(f => f.id === folderFilter)?.name}</SelectValue>
@@ -608,10 +605,10 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
                                             </SelectContent>
                                         </Select>
                                     </TableHead>
-                                    <TableHead className={`w-28 ${headCls}`}>{sortBtn('date', 'Data')}</TableHead>
-                                    <TableHead className={`w-28 ${headCls}`}>{sortBtn('size', 'Dimensione')}</TableHead>
-                                    <TableHead className={`w-[22%] ${headCls}`}>Nota</TableHead>
-                                    <TableHead className="w-14" />
+                                    <TableHead className={`w-24 ${headCls}`}>{sortBtn('date', 'Data')}</TableHead>
+                                    <TableHead className={`w-24 ${headCls}`}>{sortBtn('size', 'Dimensione')}</TableHead>
+                                    <TableHead className={`w-[18%] ${headCls}`}>Nota</TableHead>
+                                    <TableHead className="w-[4.5rem]" />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
