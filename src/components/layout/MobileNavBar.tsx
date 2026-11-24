@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -49,14 +49,17 @@ const SAVE_WORDS = /salva|conferma/i;
 
 // Tiene il pannello a schermo ancora per un po' dopo la chiusura, così può animarsi anche in uscita
 function usePresence(open: boolean, ms = 340) {
-    const [lingering, setLingering] = useState(false);
+    const [mounted, setMounted] = useState(open);
+    const wasOpen = useRef(open);
     useEffect(() => {
-        if (open) { setLingering(false); return; }
-        setLingering(true);
-        const t = setTimeout(() => setLingering(false), ms);
+        if (open) { wasOpen.current = true; setMounted(true); return; }
+        // L'uscita si anima solo se il pannello era davvero aperto (non a ogni cambio pagina)
+        if (!wasOpen.current) return;
+        wasOpen.current = false;
+        const t = setTimeout(() => setMounted(false), ms);
         return () => clearTimeout(t);
     }, [open, ms]);
-    return { mounted: open || lingering, open };
+    return { mounted: open || mounted, open };
 }
 
 // Animazione dei pannelli Naviga e Cerca: salgono dalla barra e vi rientrano
