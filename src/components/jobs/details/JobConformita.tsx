@@ -743,22 +743,22 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
                                     <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : selectedDocs.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(visibleDocs.map(d => d.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
                                     <TableHead className={TABLE_HEAD_CLS}>{sortBtn("name", "Documento")}</TableHead>
-                                    <TableHead className={`w-44 ${TABLE_HEAD_CLS}`}>
+                                    <TableHead className={`w-36 ${TABLE_HEAD_CLS}`}>
                                         <div className="flex items-center gap-1">
                                             <div className="min-w-0 flex-1">{typeSelect(TABLE_SELECT_CLS)}</div>
                                             <button type="button" aria-label="Ordina per tipo" onClick={() => toggleSort("type")} className="shrink-0 text-slate-500 hover:text-slate-900"><SortArrow active={sortKey === "type"} dir={sortDir} /></button>
                                         </div>
                                     </TableHead>
-                                    <TableHead className={`w-44 ${TABLE_HEAD_CLS}`}>
+                                    <TableHead className={`w-36 ${TABLE_HEAD_CLS}`}>
                                         <div className="flex items-center gap-1">
                                             <div className="min-w-0 flex-1">{folderSelect(TABLE_SELECT_CLS)}</div>
                                             <button type="button" aria-label="Ordina per cartella" onClick={() => toggleSort("folder")} className="shrink-0 text-slate-500 hover:text-slate-900"><SortArrow active={sortKey === "folder"} dir={sortDir} /></button>
                                         </div>
                                     </TableHead>
-                                    <TableHead className={`w-28 ${TABLE_HEAD_CLS}`}>{sortBtn("date", "Data")}</TableHead>
-                                    <TableHead className={`w-28 ${TABLE_HEAD_CLS}`}>{sortBtn("size", "Dimensione")}</TableHead>
-                                    <TableHead className={`w-[20%] ${TABLE_HEAD_CLS}`}>Nota</TableHead>
-                                    <TableHead className="w-20" />
+                                    <TableHead className={`w-24 ${TABLE_HEAD_CLS}`}>{sortBtn("date", "Data")}</TableHead>
+                                    <TableHead className={`w-24 ${TABLE_HEAD_CLS}`}>{sortBtn("size", "Dimensione")}</TableHead>
+                                    <TableHead className={`w-[16%] ${TABLE_HEAD_CLS}`}>Nota</TableHead>
+                                    <TableHead className="w-[4.5rem]" />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1258,21 +1258,21 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
                                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
                                     <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : selectedDocs.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(selectable.map(r => r.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
                                     <TableHead className={TABLE_HEAD_CLS}>{sortBtn("name", "Documento")}</TableHead>
-                                    <TableHead className={`w-48 ${TABLE_HEAD_CLS}`}>
+                                    <TableHead className={`w-36 ${TABLE_HEAD_CLS}`}>
                                         <div className="flex items-center gap-1">
                                             <div className="min-w-0 flex-1">{typeSelect(TABLE_SELECT_CLS)}</div>
                                             <button type="button" aria-label="Ordina per tipo" onClick={() => toggleSort("type")} className="shrink-0 text-slate-500 hover:text-slate-900"><SortArrow active={sortKey === "type"} dir={sortDir} /></button>
                                         </div>
                                     </TableHead>
                                     <TableHead className={`w-36 ${TABLE_HEAD_CLS}`}>{sortBtn("brand", "Marca")}</TableHead>
-                                    <TableHead className={`w-44 ${TABLE_HEAD_CLS}`}>
+                                    <TableHead className={`w-36 ${TABLE_HEAD_CLS}`}>
                                         <div className="flex items-center gap-1">
                                             <div className="min-w-0 flex-1">{originSelect(TABLE_SELECT_CLS)}</div>
                                             <button type="button" aria-label="Ordina per origine" onClick={() => toggleSort("origin")} className="shrink-0 text-slate-500 hover:text-slate-900"><SortArrow active={sortKey === "origin"} dir={sortDir} /></button>
                                         </div>
                                     </TableHead>
-                                    <TableHead className={`w-[24%] ${TABLE_HEAD_CLS}`}>Nota</TableHead>
-                                    <TableHead className="w-20" />
+                                    <TableHead className={`w-[18%] ${TABLE_HEAD_CLS}`}>Nota</TableHead>
+                                    <TableHead className="w-[4.5rem]" />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>

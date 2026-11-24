@@ -175,7 +175,7 @@ export function ProposalConformita({ proposalId }: Props) {
                                     Documento{sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
                                 </button>
                             </TableHead>
-                            <TableHead className={`w-48 ${head}`}>
+                            <TableHead className={`w-40 ${head}`}>
                                 <Select value={typeFilter} onValueChange={setTypeFilter}>
                                     <SelectTrigger aria-label="Filtra per tipo" className="h-7 min-w-0 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
                                         <SelectValue>{typeFilter === 'all' ? 'Tipo' : typeFilter}</SelectValue>
@@ -186,9 +186,9 @@ export function ProposalConformita({ proposalId }: Props) {
                                     </SelectContent>
                                 </Select>
                             </TableHead>
-                            <TableHead className={`w-36 ${head}`}>Marca</TableHead>
-                            <TableHead className={`w-[28%] ${head}`}>Nota</TableHead>
-                            <TableHead className="w-20" />
+                            <TableHead className={`w-28 ${head}`}>Marca</TableHead>
+                            <TableHead className={`w-[24%] ${head}`}>Nota</TableHead>
+                            <TableHead className="w-[4.5rem]" />
                         </TableRow>
                     </TableHeader>
                     <TableBody>

@@ -818,7 +818,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
                     <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
                       <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : selectedDocs.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(visibleDocs.map(d => d.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
                       <TableHead className={headCls}>{sortBtn("name", "Documento")}</TableHead>
-                      <TableHead className={`w-44 ${headCls}`}>
+                      <TableHead className={`w-36 ${headCls}`}>
                         <div className="flex items-center gap-1">
                           <div className="min-w-0 flex-1">{typeSelect(selectCls)}</div>
                           <button type="button" aria-label="Ordina per tipo" onClick={() => toggleSort("type")} className="shrink-0 text-slate-500 hover:text-slate-900">
@@ -826,7 +826,7 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
                           </button>
                         </div>
                       </TableHead>
-                      <TableHead className={`w-44 ${headCls}`}>
+                      <TableHead className={`w-36 ${headCls}`}>
                         <div className="flex items-center gap-1">
                           <div className="min-w-0 flex-1">{folderSelect(selectCls)}</div>
                           <button type="button" aria-label="Ordina per cartella" onClick={() => toggleSort("folder")} className="shrink-0 text-slate-500 hover:text-slate-900">
@@ -834,10 +834,10 @@ export function JobDocuments({ jobId, jobLabel }: JobDocumentsProps) {
                           </button>
                         </div>
                       </TableHead>
-                      <TableHead className={`w-28 ${headCls}`}>{sortBtn("date", "Data")}</TableHead>
-                      <TableHead className={`w-28 ${headCls}`}>{sortBtn("size", "Dimensione")}</TableHead>
-                      <TableHead className={`w-[22%] ${headCls}`}>Nota</TableHead>
-                      <TableHead className="w-20" />
+                      <TableHead className={`w-24 ${headCls}`}>{sortBtn("date", "Data")}</TableHead>
+                      <TableHead className={`w-24 ${headCls}`}>{sortBtn("size", "Dimensione")}</TableHead>
+                      <TableHead className={`w-[18%] ${headCls}`}>Nota</TableHead>
+                      <TableHead className="w-[4.5rem]" />
                     </TableRow>
                   </TableHeader>
                   <TableBody>

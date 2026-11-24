@@ -355,7 +355,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
               <TableHeader>
                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
                   <TableHead className="w-10 border-r"><Checkbox checked={allPicked ? true : selectable.some(m => picked.has(m.id)) ? "indeterminate" : false} onCheckedChange={v => setPick(selectable, v === true)} aria-label="Seleziona tutte le bolle" /></TableHead>
-                  <TableHead className={`w-40 ${headCls}`}>
+                  <TableHead className={`w-36 ${headCls}`}>
                     <div className="flex items-center gap-1">
                       <div className="min-w-0 flex-1">{typeSelect}</div>
                       <button type="button" aria-label="Ordina per tipo" onClick={() => toggleSort("type")} className="shrink-0 text-slate-500 hover:text-slate-900">
@@ -363,10 +363,10 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                       </button>
                     </div>
                   </TableHead>
-                  <TableHead className={`w-28 ${headCls}`}>{sortBtn("number", "Bolla")}</TableHead>
-                  <TableHead className={`w-28 ${headCls}`}>{sortBtn("date", "Data")}</TableHead>
-                  <TableHead className={`w-48 ${headCls}`}>Causale</TableHead>
-                  <TableHead className={`w-64 ${headCls}`}>
+                  <TableHead className={`w-24 ${headCls}`}>{sortBtn("number", "Bolla")}</TableHead>
+                  <TableHead className={`w-24 ${headCls}`}>{sortBtn("date", "Data")}</TableHead>
+                  <TableHead className={`w-40 ${headCls}`}>Causale</TableHead>
+                  <TableHead className={`w-56 ${headCls}`}>
                     <SearchableSelect
                       options={jobOptions}
                       value={jobId}
@@ -378,7 +378,7 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                     />
                   </TableHead>
                   <TableHead className={headCls}>Articoli</TableHead>
-                  <TableHead className="w-20" />
+                  <TableHead className="w-[4.5rem]" />
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -579,7 +579,7 @@ export function ProposalDocuments({ proposalId }: Props) {
                                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
                                     <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : selectedDocs.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(shownDocs.map(d => d.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
                                     <TableHead className={headCls}>{sortBtn('name', 'Documento')}</TableHead>
-                                    <TableHead className={`w-44 ${headCls}`}>
+                                    <TableHead className={`w-36 ${headCls}`}>
                                         <Select value={typeFilter} onValueChange={v => { setTypeFilter(v); setFolderFilter('all'); setPage(1) }}>
                                             <SelectTrigger aria-label="Filtra per tipo" className="h-7 min-w-0 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
                                                 <SelectValue>{typeFilter === 'all' ? 'Tipo' : typeFilter === UNTYPED_KEY ? 'Senza tipo' : docTypes.find(t => t.id === typeFilter)?.name}</SelectValue>
@@ -591,7 +591,7 @@ export function ProposalDocuments({ proposalId }: Props) {
                                             </SelectContent>
                                         </Select>
                                     </TableHead>
-                                    <TableHead className={`w-44 ${headCls}`}>
+                                    <TableHead className={`w-36 ${headCls}`}>
                                         <Select value={folderFilter} onValueChange={v => { setFolderFilter(v); setPage(1) }}>
                                             <SelectTrigger aria-label="Filtra per cartella" className="h-7 min-w-0 border-slate-300 bg-white px-2 text-xs font-semibold uppercase">
                                                 <SelectValue>{folderFilter === 'all' ? 'Cartella' : folderFilter === 'root' ? 'Senza cartella' : folders.find(f => f.id === folderFilter)?.name}</SelectValue>
@@ -603,10 +603,10 @@ export function ProposalDocuments({ proposalId }: Props) {
                                             </SelectContent>
                                         </Select>
                                     </TableHead>
-                                    <TableHead className={`w-28 ${headCls}`}>{sortBtn('date', 'Data')}</TableHead>
-                                    <TableHead className={`w-28 ${headCls}`}>{sortBtn('size', 'Dimensione')}</TableHead>
-                                    <TableHead className={`w-[22%] ${headCls}`}>Nota</TableHead>
-                                    <TableHead className="w-20" />
+                                    <TableHead className={`w-24 ${headCls}`}>{sortBtn('date', 'Data')}</TableHead>
+                                    <TableHead className={`w-24 ${headCls}`}>{sortBtn('size', 'Dimensione')}</TableHead>
+                                    <TableHead className={`w-[18%] ${headCls}`}>Nota</TableHead>
+                                    <TableHead className="w-[4.5rem]" />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>

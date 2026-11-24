@@ -340,7 +340,7 @@ export function SupplierOffers({ jobId, proposalId, jobLabel, inStrip }: Props) 
                                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
                                     <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : selectedDocs.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(rows.map(d => d.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
                                     <TableHead className={TABLE_HEAD_CLS}>{sortBtn("name", "Documento")}</TableHead>
-                                    <TableHead className={`w-56 ${TABLE_HEAD_CLS}`}>
+                                    <TableHead className={`w-48 ${TABLE_HEAD_CLS}`}>
                                         <div className="flex items-center gap-1">
                                             <div className="min-w-0 flex-1">{supplierSelect(TABLE_SELECT_CLS)}</div>
                                             <button type="button" aria-label="Ordina per fornitore" onClick={() => toggleSort("supplier")} className="shrink-0 text-slate-500 hover:text-slate-900">
@@ -348,9 +348,9 @@ export function SupplierOffers({ jobId, proposalId, jobLabel, inStrip }: Props) 
                                             </button>
                                         </div>
                                     </TableHead>
-                                    <TableHead className={`w-28 ${TABLE_HEAD_CLS}`}>{sortBtn("date", "Data")}</TableHead>
-                                    <TableHead className={`w-[28%] ${TABLE_HEAD_CLS}`}>Nota</TableHead>
-                                    <TableHead className="w-20" />
+                                    <TableHead className={`w-24 ${TABLE_HEAD_CLS}`}>{sortBtn("date", "Data")}</TableHead>
+                                    <TableHead className={`w-[24%] ${TABLE_HEAD_CLS}`}>Nota</TableHead>
+                                    <TableHead className="w-[4.5rem]" />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>

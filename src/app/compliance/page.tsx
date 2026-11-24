@@ -609,7 +609,7 @@ function ComplianceContent() {
                             <TableHeader>
                                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
                                     <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : selectedDocs.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(filtered.map(d => d.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
-                                    <TableHead className={`w-44 ${headCls}`}>
+                                    <TableHead className={`w-36 ${headCls}`}>
                                         <div className="flex items-center gap-1">
                                             <div className="min-w-0 flex-1">{typeSelect(selectCls)}</div>
                                             <button type="button" aria-label="Ordina per tipo" onClick={() => toggleSort("type")} className="shrink-0 text-slate-500 hover:text-slate-900">
@@ -618,7 +618,7 @@ function ComplianceContent() {
                                         </div>
                                     </TableHead>
                                     <TableHead className={headCls}>{sortBtn("name", "Documento")}</TableHead>
-                                    <TableHead className={`w-52 ${headCls}`}>
+                                    <TableHead className={`w-44 ${headCls}`}>
                                         <div className="flex items-center gap-1">
                                             <div className="min-w-0 flex-1">
                                                 <SearchableSelect
@@ -636,9 +636,9 @@ function ComplianceContent() {
                                             </button>
                                         </div>
                                     </TableHead>
-                                    <TableHead className={`w-64 ${headCls}`}>Note</TableHead>
-                                    <TableHead className={`w-28 ${headCls}`}>Bolla</TableHead>
-                                    <TableHead className={`w-28 ${headCls}`}>{sortBtn("date", "Data")}</TableHead>
+                                    <TableHead className={`w-52 ${headCls}`}>Note</TableHead>
+                                    <TableHead className={`w-24 ${headCls}`}>Bolla</TableHead>
+                                    <TableHead className={`w-24 ${headCls}`}>{sortBtn("date", "Data")}</TableHead>
                                     <TableHead className="w-28" />
                                 </TableRow>
                             </TableHeader>
