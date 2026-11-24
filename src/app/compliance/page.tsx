@@ -38,6 +38,8 @@ import {
     FileText,
     Trash2,
     Pencil,
+    Printer,
+    Download,
     ExternalLink,
     Search,
     Upload,
@@ -58,6 +60,9 @@ import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RowActionsButton } from "@/components/ui/row-actions";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DocumentBulkBar, useDocSelection, printOne, downloadOne } from "@/components/documents/DocumentBulkBar";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { PaginationControls } from "@/components/ui/pagination-controls";
@@ -338,7 +343,8 @@ function RowActions({
     onDelete: (doc: ComplianceDocument) => void;
 }) {
     return (
-        <div className="flex items-center justify-end gap-0.5">
+        <div className="flex items-center justify-end gap-1">
+            {/* Resta in vista: avvisa che il documento è collegato a una bolla di acquisto */}
             {doc.purchaseId && (
                 <Button variant="ghost" size="icon" className="h-7 w-7 md:size-7 text-blue-500 hover:text-blue-600" asChild title="Vai all'acquisto">
                     <a href={`/purchases/${doc.purchaseId}`} target="_blank" rel="noopener noreferrer" aria-label="Vai all'acquisto" onClick={(e) => e.stopPropagation()}>
@@ -346,12 +352,17 @@ function RowActions({
                     </a>
                 </Button>
             )}
-            <Button variant="ghost" size="icon" className="h-7 w-7 md:size-7" onClick={(e) => { e.stopPropagation(); onEdit(doc); }} title="Modifica" aria-label="Modifica">
-                <Pencil className="h-3.5 w-3.5" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7 md:size-7 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(doc); }} title="Elimina" aria-label="Elimina">
-                <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild><RowActionsButton aria-label="Azioni documento" /></DropdownMenuTrigger>
+                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenuItem onClick={() => openComplianceDocument(doc)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => printOne(doc)}><Printer className="mr-2 h-4 w-4" />Stampa</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => downloadOne(doc)}><Download className="mr-2 h-4 w-4" />Scarica</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onEdit(doc)}><Pencil className="mr-2 h-4 w-4" />Modifica</DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => onDelete(doc)} className="text-red-600 focus:text-red-600"><Trash2 className="mr-2 h-4 w-4" />Elimina</DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
         </div>
     );
 }
@@ -462,6 +473,10 @@ function ComplianceContent() {
     const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
     const currentPage = Math.min(page, totalPages);
     const rows = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+    // Selezione multipla: si può filtrare, spuntare, cambiare filtro e spuntare ancora
+    const sel = useDocSelection();
+    const selectedDocs = documents.filter(d => sel.ids.has(d.id));
+    const allShownSelected = filtered.length > 0 && filtered.every(d => sel.ids.has(d.id));
 
     const toggleSort = (key: SortKey) => {
         if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"));
@@ -586,11 +601,14 @@ function ComplianceContent() {
                 </div>
             ) : (
                 <div className={loadingDocs ? "opacity-60 transition-opacity" : "transition-opacity"}>
+                    <div className="mb-3 empty:hidden"><DocumentBulkBar docs={selectedDocs} onClear={sel.clear} /></div>
+
                     {/* Tabella: da tablet in su */}
                     <div className="mb-4 hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
                         <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
                             <TableHeader>
                                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                    <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : selectedDocs.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(filtered.map(d => d.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
                                     <TableHead className={`w-44 ${headCls}`}>
                                         <div className="flex items-center gap-1">
                                             <div className="min-w-0 flex-1">{typeSelect(selectCls)}</div>
@@ -621,19 +639,20 @@ function ComplianceContent() {
                                     <TableHead className={`w-64 ${headCls}`}>Note</TableHead>
                                     <TableHead className={`w-28 ${headCls}`}>Bolla</TableHead>
                                     <TableHead className={`w-28 ${headCls}`}>{sortBtn("date", "Data")}</TableHead>
-                                    <TableHead className="w-28" />
+                                    <TableHead className="w-24" />
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {rows.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                                        <TableCell colSpan={8} className="py-10 text-center text-slate-400 dark:text-slate-500">
                                             <ShieldCheck className="mx-auto mb-2 h-12 w-12 opacity-20" />
                                             Nessun documento trovato
                                         </TableCell>
                                     </TableRow>
                                 ) : rows.map((d) => (
                                     <TableRow key={d.id} className="cursor-pointer" onClick={() => openComplianceDocument(d)}>
+                                        <TableCell className="border-r py-2" onClick={(e) => e.stopPropagation()}><Checkbox checked={sel.ids.has(d.id)} onCheckedChange={() => sel.toggle(d.id)} aria-label="Seleziona documento" /></TableCell>
                                         <TableCell className="border-r py-2 text-xs text-slate-600 dark:text-slate-300">
                                             {d.documentTypeName || <span className="font-medium text-amber-600">Senza tipo</span>}
                                         </TableCell>
