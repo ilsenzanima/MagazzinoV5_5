@@ -1,5 +1,8 @@
 "use client"
 
+import { RowActionsButton } from "@/components/ui/row-actions"
+import { Checkbox } from "@/components/ui/checkbox"
+import { DocumentBulkBar, useDocSelection, printOne, downloadOne } from "@/components/documents/DocumentBulkBar"
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -25,6 +28,7 @@ import {
     ShieldCheck,
     X,
     Download,
+    Printer,
     FolderInput,
     FolderPlus,
     MoreHorizontal,
@@ -592,6 +596,17 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
         })
     })()
     const shownDocs = sorted.filter((r): r is OwnDocRow => r.kind === "doc").map(r => r.doc)
+    // Selezione multipla: documenti e foto delle raccolte, anche quelli nascosti da un filtro successivo
+    const sel = useDocSelection()
+    const visibleDocs = sorted.flatMap(r => (r.kind === "doc" ? [r.doc] : r.docs))
+    const selectedDocs = docs.filter(d => sel.ids.has(d.id))
+    const allShownSelected = visibleDocs.length > 0 && visibleDocs.every(d => sel.ids.has(d.id))
+    const rowDocs = (r: OwnRow) => (r.kind === "doc" ? [r.doc] : r.docs)
+    const rowChecked = (r: OwnRow): boolean | "indeterminate" => {
+        const ds = rowDocs(r)
+        const n = ds.filter(d => sel.ids.has(d.id)).length
+        return n === 0 ? false : n === ds.length ? true : "indeterminate"
+    }
     const totalPages = Math.max(1, Math.ceil(sorted.length / OWN_PAGE_SIZE))
     const currentPage = Math.min(page, totalPages)
     const rows = sorted.slice((currentPage - 1) * OWN_PAGE_SIZE, currentPage * OWN_PAGE_SIZE)
@@ -632,17 +647,12 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
     const rowMenu = (doc: JobDocument, siblings: JobDocument[] = shownDocs) => (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" aria-label="Azioni documento" onClick={e => e.stopPropagation()}>
-                    <MoreHorizontal className="h-4 w-4" />
-                </Button>
+                <RowActionsButton aria-label="Azioni documento" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
                 <DropdownMenuItem onClick={() => openRow(doc, siblings)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>
-                {isDriveFile(doc) && (
-                    <DropdownMenuItem onClick={() => window.open(`/api/drive/download?fileId=${encodeURIComponent(doc.fileUrl)}&download=1`, '_blank')}>
-                        <Download className="mr-2 h-4 w-4" />Scarica
-                    </DropdownMenuItem>
-                )}
+                <DropdownMenuItem onClick={() => printOne(doc)}><Printer className="mr-2 h-4 w-4" />Stampa</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => downloadOne(doc)}><Download className="mr-2 h-4 w-4" />Scarica</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => openEdit(doc)}><Pencil className="mr-2 h-4 w-4" />Modifica</DropdownMenuItem>
                 {docTypes.find(t => t.id === doc.conformitaDocumentTypeId)?.allowsFolders && (
                     <DropdownMenuItem onClick={() => openMove([doc])}><FolderInput className="mr-2 h-4 w-4" />Sposta in cartella</DropdownMenuItem>
@@ -658,9 +668,7 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
     const collectionMenu = (r: OwnCollectionRow) => (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" aria-label="Azioni raccolta" onClick={e => e.stopPropagation()}>
-                    <MoreHorizontal className="h-4 w-4" />
-                </Button>
+                <RowActionsButton aria-label="Azioni raccolta" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
                 <DropdownMenuItem onClick={() => showCollection({ typeId: r.typeId, folderId: r.folder?.id ?? null })}><Images className="mr-2 h-4 w-4" />Apri raccolta</DropdownMenuItem>
@@ -726,11 +734,14 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
 
                     <div className="grid grid-cols-2 gap-2 md:hidden">{typeSelect()}{folderSelect()}</div>
 
+                    <DocumentBulkBar docs={selectedDocs} onClear={sel.clear} />
+
                     {/* Tabella (PC) */}
                     <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
                         <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
                             <TableHeader>
                                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                    <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : selectedDocs.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(visibleDocs.map(d => d.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
                                     <TableHead className={TABLE_HEAD_CLS}>{sortBtn("name", "Documento")}</TableHead>
                                     <TableHead className={`w-44 ${TABLE_HEAD_CLS}`}>
                                         <div className="flex items-center gap-1">
@@ -752,9 +763,10 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                             </TableHeader>
                             <TableBody>
                                 {rows.length === 0 ? (
-                                    <TableRow><TableCell colSpan={7} className="py-10 text-center text-slate-400">Nessun documento con questi filtri</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={8} className="py-10 text-center text-slate-400">Nessun documento con questi filtri</TableCell></TableRow>
                                 ) : rows.map(r => (
                                     <TableRow key={r.id} className="cursor-pointer" onClick={() => openAny(r)}>
+                                        <TableCell className="border-r py-2" onClick={e => e.stopPropagation()}>{rowDocs(r).length > 0 && <Checkbox checked={rowChecked(r)} onCheckedChange={v => sel.setAll(rowDocs(r).map(d => d.id), v === true)} aria-label="Seleziona" />}</TableCell>
                                         <TableCell className="border-r py-2">
                                             {r.kind === "collection" ? (
                                                 <div className="flex min-w-0 items-center gap-2">
@@ -1160,6 +1172,12 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
     const totalPages = Math.max(1, Math.ceil(sorted.length / OWN_PAGE_SIZE))
     const currentPage = Math.min(page, totalPages)
     const rows = sorted.slice((currentPage - 1) * OWN_PAGE_SIZE, currentPage * OWN_PAGE_SIZE)
+    // Selezione multipla dei documenti con file
+    const sel = useDocSelection()
+    const toDoc = (r: AssocRow) => ({ id: r.id, name: r.name, fileUrl: r.fileUrl })
+    const selectable = sorted.filter(r => !!r.fileUrl)
+    const selectedDocs = allRows.filter(r => r.fileUrl && sel.ids.has(r.id)).map(toDoc)
+    const allShownSelected = selectable.length > 0 && selectable.every(r => sel.ids.has(r.id))
     const toggleSort = (key: AssocSortKey) => {
         if (sortKey === key) setSortDir(d => (d === "asc" ? "desc" : "asc"))
         else { setSortKey(key); setSortDir("asc") }
@@ -1192,12 +1210,12 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
     const rowMenu = (r: AssocRow) => (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" aria-label="Azioni documento" onClick={e => e.stopPropagation()}>
-                    <MoreHorizontal className="h-4 w-4" />
-                </Button>
+                <RowActionsButton aria-label="Azioni documento" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
                 {r.fileUrl && <DropdownMenuItem onClick={() => openDoc(r.fileUrl)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>}
+                {r.fileUrl && <DropdownMenuItem onClick={() => printOne(toDoc(r))}><Printer className="mr-2 h-4 w-4" />Stampa</DropdownMenuItem>}
+                {r.fileUrl && <DropdownMenuItem onClick={() => downloadOne(toDoc(r))}><Download className="mr-2 h-4 w-4" />Scarica</DropdownMenuItem>}
                 {r.assoc && (
                     <>
                         <DropdownMenuItem onClick={() => openEditAssoc(r.assoc!)}><Pencil className="mr-2 h-4 w-4" />Personalizza</DropdownMenuItem>
@@ -1231,11 +1249,14 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
 
                     <div className="grid grid-cols-2 gap-2 md:hidden">{typeSelect()}{originSelect()}</div>
 
+                    <DocumentBulkBar docs={selectedDocs} onClear={sel.clear} />
+
                     {/* Tabella (PC) */}
                     <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
                         <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
                             <TableHeader>
                                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                                    <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : selectedDocs.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(selectable.map(r => r.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
                                     <TableHead className={TABLE_HEAD_CLS}>{sortBtn("name", "Documento")}</TableHead>
                                     <TableHead className={`w-48 ${TABLE_HEAD_CLS}`}>
                                         <div className="flex items-center gap-1">
@@ -1256,9 +1277,10 @@ function AssociatedDocuments({ jobId }: { jobId: string }) {
                             </TableHeader>
                             <TableBody>
                                 {rows.length === 0 ? (
-                                    <TableRow><TableCell colSpan={6} className="py-10 text-center text-slate-400">Nessun documento con questi filtri</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={7} className="py-10 text-center text-slate-400">Nessun documento con questi filtri</TableCell></TableRow>
                                 ) : rows.map(r => (
                                     <TableRow key={r.id} className={r.fileUrl ? "cursor-pointer" : ""} onClick={() => r.fileUrl && openDoc(r.fileUrl)}>
+                                        <TableCell className="border-r py-2" onClick={e => e.stopPropagation()}>{r.fileUrl && <Checkbox checked={sel.ids.has(r.id)} onCheckedChange={() => sel.toggle(r.id)} aria-label="Seleziona documento" />}</TableCell>
                                         <TableCell className="border-r py-2">
                                             <div className="flex min-w-0 items-center gap-2">
                                                 <ShieldCheck className="h-5 w-5 shrink-0 text-green-600" />

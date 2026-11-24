@@ -1,5 +1,6 @@
 "use client"
 
+import { RowActionsButton } from "@/components/ui/row-actions"
 import { useState, useEffect, useRef, useMemo } from "react"
 import { Printer } from "lucide-react"
 import { DocumentBulkBar, useDocSelection, printOne, downloadOne } from "@/components/documents/DocumentBulkBar"
@@ -262,9 +263,7 @@ export function SupplierOffers({ jobId, proposalId, jobLabel, inStrip }: Props) 
     const rowMenu = (doc: SupplierOffer) => (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" aria-label="Azioni documento" onClick={e => e.stopPropagation()}>
-                    <MoreHorizontal className="h-4 w-4" />
-                </Button>
+                <RowActionsButton aria-label="Azioni documento" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
                 <DropdownMenuItem onClick={() => handleOpenDocument(doc.fileUrl)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>

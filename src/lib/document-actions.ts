@@ -10,7 +10,15 @@ export interface DocLike {
 }
 
 const isDriveFile = (fileUrl: string) => !!fileUrl && !fileUrl.includes("/")
-const extOf = (d: DocLike) => (d.fileType || d.name.split(".").pop() || "").toLowerCase().replace(".", "")
+// Estensione dal tipo file, altrimenti dal nome, altrimenti dall'indirizzo del file (il nome a volte non ha l'estensione)
+const extOf = (d: DocLike) => {
+    const clean = (v: string | undefined | null) => (v || "").toLowerCase().replace(".", "")
+    if (d.fileType) return clean(d.fileType)
+    const fromName = d.name.includes(".") ? clean(d.name.split(".").pop()) : ""
+    if (/^[a-z0-9]{2,5}$/.test(fromName)) return fromName
+    const fromUrl = clean((d.fileUrl || "").split("?")[0].split(".").pop())
+    return /^[a-z0-9]{2,5}$/.test(fromUrl) && d.fileUrl.includes(".") ? fromUrl : ""
+}
 const OFFICE = new Set(["doc", "docx", "xls", "xlsx", "ppt", "pptx"])
 const IMAGES = new Set(["jpg", "jpeg", "png", "gif", "webp", "bmp"])
 
@@ -233,3 +241,15 @@ export async function printPhotos(docs: DocLike[]) {
 
 // Stampa un PDF gia' pronto (es. la bolla) senza scaricarlo
 export const printPdfBlob = (blob: Blob) => printBlob(blob, "pdf")
+
+// Più PDF uniti in uno solo (una sola finestra di stampa per tutte le bolle scelte)
+export async function mergePdfBlobs(blobs: Blob[]): Promise<Blob> {
+    const { PDFDocument } = await import("pdf-lib")
+    const out = await PDFDocument.create()
+    for (const b of blobs) {
+        const src = await PDFDocument.load(await b.arrayBuffer(), { ignoreEncryption: true })
+        const pages = await out.copyPages(src, src.getPageIndices())
+        pages.forEach(pg => out.addPage(pg))
+    }
+    return new Blob([await out.save() as BlobPart], { type: "application/pdf" })
+}

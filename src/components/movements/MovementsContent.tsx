@@ -23,6 +23,10 @@ import { deliveryNoteDraftsApi } from "@/lib/services/delivery-note-drafts";
 import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import { useAuth } from "@/components/auth-provider";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RowActionsButton, SelectionBar, BulkButton } from "@/components/ui/row-actions";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { loadFullNote, printMovements, downloadMovements } from "@/lib/movement-actions";
 
 // Movimenti per pagina: fisso, uguale per tutti
 const PAGE_SIZE = 50;
@@ -80,37 +84,17 @@ function SortArrow({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
 }
 
 // Scorciatoie: stampa o scarica il PDF della bolla senza aprirla
-async function loadFullNote(movement: DeliveryNote) {
-  const fullNote = await deliveryNotesApi.getById(movement.id);
-  const grouped = new Map<string, DeliveryNoteItem>();
-  fullNote.items?.forEach(item => {
-    const existing = grouped.get(item.inventoryId);
-    grouped.set(item.inventoryId, existing ? { ...existing, quantity: existing.quantity + item.quantity } : { ...item });
-  });
-  return { fullNote, items: Array.from(grouped.values()) };
-}
-
-async function quickPrint(e: React.MouseEvent, movement: DeliveryNote) {
-  e.preventDefault();
+async function quickPrint(e: React.MouseEvent | Event, movement: DeliveryNote) {
   e.stopPropagation();
-  try {
-    const { fullNote, items } = await loadFullNote(movement);
-    const { printDeliveryNotePDF } = await import('@/lib/pdf/delivery-note-pdf');
-    await printDeliveryNotePDF(fullNote, items);
-  } catch (error) {
+  try { await printMovements([movement]); } catch (error) {
     console.error("Failed to print", error);
     notify.error("Errore durante la stampa");
   }
 }
 
-async function quickDownload(e: React.MouseEvent, movement: DeliveryNote) {
-  e.preventDefault();
+async function quickDownload(e: React.MouseEvent | Event, movement: DeliveryNote) {
   e.stopPropagation();
-  try {
-    const { fullNote, items } = await loadFullNote(movement);
-    const { generateDeliveryNotePDF } = await import('@/lib/pdf/delivery-note-pdf');
-    await generateDeliveryNotePDF(fullNote, items);
-  } catch (error) {
+  try { await downloadMovements([movement]); } catch (error) {
     console.error("Failed to download", error);
     notify.error("Errore durante il download");
   }
@@ -180,6 +164,26 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
       (cmp(d, first) >= 0 && cmp(d, last) <= 0);
   });
   const rows = shownDrafts.length === 0 ? movements : [...movements, ...shownDrafts].sort(cmp);
+
+  // Selezione di più bolle (solo quelle emesse, non le bozze) per stamparle o scaricarle insieme; resta anche cambiando pagina o filtro
+  const [picked, setPicked] = useState<Map<string, DeliveryNote>>(new Map());
+  const [bulkBusy, setBulkBusy] = useState<"print" | "download" | null>(null);
+  const selectable = rows.filter(m => !m.isDraft);
+  const setPick = (list: DeliveryNote[], on: boolean) => setPicked(prev => {
+    const next = new Map(prev);
+    list.forEach(m => (on ? next.set(m.id, m) : next.delete(m.id)));
+    return next;
+  });
+  const pickedList = Array.from(picked.values());
+  const allPicked = selectable.length > 0 && selectable.every(m => picked.has(m.id));
+  const runBulk = async (kind: "print" | "download") => {
+    setBulkBusy(kind);
+    try { await (kind === "print" ? printMovements(pickedList) : downloadMovements(pickedList)); }
+    catch (error) {
+      console.error("Bulk movements action failed", error);
+      notify.error(kind === "print" ? "Errore durante la stampa" : "Errore durante il download");
+    } finally { setBulkBusy(null); }
+  };
   const rowHref = (m: DeliveryNote) => (m.isDraft ? `/movements/bozza/${m.id}` : `/movements/${m.id}`);
 
   useEffect(() => {
@@ -338,11 +342,19 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
         </div>
       ) : (
         <div className={loading ? "opacity-60 transition-opacity" : "transition-opacity"}>
+          <div className="mb-3 empty:hidden">
+            <SelectionBar count={pickedList.length} singular="bolla selezionata" plural="bolle selezionate" onClear={() => setPicked(new Map())}>
+              <BulkButton icon={<Printer />} busy={bulkBusy === "print"} disabled={bulkBusy !== null} onClick={() => runBulk("print")}>Stampa</BulkButton>
+              <BulkButton icon={<Download />} busy={bulkBusy === "download"} disabled={bulkBusy !== null} onClick={() => runBulk("download")}>Scarica{pickedList.length > 1 ? " (zip)" : ""}</BulkButton>
+            </SelectionBar>
+          </div>
+
           {/* Tabella: da tablet in su */}
           <div className="mb-4 hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
             <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
               <TableHeader>
                 <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                  <TableHead className="w-10 border-r"><Checkbox checked={allPicked ? true : selectable.some(m => picked.has(m.id)) ? "indeterminate" : false} onCheckedChange={v => setPick(selectable, v === true)} aria-label="Seleziona tutte le bolle" /></TableHead>
                   <TableHead className={`w-40 ${headCls}`}>
                     <div className="flex items-center gap-1">
                       <div className="min-w-0 flex-1">{typeSelect}</div>
@@ -366,19 +378,20 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                     />
                   </TableHead>
                   <TableHead className={headCls}>Articoli</TableHead>
-                  <TableHead className="w-12" />
+                  <TableHead className="w-16" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-slate-400 dark:text-slate-500">
+                    <TableCell colSpan={8} className="py-10 text-center text-slate-400 dark:text-slate-500">
                       <Truck className="mx-auto mb-2 h-12 w-12 opacity-20" />
                       Nessun movimento trovato
                     </TableCell>
                   </TableRow>
                 ) : rows.map((m) => (
                   <TableRow key={m.id} className={`cursor-pointer ${m.isDraft ? "bg-amber-50/60 hover:bg-amber-50 dark:bg-amber-950/20" : ""}`} onClick={() => router.push(rowHref(m))}>
+                    <TableCell className="border-r py-2" onClick={e => e.stopPropagation()}>{!m.isDraft && <Checkbox checked={picked.has(m.id)} onCheckedChange={v => setPick([m], v === true)} aria-label="Seleziona bolla" />}</TableCell>
                     <TableCell className="border-r py-2"><div className="flex flex-wrap items-center gap-1">{m.isDraft && <DraftBadge />}<TypeBadge type={m.type} /></div></TableCell>
                     <TableCell className="border-r py-2 font-medium text-slate-900 dark:text-white">{m.number}</TableCell>
                     <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{format(new Date(m.date), 'dd/MM/yyyy', { locale: it })}</TableCell>
@@ -389,25 +402,16 @@ export default function MovementsContent({ initialMovements, initialTotalItems }
                     <TableCell className="border-r py-2 text-xs text-slate-500 dark:text-slate-400">
                       <span className="line-clamp-2" title={m.itemNames?.join(', ')}>{m.itemNames?.join(', ') || <span className="text-slate-300">—</span>}</span>
                     </TableCell>
-                    <TableCell className="py-2 text-center">
-                      {!m.isDraft && <div className="flex items-center justify-center gap-0.5">
-                        <button
-                          onClick={(e) => quickPrint(e, m)}
-                          className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-700"
-                          title="Stampa"
-                          aria-label="Stampa"
-                        >
-                          <Printer className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={(e) => quickDownload(e, m)}
-                          className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-blue-600 dark:hover:bg-slate-700"
-                          title="Scarica PDF"
-                          aria-label="Scarica PDF"
-                        >
-                          <Download className="h-4 w-4" />
-                        </button>
-                      </div>}
+                    <TableCell className="py-2 text-center" onClick={e => e.stopPropagation()}>
+                      {!m.isDraft && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild><RowActionsButton aria-label="Azioni bolla" /></DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                            <DropdownMenuItem onClick={e => quickPrint(e, m)}><Printer className="mr-2 h-4 w-4" />Stampa</DropdownMenuItem>
+                            <DropdownMenuItem onClick={e => quickDownload(e, m)}><Download className="mr-2 h-4 w-4" />Scarica PDF</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

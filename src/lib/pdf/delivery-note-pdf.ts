@@ -399,6 +399,17 @@ export async function generateDeliveryNotePdfBlob(
 }
 
 /**
+ * PDF della bolla con il nome file che userebbe il download (per stampe e zip di più bolle)
+ */
+export async function generateDeliveryNotePdfFile(
+    movement: DeliveryNote,
+    groupedItems: DeliveryNoteItem[]
+): Promise<{ blob: Blob; filename: string }> {
+    const { doc, filename } = await buildDeliveryNotePdfDoc(movement, groupedItems);
+    return { blob: doc.output('blob'), filename };
+}
+
+/**
  * Apre la finestra di stampa per la bolla, senza scaricare il file
  */
 export async function printDeliveryNotePDF(

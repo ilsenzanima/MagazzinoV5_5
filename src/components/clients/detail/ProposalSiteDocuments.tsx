@@ -1,5 +1,6 @@
 "use client"
 
+import { RowActionsButton } from "@/components/ui/row-actions"
 import { useState, useEffect, useRef, useMemo } from "react"
 import { Printer } from "lucide-react"
 import { DocumentBulkBar, useDocSelection, printOne, downloadOne } from "@/components/documents/DocumentBulkBar"
@@ -490,9 +491,7 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
     const rowMenu = (doc: SiteDocument, siblings: SiteDocument[] = shownDocs) => (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" aria-label="Azioni documento" onClick={e => e.stopPropagation()}>
-                    <MoreHorizontal className="h-4 w-4" />
-                </Button>
+                <RowActionsButton aria-label="Azioni documento" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
                 <DropdownMenuItem onClick={() => openDocument(doc, siblings)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>
@@ -513,9 +512,7 @@ export function ProposalSiteDocuments({ proposalId }: Props) {
     const collectionMenu = (r: Row) => (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500" aria-label="Azioni raccolta" onClick={e => e.stopPropagation()}>
-                    <MoreHorizontal className="h-4 w-4" />
-                </Button>
+                <RowActionsButton aria-label="Azioni raccolta" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
                 <DropdownMenuItem onClick={() => showCollection({ typeId: r.typeId, folderId: r.folder?.id ?? null })}><Images className="mr-2 h-4 w-4" />Apri raccolta</DropdownMenuItem>

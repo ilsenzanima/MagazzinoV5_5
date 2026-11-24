@@ -3,7 +3,13 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { FileText, Loader2, Truck, Building2, ArrowRightLeft, Search } from "lucide-react"
+import { FileText, Loader2, Truck, Building2, ArrowRightLeft, Search, Printer, Download, ExternalLink, Unlink } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { RowActionsButton, SelectionBar, BulkButton } from "@/components/ui/row-actions"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useDocSelection } from "@/components/documents/DocumentBulkBar"
+import { downloadDocuments, printDocuments } from "@/lib/document-actions"
+import { printMovements, downloadMovements } from "@/lib/movement-actions"
 import { deliveryNotesApi, purchasesApi } from "@/lib/api"
 import { DeliveryNote, DeliveryNoteItem, Purchase } from "@/lib/types"
 import { createClient } from "@/lib/supabase/client"
@@ -104,6 +110,49 @@ function DdtTable({ rows: allRows, onOpenNote, onOpenUrl, onDisassociate }: {
   const currentPage = Math.min(page, totalPages)
   const rows = sorted.slice((currentPage - 1) * DDT_PAGE_SIZE, currentPage * DDT_PAGE_SIZE)
   const anyFilter = !!search.trim() || originFilter !== "all" || supplierFilter !== "all"
+  // Selezione multipla: bolle interne e DDT dei fornitori, anche quelle nascoste da un filtro successivo
+  const sel = useDocSelection()
+  const [busy, setBusy] = useState<"print" | "download" | null>(null)
+  const selectable = sorted.filter(r => r.note || r.doc)
+  const picked = allRows.filter(r => sel.ids.has(r.id))
+  const allShownSelected = selectable.length > 0 && selectable.every(r => sel.ids.has(r.id))
+  const docOf = (r: DdtRow) => ({ id: r.id, name: r.title, fileUrl: r.doc!.url })
+  const runOn = async (list: DdtRow[], kind: "print" | "download") => {
+    const notes = list.filter(r => r.note).map(r => r.note!)
+    const docs = list.filter(r => !r.note && r.doc).map(docOf)
+    setBusy(kind)
+    try {
+      if (kind === "print") {
+        if (notes.length) await printMovements(notes)
+        if (docs.length) {
+          const res = await printDocuments(docs)
+          if (res.skipped.length) toast.error(`Non stampabili da qui (scaricali e aprili sul PC): ${res.skipped.join(", ")}`)
+        }
+      } else {
+        if (notes.length) await downloadMovements(notes)
+        if (docs.length) await downloadDocuments(docs)
+      }
+    } catch (e) {
+      console.error(e)
+      toast.error(kind === "print" ? "Stampa non riuscita" : "Download non riuscito")
+    } finally { setBusy(null) }
+  }
+  const rowMenu = (r: DdtRow) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild><RowActionsButton aria-label="Azioni DDT" /></DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+        <DropdownMenuItem onClick={() => open(r)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => runOn([r], "print")}><Printer className="mr-2 h-4 w-4" />Stampa</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => runOn([r], "download")}><Download className="mr-2 h-4 w-4" />Scarica</DropdownMenuItem>
+        {r.origin === "associato" && r.doc && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onDisassociate(r.doc!.purchase.id)} className="text-red-600 focus:text-red-600"><Unlink className="mr-2 h-4 w-4" />Disassocia</DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
   const open = (r: DdtRow) => (r.note ? onOpenNote(r.note) : r.doc ? onOpenUrl(r.doc.url) : undefined)
   const icon = (r: DdtRow, cls: string) => (r.origin === "opi" ? <Truck className={`${cls} text-blue-500`} /> : <FileText className={`${cls} text-red-500`} />)
 
@@ -141,10 +190,16 @@ function DdtTable({ rows: allRows, onOpenNote, onOpenUrl, onDisassociate }: {
       </div>
       <div className="grid grid-cols-2 gap-2 md:hidden">{originSelect()}{supplierSelect()}</div>
 
+      <SelectionBar count={picked.length} singular="DDT selezionato" plural="DDT selezionati" onClear={sel.clear}>
+        <BulkButton icon={<Printer />} busy={busy === "print"} disabled={busy !== null} onClick={() => runOn(picked, "print")}>Stampa</BulkButton>
+        <BulkButton icon={<Download />} busy={busy === "download"} disabled={busy !== null} onClick={() => runOn(picked, "download")}>Scarica{picked.length > 1 ? " (zip)" : ""}</BulkButton>
+      </SelectionBar>
+
       <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block dark:border-slate-700 dark:bg-card">
         <Table className="table-fixed border-collapse [&_td]:px-2 [&_th]:px-2">
           <TableHeader>
             <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+              <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : picked.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(selectable.map(r => r.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
               <TableHead className={`w-52 ${TABLE_HEAD_CLS}`}>{sortBtn("title", "DDT")}</TableHead>
               <TableHead className={`w-52 ${TABLE_HEAD_CLS}`}>
                 <div className="flex items-center gap-1">
@@ -160,14 +215,15 @@ function DdtTable({ rows: allRows, onOpenNote, onOpenUrl, onDisassociate }: {
               </TableHead>
               <TableHead className={`w-28 ${TABLE_HEAD_CLS}`}>{sortBtn("date", "Data", "desc")}</TableHead>
               <TableHead className={TABLE_HEAD_CLS}>Materiali</TableHead>
-              <TableHead className="w-28" />
+              <TableHead className="w-16" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="py-10 text-center text-slate-400">Nessun DDT con questi filtri</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="py-10 text-center text-slate-400">Nessun DDT con questi filtri</TableCell></TableRow>
             ) : rows.map(r => (
               <TableRow key={r.id} className="cursor-pointer" onClick={() => open(r)}>
+                <TableCell className="border-r py-2" onClick={e => e.stopPropagation()}>{(r.note || r.doc) && <Checkbox checked={sel.ids.has(r.id)} onCheckedChange={() => sel.toggle(r.id)} aria-label="Seleziona DDT" />}</TableCell>
                 <TableCell className="border-r py-2">
                   <div className="flex min-w-0 items-center gap-2">
                     {icon(r, "h-4 w-4 shrink-0")}
@@ -184,9 +240,7 @@ function DdtTable({ rows: allRows, onOpenNote, onOpenUrl, onDisassociate }: {
                   <span className="line-clamp-2" title={r.materials}>{r.materials || <span className="text-slate-300">—</span>}</span>
                 </TableCell>
                 <TableCell className="py-2 text-right" onClick={e => e.stopPropagation()}>
-                  {r.origin === "associato" && r.doc && (
-                    <Button variant="ghost" size="sm" onClick={() => onDisassociate(r.doc!.purchase.id)} className="h-7 text-xs text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/30">Disassocia</Button>
-                  )}
+                  {(r.note || r.doc) && rowMenu(r)}
                 </TableCell>
               </TableRow>
             ))}
@@ -204,9 +258,7 @@ function DdtTable({ rows: allRows, onOpenNote, onOpenUrl, onDisassociate }: {
               <p className="text-xs text-slate-500">{ORIGIN_LABEL[r.origin]}{r.supplier && ` · ${r.supplier}`}{r.date && ` · ${fmtDate(r.date)}`}</p>
               {r.materials && <p className="mt-0.5 line-clamp-2 text-xs text-slate-600 dark:text-slate-300">{r.materials}</p>}
             </div>
-            {r.origin === "associato" && r.doc && (
-              <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); onDisassociate(r.doc!.purchase.id) }} className="h-7 shrink-0 text-xs text-red-600 hover:bg-red-50 hover:text-red-700">Disassocia</Button>
-            )}
+            {(r.note || r.doc) && rowMenu(r)}
           </div>
         ))}
       </div>
