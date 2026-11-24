@@ -41,6 +41,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { FieldTip } from "@/components/ui/field-tip";
 import { HelpTip } from "@/components/ui/help-tip";
 import { Badge } from "@/components/ui/badge";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { RowActionsButton } from "@/components/ui/row-actions";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { complianceApi, ComplianceDocument } from "@/lib/services/compliance";
 import { createClient } from "@/lib/supabase/client";
 import { ShieldCheck } from "lucide-react";
@@ -108,6 +111,7 @@ export default function PurchaseDetailPage() {
 
     // Edit Item State
     const [editingItemId, setEditingItemId] = useState<string | null>(null);
+    const editOrig = useRef("");
     const [editValues, setEditValues] = useState<{ price: string, quantity: string, pieces: string, total: string }>({ price: "", quantity: "", pieces: "", total: "" });
 
     // Return (Reso) State
@@ -463,12 +467,14 @@ export default function PurchaseDetailPage() {
             piecesStr = (item.quantity / coefficient).toString();
         }
 
-        setEditValues({
+        const initial = {
             price: item.price.toString(),
             quantity: item.quantity.toString(),
             pieces: piecesStr,
             total: (item.quantity * item.price).toFixed(2)
-        });
+        };
+        editOrig.current = JSON.stringify(initial);
+        setEditValues(initial);
     };
 
     const handleEditPiecesChange = (piecesStr: string, coefficient: number) => {
@@ -547,12 +553,12 @@ export default function PurchaseDetailPage() {
 
             if (isNaN(newPrice) || newPrice < 0) {
                 alert("Prezzo non valido");
-                return;
+                return false;
             }
 
             if (isNaN(newQty) || newQty < 0) {
                 alert("Quantità non valida");
-                return;
+                return false;
             }
 
             const item = items.find(i => i.id === itemId);
@@ -607,14 +613,105 @@ export default function PurchaseDetailPage() {
             // La modifica di quantity/pieces cambia anche il disponibile calcolato
             // per il lotto: riallinea batchAvailability per i prossimi resi.
             purchasesApi.getPurchaseBatchAvailability(id).then(setBatchAvailability).catch(console.error);
+            return true;
         } catch (error) {
             console.error("Failed to update item", error);
             alert("Errore durante l'aggiornamento");
+            return false;
         }
     };
 
     const cancelEdit = () => {
         setEditingItemId(null);
+    };
+
+    // ── Modifiche di riga non salvate ──
+    const isDirty = editingItemId !== null && JSON.stringify(editValues) !== editOrig.current;
+    const dirtyRef = useRef(false);
+    dirtyRef.current = isDirty;
+    // Azione in attesa di risposta alla domanda «Salvare le modifiche alla riga?»
+    const [guard, setGuard] = useState<{ proceed: () => void } | null>(null);
+    const guardAction = (proceed: () => void) => { if (dirtyRef.current) setGuard({ proceed }); else proceed(); };
+    const saveCurrentEdit = async () => {
+        const cur = items.find(i => i.id === editingItemId);
+        if (!cur) return true;
+        const inventoryItem = inventory.find(inv => inv.id === cur.itemId);
+        const coeff = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (cur.coefficient ? Number(cur.coefficient) : 1);
+        return (await saveEdit(cur.id, coeff)) === true;
+    };
+    const requestEdit = (item: PurchaseItem) => {
+        if (editingItemId && editingItemId !== item.id) guardAction(() => startEditing(item));
+        else startEditing(item);
+    };
+
+    // Uscita dalla pagina con una riga modificata e non salvata
+    useEffect(() => {
+        const onBeforeUnload = (e: BeforeUnloadEvent) => { if (dirtyRef.current) { e.preventDefault(); e.returnValue = ""; } };
+        const onClick = (e: MouseEvent) => {
+            if (!dirtyRef.current || e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey) return;
+            const a = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+            if (!a || a.target === "_blank" || a.origin !== window.location.origin) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const href = a.pathname + a.search + a.hash;
+            setGuard({ proceed: () => router.push(href) });
+        };
+        window.addEventListener("beforeunload", onBeforeUnload);
+        document.addEventListener("click", onClick, true);
+        return () => { window.removeEventListener("beforeunload", onBeforeUnload); document.removeEventListener("click", onClick, true); };
+    }, [router]);
+
+    // Azioni di fine riga: menu «Azioni» (Modifica, Registra reso, Elimina); in modifica diventano Salva / Annulla
+    const renderRowActions = (item: PurchaseItem) => {
+        if (!(userRole === 'admin' || userRole === 'operativo')) return null;
+        if (editingItemId === item.id) {
+            return (
+                <div className="flex items-center justify-end gap-2">
+                    {isDirty && (
+                        <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:ring-amber-700">
+                            Non salvato
+                        </span>
+                    )}
+                    <Button size="sm" className="h-8 bg-green-600 text-white hover:bg-green-700" onClick={() => saveCurrentEdit()}>
+                        <Save className="mr-1 h-4 w-4" />Salva
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-8" onClick={cancelEdit}>
+                        <X className="mr-1 h-4 w-4" />Annulla
+                    </Button>
+                </div>
+            );
+        }
+        return (
+            <div className="flex justify-end">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild><RowActionsButton aria-label="Azioni riga" /></DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => requestEdit(item)} disabled={item.transportApplied}>
+                            <Pen className="mr-2 h-4 w-4" />Modifica
+                        </DropdownMenuItem>
+                        {!isOrder && !item.returnedAt && (
+                            <DropdownMenuItem onClick={() => guardAction(() => openReturnDialog(item))}>
+                                <Undo2 className="mr-2 h-4 w-4" />Registra reso
+                            </DropdownMenuItem>
+                        )}
+                        {item.returnedAt && (
+                            <DropdownMenuItem onClick={() => guardAction(() => openReturnDialog(item, true))}>
+                                <Pen className="mr-2 h-4 w-4" />Modifica reso
+                            </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        {item.returnedAt && (
+                            <DropdownMenuItem onClick={() => setCancelReturnItemId(item.id)} className="text-red-600 focus:text-red-600">
+                                <RotateCcw className="mr-2 h-4 w-4" />Elimina reso
+                            </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => { setItemToDelete(item.id); setDeleteItemDialogOpen(true); }} className="text-red-600 focus:text-red-600">
+                            <Trash2 className="mr-2 h-4 w-4" />Elimina riga
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
+        );
     };
 
     // Una riga senza job_id proprio "segue" la commessa dell'intestazione (stessa
@@ -1251,7 +1348,7 @@ export default function PurchaseDetailPage() {
                                     <TableBody>
                                         {items.map((item) => (
                                             <Fragment key={item.id}>
-                                            <TableRow className={item.price === 0 ? "bg-yellow-50/50 dark:bg-yellow-900/20" : ""}>
+                                            <TableRow className={editingItemId === item.id && isDirty ? "bg-amber-50/70 dark:bg-amber-900/10" : item.price === 0 ? "bg-yellow-50/50 dark:bg-yellow-900/20" : ""}>
                                                 <TableCell>
                                                     <div className="font-medium">
                                                         {item.itemName}
@@ -1413,55 +1510,7 @@ export default function PurchaseDetailPage() {
                                                     )}
                                                 </TableCell>
 
-                                                <TableCell className="text-right">
-                                                    {editingItemId === item.id ? (
-                                                        <div className="flex justify-end gap-1">
-                                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600" onClick={() => {
-                                                                const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-                                                                const coeff = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
-                                                                saveEdit(item.id, coeff);
-                                                            }}>
-                                                                <Save className="h-4 w-4" />
-                                                            </Button>
-                                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-500" onClick={cancelEdit}>
-                                                                X
-                                                            </Button>
-                                                            <Button
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                                                onClick={() => { setItemToDelete(item.id); setDeleteItemDialogOpen(true); }}
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </Button>
-                                                            {!isOrder && !item.returnedAt && (
-                                                                <Button
-                                                                    size="icon"
-                                                                    variant="ghost"
-                                                                    className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                                                                    title="Registra reso al fornitore"
-                                                                    onClick={() => openReturnDialog(item)}
-                                                                >
-                                                                    <Undo2 className="h-4 w-4" />
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    ) : (
-                                                        (userRole === 'admin' || userRole === 'operativo') && (
-                                                            <div className="flex justify-end gap-1">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    disabled={item.transportApplied}
-                                                                    title={item.transportApplied ? "Rimuovi il trasporto da questa riga prima di modificarla" : undefined}
-                                                                    onClick={() => startEditing(item)}
-                                                                >
-                                                                    Modifica
-                                                                </Button>
-                                                            </div>
-                                                        )
-                                                    )}
-                                                </TableCell>
+                                                <TableCell className="text-right">{renderRowActions(item)}</TableCell>
                                             </TableRow>
                                             {item.returnedAt && (
                                                 <TableRow className="bg-red-50/60 dark:bg-red-950/30 border-red-100 dark:border-red-900">
@@ -1510,28 +1559,7 @@ export default function PurchaseDetailPage() {
                                                         <span className="text-red-600 dark:text-red-400 font-medium text-sm">Reso al fornitore</span>
                                                     </TableCell>
                                                     <TableCell className="text-right">
-                                                        {(userRole === 'admin' || userRole === 'operativo') && (
-                                                            <div className="flex justify-end gap-1">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    className="text-red-600 hover:text-red-700 hover:bg-red-100"
-                                                                    title="Modifica reso"
-                                                                    onClick={() => openReturnDialog(item, true)}
-                                                                >
-                                                                    <Pen className="h-3.5 w-3.5" />
-                                                                </Button>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    className="text-red-600 hover:text-red-700 hover:bg-red-100"
-                                                                    title="Elimina reso"
-                                                                    onClick={() => setCancelReturnItemId(item.id)}
-                                                                >
-                                                                    <RotateCcw className="h-3.5 w-3.5 mr-1" /> Elimina reso
-                                                                </Button>
-                                                            </div>
-                                                        )}
+                                                        {/* Modifica / elimina reso: dal menu Azioni della riga sopra */}
                                                     </TableCell>
                                                 </TableRow>
                                             )}
@@ -1605,43 +1633,7 @@ export default function PurchaseDetailPage() {
                                             </div>
 
                                             {(userRole === 'admin' || userRole === 'operativo') && (
-                                                <div className="flex gap-0 shrink-0">
-                                                    {editingItemId === item.id ? (
-                                                        <>
-                                                            <Button size="icon" variant="ghost" className="h-7 w-7 text-green-600" onClick={() => {
-                                                                const inventoryItem = inventory.find(inv => inv.id === item.itemId);
-                                                                const coeff = inventoryItem?.coefficient ? Number(inventoryItem.coefficient) : (item.coefficient ? Number(item.coefficient) : 1);
-                                                                saveEdit(item.id, coeff);
-                                                            }}>
-                                                                <Save className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                            <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-500" onClick={cancelEdit}>
-                                                                <X className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                            <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500" onClick={() => { setItemToDelete(item.id); setDeleteItemDialogOpen(true); }}>
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                            {!isOrder && !item.returnedAt && (
-                                                                <Button size="icon" variant="ghost" className="h-7 w-7 text-amber-600" title="Registra reso al fornitore" onClick={() => openReturnDialog(item)}>
-                                                                    <Undo2 className="h-3.5 w-3.5" />
-                                                                </Button>
-                                                            )}
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-7 w-7 text-slate-500"
-                                                                disabled={item.transportApplied}
-                                                                title={item.transportApplied ? "Rimuovi il trasporto da questa riga prima di modificarla" : undefined}
-                                                                onClick={() => startEditing(item)}
-                                                            >
-                                                                <Edit className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                        </>
-                                                    )}
-                                                </div>
+                                                <div className="shrink-0">{renderRowActions(item)}</div>
                                             )}
                                         </div>
 
@@ -2207,6 +2199,19 @@ export default function PurchaseDetailPage() {
             loading={cancelingReturn}
             onConfirm={handleCancelReturn}
         />
+        <AlertDialog open={!!guard} onOpenChange={(o) => { if (!o) setGuard(null); }}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Modifiche non salvate</AlertDialogTitle>
+                    <AlertDialogDescription>Hai modificato una riga senza salvarla. Vuoi salvare le modifiche prima di continuare?</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter className="gap-2 sm:gap-2">
+                    <Button variant="outline" onClick={() => setGuard(null)}>Continua a modificare</Button>
+                    <Button variant="outline" className="text-red-600" onClick={() => { const g = guard; setGuard(null); cancelEdit(); g?.proceed(); }}>Scarta</Button>
+                    <Button className="bg-green-600 text-white hover:bg-green-700" onClick={async () => { const g = guard; if (await saveCurrentEdit()) { setGuard(null); g?.proceed(); } }}>Salva</Button>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
         </>
     );
 }
