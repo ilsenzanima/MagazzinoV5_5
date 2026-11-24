@@ -701,6 +701,7 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                 <JobPhotoCollection
                     title={collection.title}
                     backLabel="Conformità Personalizzata"
+                    withStrip={false}
                     docs={collection.docs}
                     onBack={closeCollection}
                     onMoveSelected={list => openMove(list)}
@@ -756,7 +757,7 @@ function OwnDocuments({ jobId, jobLabel }: { jobId: string; jobLabel?: string })
                                         </div>
                                     </TableHead>
                                     <TableHead className={`w-24 ${TABLE_HEAD_CLS}`}>{sortBtn("date", "Data")}</TableHead>
-                                    <TableHead className={`w-24 ${TABLE_HEAD_CLS}`}>{sortBtn("size", "Dimensione")}</TableHead>
+                                    <TableHead className={`w-36 ${TABLE_HEAD_CLS}`}>{sortBtn("size", "Dimensione")}</TableHead>
                                     <TableHead className={`w-[16%] ${TABLE_HEAD_CLS}`}>Nota</TableHead>
                                     <TableHead className="w-[4.5rem]" />
                                 </TableRow>

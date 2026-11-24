@@ -756,6 +756,7 @@ export function JobCommessaDocuments({ jobId, jobLabel }: JobCommessaDocumentsPr
           title={collection.title}
           docs={collection.docs}
           onBack={closeCollection}
+          backLabel="Documenti Commessa"
           onMoveSelected={docs => openMove(docs)}
           onDeleteSelected={docs => { setBulkDeleteDocs(docs); setBulkDeleteOpen(true) }}
           onAdd={() => openUpload({ typeId: openCollection!.typeId, folderId: openCollection!.folderId })}
@@ -835,7 +836,7 @@ export function JobCommessaDocuments({ jobId, jobLabel }: JobCommessaDocumentsPr
                         </div>
                       </TableHead>
                       <TableHead className={`w-24 ${headCls}`}>{sortBtn("date", "Data")}</TableHead>
-                      <TableHead className={`w-24 ${headCls}`}>{sortBtn("size", "Dimensione")}</TableHead>
+                      <TableHead className={`w-36 ${headCls}`}>{sortBtn("size", "Dimensione")}</TableHead>
                       <TableHead className={`w-[18%] ${headCls}`}>Nota</TableHead>
                       <TableHead className="w-[4.5rem]" />
                     </TableRow>

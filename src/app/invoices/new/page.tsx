@@ -285,7 +285,7 @@ export default function NewInvoicePage() {
           <BlockBrowserBack />
             <div className="pb-10">
                 <div className="mb-6">
-                    <Link href="/purchases?tab=fatture" className="flex items-center text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 mb-2">
+                    <Link href="/purchases?tab=fatture" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-300 mb-2">
                         <ArrowLeft className="h-4 w-4 mr-1" />
                         Torna alle Fatture
                     </Link>

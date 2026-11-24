@@ -3,7 +3,7 @@
 import { createContext, forwardRef, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
-import { Search, Menu, Check } from "lucide-react"
+import { Search, Menu, Check, ArrowLeft } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { HelpTip } from "@/components/ui/help-tip"
@@ -62,8 +62,8 @@ function barGeometry(w: number, x: number) {
   return { d, cx }
 }
 
-interface Slots { actions: HTMLElement | null; help: HTMLElement | null; title?: string }
-const SlotsCtx = createContext<Slots>({ actions: null, help: null })
+interface Slots { actions: HTMLElement | null; help: HTMLElement | null; back: HTMLElement | null; title?: string }
+const SlotsCtx = createContext<Slots>({ actions: null, help: null, back: null })
 // Per le pagine che stanno dentro una pagina unita: leggono gli spazi della striscia (ricerca e pulsanti vanno lì)
 export const useNotchSlots = () => useContext(SlotsCtx)
 // Vero quando la pagina sta sotto la striscia di una pagina unita: la sua striscia piatta si avvicina a quella sopra
@@ -154,6 +154,17 @@ export function NotchSearch({ value, onChange, placeholder }: { value: string; o
   return actions ? createPortal(field, actions) : field
 }
 
+// Pulsante «indietro» standard: sta sopra la striscia, a sinistra, come nelle pagine di dettaglio (testo grigio con freccia)
+export function NotchBack({ onClick, children }: { onClick: () => void; children: ReactNode }) {
+  const { back } = useContext(SlotsCtx)
+  const btn = (
+    <button type="button" onClick={onClick} className="inline-flex items-center text-sm text-slate-500 outline-none hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-blue-400 dark:hover:text-slate-300">
+      <ArrowLeft className="mr-1 h-4 w-4" />{children}
+    </button>
+  )
+  return back ? createPortal(btn, back) : btn
+}
+
 // Punto di domanda con l'elenco dei tipi inseribili: sta a sinistra, dopo il nome della pagina
 export function NotchHelp(props: React.ComponentProps<typeof HelpTip>) {
   const { help } = useContext(SlotsCtx)
@@ -199,6 +210,7 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
   const wrapRef = useRef<HTMLDivElement>(null)
   const [actionsEl, setActionsEl] = useState<HTMLElement | null>(null)
   const [helpEl, setHelpEl] = useState<HTMLElement | null>(null)
+  const [backEl, setBackEl] = useState<HTMLElement | null>(null)
   const [width, setWidth] = useState(0)
   const [x, setX] = useState(0)
   const xRef = useRef(0)
@@ -250,7 +262,7 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
   const phone = usePhone()
   const mobile = useMobileSearch()
   // Telefono: i pulsanti della fascia stanno nel tasto centrale della barra in basso
-  const slots: Slots = { actions: phone && mobile?.actionsSlot ? mobile.actionsSlot : actionsEl, help: helpEl, title: typeof title === "string" ? title : undefined }
+  const slots: Slots = { actions: phone && mobile?.actionsSlot ? mobile.actionsSlot : actionsEl, help: helpEl, back: backEl, title: typeof title === "string" ? title : undefined }
   const titleBlock = (
     <div className="pointer-events-auto flex min-w-0 items-center gap-1" style={{ maxWidth: items.length ? sideMax : undefined }}>
       <span className="truncate text-sm font-semibold uppercase tracking-wide">{title}</span>
@@ -265,9 +277,12 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
     />
   )
 
+  const backBlock = <div ref={setBackEl} className="empty:hidden" />
+
   if (items.length === 0) {
     return (
       <SlotsCtx.Provider value={slots}>
+        {backBlock}
         <div style={{ minHeight: H }} className={cn("flex items-center justify-between gap-3 rounded-2xl bg-slate-800 px-4 text-white shadow-md dark:bg-slate-700", nested ? "mt-0" : "mt-1 lg:mt-7", nested ? "" : "mb-6", className)}>
           {titleBlock}
           {actionsBlock}
@@ -279,6 +294,7 @@ export function NotchTabs({ items = [], value = "", onValueChange, title, classN
 
   return (
     <SlotsCtx.Provider value={slots}>
+      {backBlock}
       <div ref={wrapRef} role="tablist" className={cn("relative w-full select-none", className)}>
         <div
           className={cn(

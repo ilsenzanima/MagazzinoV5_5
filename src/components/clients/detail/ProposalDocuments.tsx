@@ -604,7 +604,7 @@ export function ProposalDocuments({ proposalId }: Props) {
                                         </Select>
                                     </TableHead>
                                     <TableHead className={`w-24 ${headCls}`}>{sortBtn('date', 'Data')}</TableHead>
-                                    <TableHead className={`w-24 ${headCls}`}>{sortBtn('size', 'Dimensione')}</TableHead>
+                                    <TableHead className={`w-36 ${headCls}`}>{sortBtn('size', 'Dimensione')}</TableHead>
                                     <TableHead className={`w-[18%] ${headCls}`}>Nota</TableHead>
                                     <TableHead className="w-[4.5rem]" />
                                 </TableRow>

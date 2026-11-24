@@ -146,7 +146,7 @@ export default function VanDetailPage() {
     return (
         <DashboardLayout>
             <div className="pb-10">
-                <Link href="/load-notes?vista=furgoni" className="mb-2 flex items-center text-muted-foreground hover:text-foreground">
+                <Link href="/load-notes?vista=furgoni" className="mb-2 inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
                     <ArrowLeft className="mr-1 h-4 w-4" /> Torna ai furgoni
                 </Link>
                 <NotchTabs title={van.name}>
