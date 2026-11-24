@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog"
 import { Checkbox } from "@/components/ui/checkbox"
+import { InlineNote } from "@/components/jobs/details/JobDocuments"
 import { RowActionsButton, SelectionBar, BulkButton } from "@/components/ui/row-actions"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Loader2, Calculator, Pencil, Trash2, ArrowUp, ArrowDown, ArrowUpDown, Download, Printer } from "lucide-react"
@@ -139,6 +140,15 @@ export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel, onEd
         finally { setSaving(false) }
     }
 
+    // Nota modificata direttamente dalla tabella
+    const saveNote = async (v: ProposalCostAnalysisVersion, note: string) => {
+        if (note === (v.note ?? "")) return
+        try {
+            const updated = await proposalCostAnalysisVersionsApi.update(v.id, { name: v.name, note: note || null })
+            setVersions(prev => prev.map(x => x.id === updated.id ? updated : x))
+        } catch { notify.error("Errore durante il salvataggio della nota") }
+    }
+
     const handleDelete = async () => {
         if (!deleteTarget) return
         try {
@@ -199,7 +209,7 @@ export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel, onEd
                             <TableHead className="w-1/3 border-r text-xs font-semibold uppercase tracking-wide text-slate-600"><button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">Nome{sortIcon('name')}</button></TableHead>
                             <TableHead className="border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Nota</TableHead>
                             <TableHead className="w-36 border-r text-xs font-semibold uppercase tracking-wide text-slate-600"><button type="button" onClick={() => toggleSort('date')} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">Creata il{sortIcon('date')}</button></TableHead>
-                            <TableHead className="w-20" />
+                            <TableHead className="w-[4.5rem]" />
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -211,7 +221,7 @@ export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel, onEd
                                 <TableCell className="border-r py-2">
                                     <span className="flex items-center gap-2 font-medium text-slate-900 dark:text-white"><Calculator className="h-4 w-4 shrink-0 text-emerald-600" />{v.name}</span>
                                 </TableCell>
-                                <TableCell className="border-r py-2 text-sm text-slate-500">{v.note || <span className="text-slate-300">—</span>}</TableCell>
+                                <TableCell className="border-r py-1" onClick={e => e.stopPropagation()}><InlineNote value={v.note ?? ""} onSave={n => saveNote(v, n)} /></TableCell>
                                 <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{new Date(v.createdAt).toLocaleDateString('it-IT')}</TableCell>
                                 <TableCell className="py-2">
                                     <div className="flex items-center justify-end" onClick={e => e.stopPropagation()}>

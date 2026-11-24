@@ -298,7 +298,7 @@ export default function AnalisiCostiArchivePage() {
                     {isTpl ? "Nota" : "Commessa di riferimento"}
                   </TableHead>
                   <TableHead className="w-32 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Creata il</TableHead>
-                  <TableHead className="w-20" />
+                  <TableHead className="w-[4.5rem]" />
                 </TableRow>
               </TableHeader>
               <TableBody>

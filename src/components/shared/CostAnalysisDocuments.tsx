@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Upload, Loader2, FileText, Pencil, Trash2, X, ArrowUp, ArrowDown, ArrowUpDown, ExternalLink, Printer, Download } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
+import { InlineNote } from "@/components/jobs/details/JobDocuments"
 import { RowActionsButton } from "@/components/ui/row-actions"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DocumentBulkBar, useDocSelection, printOne, downloadOne } from "@/components/documents/DocumentBulkBar"
@@ -160,6 +161,15 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
         }
     }
 
+    // Nota modificata direttamente dalla tabella
+    const saveNote = async (d: CostAnalysisDocument, notes: string) => {
+        if (notes === (d.notes || "")) return
+        try {
+            await costAnalysisDocumentsApi.update(d.id, { name: d.name, notes })
+            setDocuments(prev => prev.map(x => x.id === d.id ? { ...x, notes } : x))
+        } catch { notify.error("Errore durante il salvataggio della nota") }
+    }
+
     const handleDelete = async () => {
         if (!activeDoc) return
         try {
@@ -223,7 +233,7 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
                             <TableHead className="w-1/3 border-r text-xs font-semibold uppercase tracking-wide text-slate-600"><button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">Nome{sortIcon('name')}</button></TableHead>
                             <TableHead className="border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Note</TableHead>
                             <TableHead className="w-36 border-r text-xs font-semibold uppercase tracking-wide text-slate-600"><button type="button" onClick={() => toggleSort('date')} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">Caricato il{sortIcon('date')}</button></TableHead>
-                            <TableHead className="w-20" />
+                            <TableHead className="w-[4.5rem]" />
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -236,7 +246,7 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
                                         <span className="truncate" title={doc.name}>{doc.name}</span>
                                     </span>
                                 </TableCell>
-                                <TableCell className="border-r py-2 text-sm text-slate-500">{doc.notes || <span className="text-slate-300">—</span>}</TableCell>
+                                <TableCell className="border-r py-1" onClick={e => e.stopPropagation()}><InlineNote value={doc.notes || ""} onSave={n => saveNote(doc, n)} /></TableCell>
                                 <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{format(new Date(doc.createdAt), 'dd/MM/yyyy', { locale: it })}</TableCell>
                                 <TableCell className="py-2">
                                     <div className="flex justify-end">
