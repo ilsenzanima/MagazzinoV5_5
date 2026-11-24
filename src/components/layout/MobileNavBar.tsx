@@ -40,26 +40,25 @@ const NAV_ITEMS: NavItem[] = [
 ];
 const RECENT_KEY = "mobile-recent-pages";
 
+// Azioni che eliminano: icona sempre rossa
+const DANGER_WORDS = /elimin|cancell|rimuov|svuota/i;
+// Azioni che salvano o confermano: icona sempre verde
+const SAVE_WORDS = /salva|conferma/i;
+
 // Tiene il pannello a schermo ancora per un po' dopo la chiusura, così può animarsi anche in uscita
-function usePresence(open: boolean, ms = 320) {
-    const [mounted, setMounted] = useState(open);
-    const [shown, setShown] = useState(false);
+function usePresence(open: boolean, ms = 340) {
+    const [lingering, setLingering] = useState(false);
     useEffect(() => {
-        if (open) {
-            setMounted(true);
-            let r2 = 0;
-            const r1 = requestAnimationFrame(() => { r2 = requestAnimationFrame(() => setShown(true)); });
-            return () => { cancelAnimationFrame(r1); cancelAnimationFrame(r2); };
-        }
-        setShown(false);
-        const t = setTimeout(() => setMounted(false), ms);
+        if (open) { setLingering(false); return; }
+        setLingering(true);
+        const t = setTimeout(() => setLingering(false), ms);
         return () => clearTimeout(t);
     }, [open, ms]);
-    return { mounted, shown };
+    return { mounted: open || lingering, open };
 }
 
 // Animazione dei pannelli Naviga e Cerca: salgono dalla barra e vi rientrano
-const panelMotion = (shown: boolean) => cn("transition-[transform,opacity]", shown ? "translate-y-0 opacity-100 duration-[450ms] ease-out" : "translate-y-[60%] opacity-0 duration-300 ease-in");
+const panelMotion = (open: boolean) => (open ? "sheet-in" : "sheet-out");
 
 const baseOf = (path: string | null) => "/" + (path?.split("/")[1] ?? "");
 
@@ -77,12 +76,24 @@ export function MobileNavBar() {
         if (!actionsSlot) return;
         const count = () => {
             const kids = Array.from(actionsSlot.children) as HTMLElement[];
-            kids.forEach((k, i) => k.style.setProperty("--i", String(i)));
+            kids.forEach((k, i) => {
+                k.style.setProperty("--i", String(i));
+                const btn = k.matches("button") ? k : k.querySelector("button");
+                if (!btn) return;
+                // Pulsante con la sola icona: gli si dà un nome da mostrare accanto
+                const label = btn.getAttribute("aria-label") || btn.getAttribute("title") || "";
+                if (!(btn.textContent ?? "").trim() && label) { btn.setAttribute("data-iconly", ""); btn.setAttribute("data-dial-label", label); }
+                else btn.removeAttribute("data-iconly");
+                if (DANGER_WORDS.test(`${btn.textContent ?? ""} ${label}`) || /\bred-\d/.test(btn.className) || /\bred-\d/.test(k.className)) k.setAttribute("data-dial-danger", "");
+                else k.removeAttribute("data-dial-danger");
+                if (!k.hasAttribute("data-dial-danger") && SAVE_WORDS.test(`${btn.textContent ?? ""} ${label} ${btn.getAttribute("title") ?? ""}`)) k.setAttribute("data-dial-save", "");
+                else k.removeAttribute("data-dial-save");
+            });
             setSlotCount(kids.length);
         };
         count();
         const mo = new MutationObserver(count);
-        mo.observe(actionsSlot, { childList: true });
+        mo.observe(actionsSlot, { childList: true, subtree: true });
         const onClick = (e: Event) => {
             const t = e.target as HTMLElement | null;
             if (!t?.closest("button,a")) return;
@@ -141,7 +152,7 @@ export function MobileNavBar() {
             {/* Sfondo scuro dietro ai menu: sfuma in entrata e in uscita */}
             {backdropP.mounted && (
                 <button type="button" aria-label="Chiudi" onClick={() => { setDialOpen(false); setNavOpen(false); setSearchOpen(false); }}
-                    className={cn("fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-[1px] transition-opacity duration-300 lg:hidden", backdropP.shown ? "opacity-100" : "opacity-0")} />
+                    className={cn("fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-[1px] lg:hidden", backdropP.open ? "backdrop-in" : "backdrop-out")} />
             )}
 
             {/* Menu flottante: sempre montato, cosi' i pulsanti della pagina restano al loro posto. Il riquadro non cattura i tocchi: solo i pulsanti */}
@@ -158,7 +169,7 @@ export function MobileNavBar() {
                                 </>
                             );
                             return (
-                                <li key={a.key} className="dial-item" style={{ "--i": slotCount + i } as React.CSSProperties}>
+                                <li key={a.key} className="dial-item" data-dial-danger={DANGER_WORDS.test(a.label) ? "" : undefined} data-dial-save={!DANGER_WORDS.test(a.label) && SAVE_WORDS.test(a.label) ? "" : undefined} style={{ "--i": slotCount + i } as React.CSSProperties}>
                                     {a.href ? (
                                         <Link href={a.href} prefetch={false} onClick={() => setDialOpen(false)} className="dial-pill">{inner}</Link>
                                     ) : (
@@ -175,7 +186,7 @@ export function MobileNavBar() {
             <div className="fixed inset-x-0 bottom-0 z-50 lg:hidden">
                 {/* Menu Naviga: la fascia stessa che sale, stessa tinta della barra */}
                 {navP.mounted && (
-                    <div className={cn("relative -mb-[38px] max-h-[calc(100dvh-9rem)] overflow-y-auto overscroll-contain rounded-t-3xl bg-slate-800 px-4 pb-[50px] pt-5 text-slate-100 shadow-[0_-8px_24px_rgba(0,0,0,0.35)]", panelMotion(navP.shown))}>
+                    <div className={cn("relative -mb-[38px] max-h-[calc(100dvh-9rem)] overflow-y-auto overscroll-contain rounded-t-3xl bg-slate-800 px-4 pb-[50px] pt-5 text-slate-100 shadow-[0_-8px_24px_rgba(0,0,0,0.35)]", panelMotion(navP.open))}>
                         {navSection && (
                             <div className="mb-4 space-y-3">
                                 <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{navSection.title}</p>
@@ -246,7 +257,7 @@ export function MobileNavBar() {
                         )}
                     </div>
                 )}
-                {searchP.mounted && <MobileSearchSheet onClose={() => setSearchOpen(false)} className={panelMotion(searchP.shown)} />}
+                {searchP.mounted && <MobileSearchSheet onClose={() => setSearchOpen(false)} className={panelMotion(searchP.open)} />}
                 <div className="relative flex h-16 items-stretch">
                     <button type="button" onClick={() => { setDialOpen(false); setSearchOpen(false); setNavOpen(o => !o); }} className={cn(sideButton, "bg-slate-800")} aria-label={navOpen ? "Chiudi il menu" : "Naviga tra le pagine"} aria-expanded={navOpen}>
                         {navOpen ? <X className="h-5 w-5" /> : <LayoutGrid className="h-5 w-5" />}
