@@ -144,6 +144,27 @@ function NewVoceCell({ placeholder, onAdd }: { placeholder: string; onAdd: (name
     )
 }
 
+// Unità di misura piccola accanto al prezzo («€/ora») o alla quantità («ore»): un clic per cambiarla, «€» / «—» se non serve
+function UnitPick({ value, units, mode, onChange }: { value: string; units: CostAnalysisVoceUnit[]; mode: 'price' | 'qty'; onChange: (u: string) => void }) {
+    const known = !value || units.some(u => u.name === value)
+    const shown = mode === 'price' ? `€${priceUnitSuffix(value)}` : (qtyUnitSuffix(value) || '—')
+    return (
+        <span className={`relative inline-flex items-center text-[10px] text-slate-400 hover:text-blue-600 ${mode === 'price' ? 'mr-0.5' : 'ml-0.5 min-w-[2rem]'}`} title="Unità di misura (facoltativa)">
+            <span aria-hidden="true" className="pointer-events-none whitespace-nowrap">{shown}</span>
+            <select
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                aria-label="Unità di misura"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            >
+                <option value="">{mode === 'price' ? '€ (nessuna unità)' : '— (nessuna unità)'}</option>
+                {!known && <option value={value}>{mode === 'price' ? `€/${value}` : value}</option>}
+                {units.map(u => <option key={u.id} value={u.name}>{mode === 'price' ? `€/${u.name}` : (u.qtyLabel || u.name)}</option>)}
+            </select>
+        </span>
+    )
+}
+
 function GenericTable({ rows, units, onUpdate, onDelete, onAdd, addPlaceholder, voceLabel = 'Voce', totalLabel = 'Totale voci generiche' }: { rows: CostAnalysisRow[]; voceLabel?: string; totalLabel?: string; units: CostAnalysisVoceUnit[]; addPlaceholder: string; onAdd: (name: string) => void; onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName' | 'itemUnit'>>) => void; onDelete: (id: string) => void }) {
     const [pendingDelete, setPendingDelete] = useState<string | null>(null)
     const totalEst = rows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0)
@@ -152,7 +173,6 @@ function GenericTable({ rows, units, onUpdate, onDelete, onAdd, addPlaceholder, 
             <table className="w-full text-sm">
                 <thead><tr className="border-b bg-slate-100/80 dark:bg-slate-800/70">
                     <th className="text-left p-2 font-medium text-slate-500">{voceLabel}</th>
-                    <th className="text-left p-2 font-medium text-slate-500 whitespace-nowrap w-32">U.M.</th>
                     <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Prezzo unit.</th>
                     <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Qtà presunta</th>
                     <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Tot. presunto</th>
@@ -162,24 +182,11 @@ function GenericTable({ rows, units, onUpdate, onDelete, onAdd, addPlaceholder, 
                     {rows.map((row, idx) => {
                         const totEst = (row.unitPrice ?? 0) * row.qtyEstimated
                         const stripe = idx % 2 === 1 ? 'bg-slate-50/80 dark:bg-slate-800/30' : ''
-                        const known = !row.itemUnit || units.some(u => u.name === row.itemUnit)
                         return (
                             <tr key={row.id} className={`border-b border-slate-100 dark:border-slate-800 ${stripe}`}>
                                 <td className="p-2 min-w-[160px]"><InlineTextEdit value={row.itemName} onSave={v => onUpdate(row.id, { itemName: v })} placeholder="Descrizione voce…" /></td>
-                                <td className="p-2">
-                                    <select
-                                        value={row.itemUnit}
-                                        onChange={e => onUpdate(row.id, { itemUnit: e.target.value })}
-                                        aria-label="Unità di misura"
-                                        className="h-7 w-full rounded-md border border-slate-200 bg-white px-1 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                                    >
-                                        <option value="">Nessuna (€)</option>
-                                        {!known && <option value={row.itemUnit}>€/{row.itemUnit}</option>}
-                                        {units.map(u => <option key={u.id} value={u.name}>€/{u.name}</option>)}
-                                    </select>
-                                </td>
-                                <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><span className="text-[10px] text-slate-400">€{priceUnitSuffix(row.itemUnit)}</span><EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })} /></div></td>
-                                <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><EditCell value={row.qtyEstimated || null} onSave={v => onUpdate(row.id, { qtyEstimated: v ?? 0 })} />{qtyUnitSuffix(row.itemUnit) && <span className="text-[10px] text-slate-400 w-8 text-left">{qtyUnitSuffix(row.itemUnit)}</span>}</div></td>
+                                <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><UnitPick value={row.itemUnit} units={units} mode="price" onChange={u => onUpdate(row.id, { itemUnit: u })} /><EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })} /></div></td>
+                                <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><EditCell value={row.qtyEstimated || null} onSave={v => onUpdate(row.id, { qtyEstimated: v ?? 0 })} /><UnitPick value={row.itemUnit} units={units} mode="qty" onChange={u => onUpdate(row.id, { itemUnit: u })} /></div></td>
                                 <td className="p-2 text-right font-mono text-xs font-medium text-slate-700 dark:text-slate-300">{row.unitPrice !== null ? `€ ${fmt(totEst)}` : '—'}</td>
                                 <td className="p-2 text-right whitespace-nowrap">
                                     {pendingDelete === row.id ? (
@@ -198,14 +205,13 @@ function GenericTable({ rows, units, onUpdate, onDelete, onAdd, addPlaceholder, 
                     {/* Riga precompilata: scrivendo il nome diventa una riga vera */}
                     <tr className="border-b border-slate-100 dark:border-slate-800">
                         <td className="p-2 min-w-[160px]"><NewVoceCell placeholder={addPlaceholder} onAdd={onAdd} /></td>
-                        <td className="p-2"></td>
                         <td className="p-2"><GhostBox text="0,00" /></td>
                         <td className="p-2"><GhostBox text="0,00" /></td>
                         <td className="p-2"></td>
                         <td className="w-6 p-2"></td>
                     </tr>
                 </tbody>
-                {rows.length > 0 && <tfoot><tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/60 font-semibold text-sm"><td colSpan={4} className="p-2 text-slate-600 dark:text-slate-400">{totalLabel}</td><td className="p-2 text-right font-mono text-blue-700 dark:text-blue-300">€ {fmt(totalEst)}</td><td></td></tr></tfoot>}
+                {rows.length > 0 && <tfoot><tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/60 font-semibold text-sm"><td colSpan={3} className="p-2 text-slate-600 dark:text-slate-400">{totalLabel}</td><td className="p-2 text-right font-mono text-blue-700 dark:text-blue-300">€ {fmt(totalEst)}</td><td></td></tr></tfoot>}
             </table>
         </div>
     )
