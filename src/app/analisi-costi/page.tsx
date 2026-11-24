@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { RowActionsButton, SelectionBar, BulkButton } from "@/components/ui/row-actions";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -274,21 +276,13 @@ export default function AnalisiCostiArchivePage() {
         }}
       />
 
-      {selCount > 0 && (
-        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm dark:border-blue-900/40 dark:bg-blue-950/20">
-          <span className="font-medium text-blue-900 dark:text-blue-200">{selCount} selezionat{selCount === 1 ? "a" : "e"}</span>
-          <Button size="sm" onClick={() => openBase([...selected])} className="bg-blue-600 hover:bg-blue-700">
-            <Layers className="mr-1 h-4 w-4" />{selCount === 1 ? "Usa come base" : `Unisci in una nuova analisi`}
-          </Button>
-          <Button size="sm" variant="outline" disabled={exporting} onClick={() => runExport(selectedVersions(), "download")}>
-            {exporting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}Scarica PDF
-          </Button>
-          <Button size="sm" variant="outline" disabled={exporting} onClick={() => runExport(selectedVersions(), "print")}>
-            <Printer className="mr-1 h-4 w-4" />Stampa
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Deseleziona</Button>
-        </div>
-      )}
+      <div className="mb-3 empty:hidden">
+        <SelectionBar count={selCount} singular="analisi selezionata" plural="analisi selezionate" onClear={() => setSelected(new Set())}>
+          <BulkButton icon={<Layers />} onClick={() => openBase([...selected])}>{selCount === 1 ? "Usa come base" : "Unisci in una nuova analisi"}</BulkButton>
+          <BulkButton icon={<Download />} busy={exporting} disabled={exporting} onClick={() => runExport(selectedVersions(), "download")}>Scarica PDF</BulkButton>
+          <BulkButton icon={<Printer />} disabled={exporting} onClick={() => runExport(selectedVersions(), "print")}>Stampa</BulkButton>
+        </SelectionBar>
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
@@ -344,19 +338,24 @@ export default function AnalisiCostiArchivePage() {
                       </TableCell>
                       <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{new Date(v.createdAt).toLocaleDateString("it-IT")}</TableCell>
                       <TableCell className="py-2" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-end gap-1">
-                          <button title="Scarica PDF" disabled={exporting} className="p-1 text-slate-400 hover:text-blue-600 disabled:opacity-40" onClick={() => runExport([v], "download")}><Download className="h-4 w-4" /></button>
-                          <button title="Stampa" disabled={exporting} className="p-1 text-slate-400 hover:text-blue-600 disabled:opacity-40" onClick={() => runExport([v], "print")}><Printer className="h-4 w-4" /></button>
-                          <button title="Usa come base" className="p-1 text-slate-400 hover:text-blue-600" onClick={() => openBase([v.id])}><Copy className="h-4 w-4" /></button>
-                          {!isTpl && (
-                            <button title="Salva come modello" className="p-1 text-slate-400 hover:text-amber-600"
-                              onClick={() => { setTplSource(v); setTplName(v.name); setTplNote(v.note ?? ""); }}>
-                              <Bookmark className="h-4 w-4" />
-                            </button>
-                          )}
-                          {isTpl && (
-                            <button title="Elimina modello" className="p-1 text-slate-400 hover:text-red-600" onClick={() => setDeleteTarget(v)}><Trash2 className="h-4 w-4" /></button>
-                          )}
+                        <div className="flex items-center justify-end">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild><RowActionsButton aria-label="Azioni analisi costi" /></DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem disabled={exporting} onClick={() => runExport([v], "download")}><Download className="mr-2 h-4 w-4" />Scarica PDF</DropdownMenuItem>
+                              <DropdownMenuItem disabled={exporting} onClick={() => runExport([v], "print")}><Printer className="mr-2 h-4 w-4" />Stampa</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openBase([v.id])}><Copy className="mr-2 h-4 w-4" />Usa come base</DropdownMenuItem>
+                              {!isTpl && (
+                                <DropdownMenuItem onClick={() => { setTplSource(v); setTplName(v.name); setTplNote(v.note ?? ""); }}><Bookmark className="mr-2 h-4 w-4" />Salva come modello</DropdownMenuItem>
+                              )}
+                              {isTpl && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => setDeleteTarget(v)} className="text-red-600 focus:text-red-600"><Trash2 className="mr-2 h-4 w-4" />Elimina modello</DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>
