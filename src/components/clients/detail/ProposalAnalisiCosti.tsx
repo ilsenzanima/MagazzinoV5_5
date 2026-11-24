@@ -90,9 +90,9 @@ function MaterialTable({ rows, onUpdate, onDelete, onAdd }: { rows: CostAnalysis
                             <tr key={row.id} className={`border-b border-slate-100 dark:border-slate-800 ${stripe}`}>
                                 <td className="p-2 text-slate-800 dark:text-slate-200 text-sm leading-snug">{label}</td>
                                 <td className="p-2 text-right whitespace-nowrap">
-                                    {row.maxPurchasePrice !== null ? <span className="text-xs font-mono text-slate-600"><span className="text-slate-400 text-[10px] mr-0.5">{unitPfx}</span>{fmt(row.maxPurchasePrice)}</span> : <Badge variant="outline" className="text-xs text-slate-400 border-slate-300">N/D</Badge>}
+                                    {row.maxPurchasePrice !== null ? <span className="text-xs font-mono text-slate-600">{fmt(row.maxPurchasePrice)}<span className="text-slate-400 text-[10px] ml-0.5">{unitPfx}</span></span> : <Badge variant="outline" className="text-xs text-slate-400 border-slate-300">N/D</Badge>}
                                 </td>
-                                <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><span className="text-[10px] text-slate-400">{unitPfx}</span><EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })} placeholder={row.maxPurchasePrice !== null ? fmt(row.maxPurchasePrice) : '—'} /></div></td>
+                                <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })} placeholder={row.maxPurchasePrice !== null ? fmt(row.maxPurchasePrice) : '—'} /><span className="text-[10px] text-slate-400 w-14 text-left whitespace-nowrap">{unitPfx}</span></div></td>
                                 <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><EditCell value={row.qtyEstimated || null} onSave={v => onUpdate(row.id, { qtyEstimated: v ?? 0 })} />{row.itemUnit && <span className="text-[10px] text-slate-400 w-8 text-left">{qtyUnitSuffix(row.itemUnit)}</span>}</div></td>
                                 <td className={`p-2 text-right font-mono text-xs ${usingMax ? 'italic text-slate-500' : 'text-slate-700 dark:text-slate-300 font-medium'}`} title={usingMax ? 'Prezzo non impostato: usato in automatico il prezzo massimo di acquisto' : undefined}>{price !== null ? `€ ${fmt(totEst)}` : '—'}</td>
                                 <td className="p-2 text-right whitespace-nowrap">
@@ -149,7 +149,7 @@ function UnitPick({ value, units, mode, onChange }: { value: string; units: Cost
     const known = !value || units.some(u => u.name === value)
     const shown = mode === 'price' ? `€${priceUnitSuffix(value)}` : (qtyUnitSuffix(value) || '—')
     return (
-        <span className={`relative inline-flex items-center text-[10px] text-slate-400 hover:text-blue-600 ${mode === 'price' ? 'mr-0.5' : 'ml-0.5 min-w-[2rem]'}`} title="Unità di misura (facoltativa)">
+        <span className={`relative inline-flex items-center text-[10px] text-slate-400 hover:text-blue-600 ${mode === 'price' ? 'ml-0.5 min-w-[3.5rem]' : 'ml-0.5 min-w-[2rem]'}`} title="Unità di misura (facoltativa)">
             <span aria-hidden="true" className="pointer-events-none whitespace-nowrap">{shown}</span>
             <select
                 value={value}
@@ -185,7 +185,7 @@ function GenericTable({ rows, units, onUpdate, onDelete, onAdd, addPlaceholder, 
                         return (
                             <tr key={row.id} className={`border-b border-slate-100 dark:border-slate-800 ${stripe}`}>
                                 <td className="p-2 min-w-[160px]"><InlineTextEdit value={row.itemName} onSave={v => onUpdate(row.id, { itemName: v })} placeholder="Descrizione voce…" /></td>
-                                <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><UnitPick value={row.itemUnit} units={units} mode="price" onChange={u => onUpdate(row.id, { itemUnit: u })} /><EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })} /></div></td>
+                                <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })} /><UnitPick value={row.itemUnit} units={units} mode="price" onChange={u => onUpdate(row.id, { itemUnit: u })} /></div></td>
                                 <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><EditCell value={row.qtyEstimated || null} onSave={v => onUpdate(row.id, { qtyEstimated: v ?? 0 })} /><UnitPick value={row.itemUnit} units={units} mode="qty" onChange={u => onUpdate(row.id, { itemUnit: u })} /></div></td>
                                 <td className="p-2 text-right font-mono text-xs font-medium text-slate-700 dark:text-slate-300">{row.unitPrice !== null ? `€ ${fmt(totEst)}` : '—'}</td>
                                 <td className="p-2 text-right whitespace-nowrap">

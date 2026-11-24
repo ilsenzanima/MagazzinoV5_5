@@ -144,7 +144,7 @@ export async function generateCostAnalysisExcel(input: CostAnalysisPdfInput): Pr
             const totEst = (price ?? 0) * r.qtyEstimated;
             pushRow([
                 dataCell(label),
-                price !== null ? numDataCell(price, true, priceUnitSuffix(r.itemUnit)) : dataCell('—', true),
+                price !== null ? numDataCell(price, false, ` €${priceUnitSuffix(r.itemUnit)}`) : dataCell('—', true),
                 numDataCell(r.qtyEstimated, false, qtyUnitSuffix(r.itemUnit) ? ` ${qtyUnitSuffix(r.itemUnit)}` : ''),
                 price !== null ? numDataCell(totEst) : dataCell('—', true),
             ], estimateLines(label, COL_WCH[0]));
@@ -161,7 +161,7 @@ export async function generateCostAnalysisExcel(input: CostAnalysisPdfInput): Pr
             const totEst = (r.unitPrice ?? 0) * r.qtyEstimated;
             pushRow([
                 dataCell(r.itemName),
-                r.unitPrice !== null ? numDataCell(r.unitPrice, true, priceUnitSuffix(r.itemUnit)) : dataCell('—', true),
+                r.unitPrice !== null ? numDataCell(r.unitPrice, false, ` €${priceUnitSuffix(r.itemUnit)}`) : dataCell('—', true),
                 numDataCell(r.qtyEstimated, false, qtyUnitSuffix(r.itemUnit) ? ` ${qtyUnitSuffix(r.itemUnit)}` : ''),
                 r.unitPrice !== null ? numDataCell(totEst) : dataCell('—', true),
             ], estimateLines(r.itemName, COL_WCH[0]));

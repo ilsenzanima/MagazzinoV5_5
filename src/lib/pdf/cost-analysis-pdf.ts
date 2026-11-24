@@ -154,7 +154,7 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
     currentY += boxH + 6;
 
     // --- 4. Materiali da Magazzino ---
-    const fmtCell = (n: number | null, unit?: string | null) => n !== null ? `€ ${fmt(n)}${priceUnitSuffix(unit)}` : '—';
+    const fmtCell = (n: number | null, unit?: string | null) => n !== null ? `${fmt(n)} €${priceUnitSuffix(unit)}` : '—';
     const fmtQty = (q: number, unit?: string | null) => { const u = qtyUnitSuffix(unit); return u ? `${fmt(q)} ${u}` : fmt(q); };
     const totMateriali = input.inventoryRows.reduce((s, r) => s + (effectiveUnitPrice(r) ?? 0) * r.qtyEstimated, 0);
 
