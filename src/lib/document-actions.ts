@@ -35,7 +35,7 @@ async function fetchBlob(url: string): Promise<Blob> {
     return res.blob()
 }
 
-const saveBlob = (blob: Blob, name: string) => {
+export const saveBlob = (blob: Blob, name: string) => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url

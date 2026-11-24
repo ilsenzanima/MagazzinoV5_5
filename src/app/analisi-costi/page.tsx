@@ -16,12 +16,14 @@ import { ListPageHeader } from "@/components/ui/list-page-header";
 import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Calculator, Copy, Bookmark, BookmarkCheck, Trash2, Layers } from "lucide-react";
+import { Loader2, Calculator, Copy, Bookmark, BookmarkCheck, Trash2, Layers, Download, Printer } from "lucide-react";
+import { buildExportInputs, downloadCostAnalysesPdf, printCostAnalysesPdf } from "@/lib/cost-analysis-export";
 import { clientProposalsApi, ClientProposal } from "@/lib/services/client-proposals";
 import { jobsApi, Job } from "@/lib/api";
 import { proposalCostAnalysisVersionsApi, ProposalCostAnalysisVersion } from "@/lib/services/proposal-cost-analysis";
 import { costAnalysisArchiveApi, ArchiveTarget } from "@/lib/services/cost-analysis-archive";
 import { ProposalAnalisiCosti } from "@/components/clients/detail/ProposalAnalisiCosti";
+import { NotchTabs } from "@/components/ui/notch-tabs";
 import { InlineNote } from "@/components/ui/table-bits";
 import { useHistoryStep } from "@/hooks/useHistoryStep";
 import { useAuth } from "@/components/auth-provider";
@@ -189,6 +191,25 @@ export default function AnalisiCostiArchivePage() {
     finally { setCreating(false); }
   };
 
+  // Scarico/stampa rapidi di una o più analisi (PDF)
+  const [exporting, setExporting] = useState(false);
+  const runExport = async (list: ProposalCostAnalysisVersion[], mode: "download" | "print") => {
+    if (list.length === 0) return;
+    try {
+      setExporting(true);
+      const inputs = await buildExportInputs(list, v => {
+        if (v.isTemplate) return { proposalTitle: "Modello" };
+        if (v.proposalId) { const p = proposalById.get(v.proposalId); return { proposalTitle: p?.title ?? "", clientId: p?.clientId }; }
+        const j = v.jobId ? jobById.get(v.jobId) : undefined;
+        return { proposalTitle: j ? `${j.code} · ${j.name}` : "", clientId: j?.clientId };
+      });
+      if (mode === "download") await downloadCostAnalysesPdf(inputs);
+      else await printCostAnalysesPdf(inputs);
+    } catch { notify.error(mode === "download" ? "Errore durante il download del PDF" : "Errore durante la stampa"); }
+    finally { setExporting(false); }
+  };
+  const selectedVersions = () => versions.filter(v => selected.has(v.id));
+
   // Nota di un modello modificabile direttamente dalla tabella
   const handleSaveNote = async (v: ProposalCostAnalysisVersion, note: string) => {
     const prev = v.note;
@@ -215,15 +236,16 @@ export default function AnalisiCostiArchivePage() {
     const v = versionById.get(openId);
     return (
       <DashboardLayout>
-        <ListPageHeader strip title={v?.isTemplate ? `Modello · ${v.name}` : `Analisi costi · ${v?.name ?? ""}`} />
-        <ProposalAnalisiCosti
-          proposalId={v?.proposalId ?? null}
-          jobLabel={v ? (v.isTemplate ? "Modello" : refOf(v).main) : undefined}
-          versionId={openId}
-          versionName={v?.name ?? ""}
-          versionCreatedAt={v?.createdAt ?? ""}
-          onBack={() => { closeVersion(); load(); }}
-        />
+        <NotchTabs title={v?.name ?? "Analisi costi"}>
+          <ProposalAnalisiCosti
+            proposalId={v?.proposalId ?? null}
+            jobLabel={v ? (v.isTemplate ? "Modello" : refOf(v).main) : undefined}
+            versionId={openId}
+            versionName={v?.name ?? ""}
+            versionCreatedAt={v?.createdAt ?? ""}
+            onBack={() => { closeVersion(); load(); }}
+          />
+        </NotchTabs>
       </DashboardLayout>
     );
   }
@@ -258,6 +280,12 @@ export default function AnalisiCostiArchivePage() {
           <Button size="sm" onClick={() => openBase([...selected])} className="bg-blue-600 hover:bg-blue-700">
             <Layers className="mr-1 h-4 w-4" />{selCount === 1 ? "Usa come base" : `Unisci in una nuova analisi`}
           </Button>
+          <Button size="sm" variant="outline" disabled={exporting} onClick={() => runExport(selectedVersions(), "download")}>
+            {exporting ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Download className="mr-1 h-4 w-4" />}Scarica PDF
+          </Button>
+          <Button size="sm" variant="outline" disabled={exporting} onClick={() => runExport(selectedVersions(), "print")}>
+            <Printer className="mr-1 h-4 w-4" />Stampa
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Deseleziona</Button>
         </div>
       )}
@@ -276,7 +304,7 @@ export default function AnalisiCostiArchivePage() {
                     {isTpl ? "Nota" : "Commessa di riferimento"}
                   </TableHead>
                   <TableHead className="w-32 border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Creata il</TableHead>
-                  <TableHead className="w-28" />
+                  <TableHead className="w-40" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -317,6 +345,8 @@ export default function AnalisiCostiArchivePage() {
                       <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{new Date(v.createdAt).toLocaleDateString("it-IT")}</TableCell>
                       <TableCell className="py-2" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
+                          <button title="Scarica PDF" disabled={exporting} className="p-1 text-slate-400 hover:text-blue-600 disabled:opacity-40" onClick={() => runExport([v], "download")}><Download className="h-4 w-4" /></button>
+                          <button title="Stampa" disabled={exporting} className="p-1 text-slate-400 hover:text-blue-600 disabled:opacity-40" onClick={() => runExport([v], "print")}><Printer className="h-4 w-4" /></button>
                           <button title="Usa come base" className="p-1 text-slate-400 hover:text-blue-600" onClick={() => openBase([v.id])}><Copy className="h-4 w-4" /></button>
                           {!isTpl && (
                             <button title="Salva come modello" className="p-1 text-slate-400 hover:text-amber-600"

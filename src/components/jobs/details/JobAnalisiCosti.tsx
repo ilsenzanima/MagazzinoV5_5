@@ -158,7 +158,7 @@ function MaterialTable({ rows, alerts, onUpdate, onDelete }: {
                                 <td className="p-2 text-right whitespace-nowrap">
                                     {row.maxPurchasePrice !== null ? (
                                         <span className="text-xs font-mono text-slate-600">
-                                            <span className="text-slate-400 text-[10px] mr-0.5">{unitPfx}</span>{fmt(row.maxPurchasePrice)}
+                                            {fmt(row.maxPurchasePrice)}<span className="text-slate-400 text-[10px] ml-0.5">{unitPfx}</span>
                                         </span>
                                     ) : (
                                         <Badge variant="outline" className="text-xs text-slate-400 border-slate-300">N/D</Badge>
@@ -166,13 +166,16 @@ function MaterialTable({ rows, alerts, onUpdate, onDelete }: {
                                 </td>
                                 <td className="p-2 text-right">
                                     <div className="flex items-center justify-end gap-0.5">
-                                        <span className="text-[10px] text-slate-400">{unitPfx}</span>
                                         <EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })}
                                             placeholder={row.maxPurchasePrice !== null ? fmt(row.maxPurchasePrice) : '—'} />
+                                        <span className="text-[10px] text-slate-400 w-14 text-left whitespace-nowrap">{unitPfx}</span>
                                     </div>
                                 </td>
                                 <td className="p-2 text-right">
-                                    <EditCell value={row.qtyEstimated || null} onSave={v => onUpdate(row.id, { qtyEstimated: v ?? 0 })} />
+                                    <div className="flex items-center justify-end gap-0.5">
+                                        <EditCell value={row.qtyEstimated || null} onSave={v => onUpdate(row.id, { qtyEstimated: v ?? 0 })} />
+                                        <span className="text-[10px] text-slate-400 w-8 text-left">{row.itemUnit}</span>
+                                    </div>
                                 </td>
                                 <td className={`p-2 text-right font-mono text-xs ${usingMax ? 'italic text-slate-500' : 'text-slate-700 dark:text-slate-300 font-medium'}`}
                                     title={usingMax ? 'Prezzo non impostato: usato in automatico il prezzo massimo di acquisto' : undefined}>
@@ -325,6 +328,8 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
     const alertsByRow = useMemo(() => new Map(alerts.map(a => [a.rowId, a])), [alerts])
     const [proposalId, setProposalId] = useState<string | null>(null)
     const [subTab, setSubTab] = useState<'prezzi' | 'offerta' | 'terzi'>('prezzi')
+    // Nome dell'analisi costi aperta nell'editor (null = elenco): la striscia mostra nome e pulsanti dell'editor
+    const [costEditing, setCostEditing] = useState<string | null>(null)
 
     const inventoryRows = useMemo(() => rows.filter(r => r.type === 'inventory'), [rows])
     const genericRows = useMemo(() => rows.filter(r => r.type === 'generic'), [rows])
@@ -482,10 +487,10 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
         <div className="space-y-4">
             <Tabs value={subTab} onValueChange={v => setSubTab(v as 'prezzi' | 'offerta' | 'terzi')}>
                 <NotchTabs
-                    title="Analisi costi"
+                    title={costEditing ?? "Analisi costi"}
                     value={subTab}
                     onValueChange={v => setSubTab(v as 'prezzi' | 'offerta' | 'terzi')}
-                    items={[
+                    items={costEditing !== null ? [] : [
                         { value: 'prezzi', label: 'Prezzi materiali', icon: <Package /> },
                         { value: 'offerta', label: 'Analisi costi offerta', icon: <Calculator /> },
                         { value: 'terzi', label: 'Caricate da terzi', icon: <Upload /> },
@@ -657,15 +662,17 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
                 </TabsContent>
 
                 <TabsContent value="offerta" className="space-y-4 pt-4">
+                    {costEditing === null && (
                     <p className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-md p-3">
                         <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-slate-400" />
                         {proposalId
                             ? 'Qui trovi le analisi costi create nell\'offerta di origine di questa commessa, suddivise per attività/lavorazione. Puoi consultarle e modificarle: le modifiche aggiornano l\'offerta, ma non si riflettono automaticamente sui "Prezzi Materiali" della commessa.'
                             : 'Questa commessa non è collegata a nessuna offerta: qui puoi creare direttamente le sue analisi costi, suddivise per attività/lavorazione. Le modifiche non si riflettono automaticamente sui "Prezzi Materiali" della commessa.'}
                     </p>
+                    )}
                     {proposalId
-                        ? <ProposalCostAnalysisVersions proposalId={proposalId} jobLabel={jobLabel} />
-                        : <ProposalCostAnalysisVersions jobId={jobId} jobLabel={jobLabel} />}
+                        ? <ProposalCostAnalysisVersions proposalId={proposalId} jobLabel={jobLabel} onEditingChange={setCostEditing} />
+                        : <ProposalCostAnalysisVersions jobId={jobId} jobLabel={jobLabel} onEditingChange={setCostEditing} />}
                 </TabsContent>
 
                 <TabsContent value="terzi" className="space-y-4 pt-4">

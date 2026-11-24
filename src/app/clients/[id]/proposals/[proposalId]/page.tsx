@@ -113,6 +113,8 @@ export default function ProposalDetailPage() {
     // Pagina aperta e sotto-scheda dell'analisi costi
     const [activeTab, setActiveTab] = useState("info")
     const [costTab, setCostTab] = useState("create")
+    // Nome dell'analisi costi aperta nell'editor (null = elenco): la striscia mostra nome e pulsanti dell'editor
+    const [costEditing, setCostEditing] = useState<string | null>(null)
 
     // Inline edit state
     const [inlineEdit, setInlineEdit] = useState<"status" | "value" | "description" | null>(null)
@@ -644,16 +646,16 @@ export default function ProposalDetailPage() {
                     <TabsContent value="costi" className="space-y-6 focus-visible:outline-none">
                         <Tabs value={costTab} onValueChange={setCostTab}>
                             <NotchTabs
-                                title="Analisi costi"
+                                title={costEditing ?? "Analisi costi"}
                                 value={costTab}
                                 onValueChange={setCostTab}
-                                items={[
+                                items={costEditing !== null ? [] : [
                                     { value: "create", label: "Create", icon: <Calculator /> },
                                     { value: "terzi", label: "Caricate da terzi", icon: <Upload /> },
                                 ]}
                             >
                                 <TabsContent value="create" className="focus-visible:outline-none">
-                                    <ProposalCostAnalysisVersions proposalId={proposalId} />
+                                    <ProposalCostAnalysisVersions proposalId={proposalId} onEditingChange={setCostEditing} />
                                 </TabsContent>
                                 <TabsContent value="terzi" className="focus-visible:outline-none">
                                     <CostAnalysisDocuments proposalId={proposalId} />

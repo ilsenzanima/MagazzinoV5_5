@@ -184,8 +184,9 @@ export const proposalCostAnalysisApi = {
         return mapRow(data);
     },
 
-    update: async (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName' | 'sortOrder'>>): Promise<void> => {
+    update: async (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName' | 'itemUnit' | 'sortOrder'>>): Promise<void> => {
         const db: any = {};
+        if (fields.itemUnit !== undefined) db.item_unit = fields.itemUnit;
         if (fields.unitPrice !== undefined) db.unit_price = fields.unitPrice;
         if (fields.qtyEstimated !== undefined) db.qty_estimated = fields.qtyEstimated;
         if (fields.qtyActual !== undefined) db.qty_actual = fields.qtyActual;

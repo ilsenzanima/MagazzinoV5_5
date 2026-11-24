@@ -2,6 +2,8 @@ import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { effectiveUnitPrice, type CostAnalysisRow, type CostAnalysisParams } from '@/lib/services/cost-analysis';
 import type { Client } from '@/lib/types';
+import { costAnalysisFileName } from '@/lib/cost-analysis-filename';
+import { loadVoceUnits, priceUnitSuffix, qtyUnitSuffix } from '@/lib/cost-analysis-units';
 
 const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 , useGrouping: true});
 
@@ -22,6 +24,7 @@ export interface CostAnalysisPdfInput {
  * Generates a PDF for a cost analysis (Analisi Costi) of a client proposal
  */
 async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ doc: any; filename: string }> {
+    await loadVoceUnits();
     // Dynamic import of jsPDF to reduce initial bundle size
     const { default: jsPDF } = await import('jspdf');
     const { default: autoTable } = await import('jspdf-autotable');
@@ -151,7 +154,8 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
     currentY += boxH + 6;
 
     // --- 4. Materiali da Magazzino ---
-    const fmtCell = (n: number | null) => n !== null ? `€ ${fmt(n)}` : '—';
+    const fmtCell = (n: number | null, unit?: string | null) => n !== null ? `${fmt(n)} €${priceUnitSuffix(unit)}` : '—';
+    const fmtQty = (q: number, unit?: string | null) => { const u = qtyUnitSuffix(unit); return u ? `${fmt(q)} ${u}` : fmt(q); };
     const totMateriali = input.inventoryRows.reduce((s, r) => s + (effectiveUnitPrice(r) ?? 0) * r.qtyEstimated, 0);
 
     if (input.inventoryRows.length > 0) {
@@ -169,8 +173,8 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
                 const price = effectiveUnitPrice(r);
                 return [
                     r.itemModel ? `${r.itemName} (${r.itemModel})` : r.itemName,
-                    fmtCell(price),
-                    fmt(r.qtyEstimated),
+                    fmtCell(price, r.itemUnit),
+                    fmtQty(r.qtyEstimated, r.itemUnit),
                     price !== null ? `€ ${fmt(price * r.qtyEstimated)}` : '—',
                 ];
             }),
@@ -181,8 +185,8 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
             footStyles: { fillColor: [30, 58, 95], textColor: 255, fontStyle: 'bold', lineWidth: 0 },
             columnStyles: {
                 0: { cellWidth: 'auto' },
-                1: { cellWidth: 28, halign: 'right' },
-                2: { cellWidth: 25, halign: 'right' },
+                1: { cellWidth: 30, halign: 'right' },
+                2: { cellWidth: 28, halign: 'right' },
                 3: { cellWidth: 28, halign: 'right' },
             },
             margin: { left: margin, right: margin },
@@ -206,8 +210,8 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
             head: [['Voce', 'Prezzo unit.', 'Qtà presunta', 'Tot. presunto']],
             body: input.genericRows.map(r => [
                 r.itemName,
-                fmtCell(r.unitPrice),
-                fmt(r.qtyEstimated),
+                fmtCell(r.unitPrice, r.itemUnit),
+                fmtQty(r.qtyEstimated, r.itemUnit),
                 r.unitPrice !== null ? `€ ${fmt(r.unitPrice * r.qtyEstimated)}` : '—',
             ]),
             foot: [['Totale voci generiche', '', '', `€ ${fmt(totGeneriche)}`]],
@@ -217,8 +221,8 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
             footStyles: { fillColor: [30, 58, 95], textColor: 255, fontStyle: 'bold', lineWidth: 0 },
             columnStyles: {
                 0: { cellWidth: 'auto' },
-                1: { cellWidth: 28, halign: 'right' },
-                2: { cellWidth: 25, halign: 'right' },
+                1: { cellWidth: 30, halign: 'right' },
+                2: { cellWidth: 28, halign: 'right' },
                 3: { cellWidth: 28, halign: 'right' },
             },
             margin: { left: margin, right: margin },
@@ -243,7 +247,7 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
             if (rows.length === 0) return;
             body.push([{ content: title, colSpan: 4, styles: { fontStyle: 'bold', fillColor: [250, 250, 250] } }]);
             for (const r of rows) {
-                body.push([r.itemName, fmtCell(r.unitPrice), fmt(r.qtyEstimated), r.unitPrice !== null ? `€ ${fmt(r.unitPrice * r.qtyEstimated)}` : '—']);
+                body.push([r.itemName, fmtCell(r.unitPrice, r.itemUnit), fmtQty(r.qtyEstimated, r.itemUnit), r.unitPrice !== null ? `€ ${fmt(r.unitPrice * r.qtyEstimated)}` : '—']);
             }
             body.push([{ content: `Totale ${title.toLowerCase()}`, colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } }, { content: `€ ${fmt(sumRows(rows))}`, styles: { fontStyle: 'bold' } }]);
         };
@@ -259,8 +263,8 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
             headStyles: { fillColor: grayBg, textColor: 0, fontStyle: 'bold', lineColor: borderColor, lineWidth: 0.1 },
             columnStyles: {
                 0: { cellWidth: 'auto' },
-                1: { cellWidth: 28, halign: 'right' },
-                2: { cellWidth: 25, halign: 'right' },
+                1: { cellWidth: 30, halign: 'right' },
+                2: { cellWidth: 28, halign: 'right' },
                 3: { cellWidth: 28, halign: 'right' },
             },
             margin: { left: margin, right: margin },
@@ -282,24 +286,40 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
     const marg_delta = conRicarico * params.margineTrattativa / 100;
     const totaleFinale = conRicarico + marg_delta;
 
-    if (currentY > pageHeight - 60) { doc.addPage(); currentY = margin; }
+    // Il riepilogo non va spezzato su due pagine: se non ci sta intero passa a una pagina nuova
+    // (lo spazio rimasto in fondo alla pagina precedente resta vuoto).
+    // Altezza stimata: titolo + intestazione + 11 righe + totale, circa 9 mm l'una
+    const summaryHeight = 7 + 13 * 9;
+    if (currentY + summaryHeight > pageHeight - 15) { doc.addPage(); currentY = margin; }
     doc.setFontSize(10);
     doc.setTextColor(30);
     doc.setFont("helvetica", "bold");
     doc.text("Riepilogo Prezzi", margin, currentY + 4);
     currentY += 7;
 
+    // Riga di subtotale, come nel riepilogo a schermo
+    const subStyle = { fontStyle: 'bold' as const, fillColor: [245, 247, 250] as [number, number, number] };
+    const subRow = (label: string, value: number) => [
+        { content: label, styles: subStyle },
+        { content: '', styles: subStyle },
+        { content: `€ ${fmt(value)}`, styles: subStyle },
+    ];
+
     autoTable(doc, {
         startY: currentY,
-        head: [['Voce', 'Incremento', 'Valore']],
+        head: [['Voce', '', 'Valore / incremento']],
         body: [
             ['Tot. materiali + voci', '', `€ ${fmt(totBase)}`],
-            [`+ Sfrido (${params.sfrido}%)`, `+€ ${fmt(sfrido_delta)}`, `€ ${fmt(totListino)}`],
-            [`- Sconto (${params.sconto}%)`, `-€ ${fmt(sconto_delta)}`, `€ ${fmt(totSconto)}`],
-            [`+ Trasporto (A)`, `+€ ${fmt(params.trasporto)}`, `€ ${fmt(costoFranco)}`],
-            [`+ Posa (B)`, `+€ ${fmt(params.posa)}`, `€ ${fmt(costoTot)}`],
-            [`+ Ricarico (${params.ricarico}%)`, `+€ ${fmt(ric_delta)}`, `€ ${fmt(conRicarico)}`],
-            [`+ Margine trattativa (${params.margineTrattativa}%)`, `+€ ${fmt(marg_delta)}`, `€ ${fmt(totaleFinale)}`],
+            [`+ Sfrido (${params.sfrido}%)`, '', `+€ ${fmt(sfrido_delta)}`],
+            subRow('TOT materiali listino', totListino),
+            [`- Sconto (${params.sconto}%)`, '', `-€ ${fmt(sconto_delta)}`],
+            subRow('TOT materiali sconto', totSconto),
+            [`+ Trasporto (A)`, '', `+€ ${fmt(params.trasporto)}`],
+            subRow('Costo franco', costoFranco),
+            [`+ Posa (B)`, '', `+€ ${fmt(params.posa)}`],
+            subRow('Costo TOT (TC)', costoTot),
+            [`+ Ricarico (${params.ricarico}%)`, '', `+€ ${fmt(ric_delta)}`],
+            [`+ Margine trattativa (${params.margineTrattativa}%)`, '', `+€ ${fmt(marg_delta)}`],
         ],
         foot: [['TOTALE FINALE', '', `€ ${fmt(totaleFinale)}`]],
         theme: 'plain',
@@ -324,11 +344,18 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
     }
 
     // --- Filename ---
-    const today = format(new Date(), 'yyyyMMdd');
-    const slug = (s: string) => (s || '').replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').substring(0, 30);
-    const filename = `${slug(input.proposalTitle) || 'Offerta'}_${slug(input.versionName) || 'AnalisiCosti'}_${today}.pdf`;
+    // Nome completo dell'analisi (non più accorciato a 30 caratteri senza simboli)
+    const filename = costAnalysisFileName(input, 'pdf');
 
     return { doc, filename };
+}
+
+/**
+ * Genera il PDF di un'analisi costi senza scaricarlo (per stampa e scarichi multipli)
+ */
+export async function generateCostAnalysisPdfBlob(input: CostAnalysisPdfInput): Promise<{ blob: Blob; filename: string }> {
+    const { doc, filename } = await buildCostAnalysisPdfDoc(input);
+    return { blob: doc.output('blob') as Blob, filename };
 }
 
 /**
