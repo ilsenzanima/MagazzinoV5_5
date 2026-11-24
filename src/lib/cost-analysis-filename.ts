@@ -9,19 +9,20 @@ const clean = (s: string, max: number) =>
 
 /**
  * Nome file di un'analisi costi: «Offerta - GGmesAAAA - Nome completo dell'analisi»
- * (la data è quella del giorno in cui si scarica, mese con le prime 3 lettere, es. 24nov2026).
+ * (la data è quella di creazione dell'analisi, mese con le prime 3 lettere, es. 24nov2026).
  * Il nome dell'analisi non viene più accorciato né privato dei simboli, così analisi con nomi
  * simili (es. «... POS 23» e «... POS 25») non si sovrascrivono.
  */
 export function costAnalysisFileName(
-    input: { proposalTitle: string; versionName: string },
+    input: { proposalTitle: string; versionName: string; createdAt?: string | null },
     ext: 'pdf' | 'xlsx' | 'zip' = 'pdf'
 ): string {
     const name = clean(input.versionName, 120) || 'Analisi costi';
     const offer = clean(input.proposalTitle, 50);
     const parts: string[] = [];
     if (offer && offer.toLowerCase() !== name.toLowerCase()) parts.push(offer);
-    const now = new Date();
+    const created = input.createdAt ? new Date(input.createdAt) : new Date();
+    const now = isNaN(created.getTime()) ? new Date() : created;
     parts.push(`${format(now, 'dd')}${MESI[now.getMonth()]}${format(now, 'yyyy')}`);
     parts.push(name);
     return `${parts.join(' - ')}.${ext}`;
