@@ -325,6 +325,8 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
     const alertsByRow = useMemo(() => new Map(alerts.map(a => [a.rowId, a])), [alerts])
     const [proposalId, setProposalId] = useState<string | null>(null)
     const [subTab, setSubTab] = useState<'prezzi' | 'offerta' | 'terzi'>('prezzi')
+    // Nome dell'analisi costi aperta nell'editor (null = elenco): la striscia mostra nome e pulsanti dell'editor
+    const [costEditing, setCostEditing] = useState<string | null>(null)
 
     const inventoryRows = useMemo(() => rows.filter(r => r.type === 'inventory'), [rows])
     const genericRows = useMemo(() => rows.filter(r => r.type === 'generic'), [rows])
@@ -482,10 +484,10 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
         <div className="space-y-4">
             <Tabs value={subTab} onValueChange={v => setSubTab(v as 'prezzi' | 'offerta' | 'terzi')}>
                 <NotchTabs
-                    title="Analisi costi"
+                    title={costEditing ?? "Analisi costi"}
                     value={subTab}
                     onValueChange={v => setSubTab(v as 'prezzi' | 'offerta' | 'terzi')}
-                    items={[
+                    items={costEditing !== null ? [] : [
                         { value: 'prezzi', label: 'Prezzi materiali', icon: <Package /> },
                         { value: 'offerta', label: 'Analisi costi offerta', icon: <Calculator /> },
                         { value: 'terzi', label: 'Caricate da terzi', icon: <Upload /> },
@@ -657,15 +659,17 @@ export function JobAnalisiCosti({ jobId, jobLabel, movements }: JobAnalisiCostiP
                 </TabsContent>
 
                 <TabsContent value="offerta" className="space-y-4 pt-4">
+                    {costEditing === null && (
                     <p className="flex items-start gap-2 text-xs text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40 rounded-md p-3">
                         <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-slate-400" />
                         {proposalId
                             ? 'Qui trovi le analisi costi create nell\'offerta di origine di questa commessa, suddivise per attività/lavorazione. Puoi consultarle e modificarle: le modifiche aggiornano l\'offerta, ma non si riflettono automaticamente sui "Prezzi Materiali" della commessa.'
                             : 'Questa commessa non è collegata a nessuna offerta: qui puoi creare direttamente le sue analisi costi, suddivise per attività/lavorazione. Le modifiche non si riflettono automaticamente sui "Prezzi Materiali" della commessa.'}
                     </p>
+                    )}
                     {proposalId
-                        ? <ProposalCostAnalysisVersions proposalId={proposalId} jobLabel={jobLabel} />
-                        : <ProposalCostAnalysisVersions jobId={jobId} jobLabel={jobLabel} />}
+                        ? <ProposalCostAnalysisVersions proposalId={proposalId} jobLabel={jobLabel} onEditingChange={setCostEditing} />
+                        : <ProposalCostAnalysisVersions jobId={jobId} jobLabel={jobLabel} onEditingChange={setCostEditing} />}
                 </TabsContent>
 
                 <TabsContent value="terzi" className="space-y-4 pt-4">

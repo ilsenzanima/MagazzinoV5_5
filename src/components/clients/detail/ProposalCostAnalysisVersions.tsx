@@ -25,9 +25,12 @@ interface Props {
     proposalId?: string
     jobId?: string
     jobLabel?: string
+    // Chi sta sopra (la striscia scura con le schede) riceve il nome dell'analisi aperta, o null quando si torna all'elenco:
+    // con l'analisi aperta la striscia mostra solo il nome a sinistra e Salva/Azioni a destra
+    onEditingChange?: (name: string | null) => void
 }
 
-export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel }: Props) {
+export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel, onEditingChange }: Props) {
     const [versions, setVersions] = useState<ProposalCostAnalysisVersion[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
@@ -144,6 +147,10 @@ export function ProposalCostAnalysisVersions({ proposalId, jobId, jobLabel }: Pr
         } catch { notify.error("Errore durante l'eliminazione") }
         finally { setDeleteTarget(null) }
     }
+
+    const openName = openVersionId ? (versions.find(v => v.id === openVersionId)?.name ?? "") : null
+    useEffect(() => { onEditingChange?.(openName) }, [openName]) // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => () => { onEditingChange?.(null) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
     if (openVersionId) {
         const v = versions.find(v => v.id === openVersionId)

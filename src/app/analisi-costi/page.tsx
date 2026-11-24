@@ -23,6 +23,7 @@ import { jobsApi, Job } from "@/lib/api";
 import { proposalCostAnalysisVersionsApi, ProposalCostAnalysisVersion } from "@/lib/services/proposal-cost-analysis";
 import { costAnalysisArchiveApi, ArchiveTarget } from "@/lib/services/cost-analysis-archive";
 import { ProposalAnalisiCosti } from "@/components/clients/detail/ProposalAnalisiCosti";
+import { NotchTabs } from "@/components/ui/notch-tabs";
 import { InlineNote } from "@/components/ui/table-bits";
 import { useHistoryStep } from "@/hooks/useHistoryStep";
 import { useAuth } from "@/components/auth-provider";
@@ -235,15 +236,16 @@ export default function AnalisiCostiArchivePage() {
     const v = versionById.get(openId);
     return (
       <DashboardLayout>
-        <ListPageHeader strip title={v?.isTemplate ? `Modello · ${v.name}` : `Analisi costi · ${v?.name ?? ""}`} />
-        <ProposalAnalisiCosti
-          proposalId={v?.proposalId ?? null}
-          jobLabel={v ? (v.isTemplate ? "Modello" : refOf(v).main) : undefined}
-          versionId={openId}
-          versionName={v?.name ?? ""}
-          versionCreatedAt={v?.createdAt ?? ""}
-          onBack={() => { closeVersion(); load(); }}
-        />
+        <NotchTabs title={v?.name ?? "Analisi costi"}>
+          <ProposalAnalisiCosti
+            proposalId={v?.proposalId ?? null}
+            jobLabel={v ? (v.isTemplate ? "Modello" : refOf(v).main) : undefined}
+            versionId={openId}
+            versionName={v?.name ?? ""}
+            versionCreatedAt={v?.createdAt ?? ""}
+            onBack={() => { closeVersion(); load(); }}
+          />
+        </NotchTabs>
       </DashboardLayout>
     );
   }

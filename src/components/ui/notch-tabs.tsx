@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { createContext, forwardRef, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 import { Search, Menu, Check } from "lucide-react"
@@ -75,16 +75,17 @@ export function PageStrip({ embedded, title, children }: { embedded?: boolean; t
 }
 
 // Stile unico dei pulsanti nella striscia, uguale in ogni pagina
-export function NotchButton({ className, ...props }: React.ComponentProps<typeof Button>) {
+export const NotchButton = forwardRef<HTMLButtonElement, React.ComponentProps<typeof Button>>(function NotchButton({ className, ...props }, ref) {
   return (
     <Button
+      ref={ref}
       size="sm"
       variant="outline"
       className={cn("h-8 gap-1.5 rounded-full border-slate-300 bg-white px-4 text-slate-800 shadow-[0_3px_6px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.8),inset_0_-3px_4px_rgba(0,0,0,0.12)] transition-all hover:bg-slate-100 hover:text-slate-900 active:translate-y-px active:shadow-[0_1px_2px_rgba(0,0,0,0.35),inset_0_2px_4px_rgba(0,0,0,0.18)] [&_svg]:size-4 [&_svg]:text-blue-600", className)}
       {...props}
     />
   )
-}
+})
 
 // Testo di suggerimento che scorre da una parte all'altra quando e' piu' lungo della casella (ricerche con voci lunghe)
 export function ScrollingPlaceholder({ text, show, className }: { text: string; show: boolean; className?: string }) {

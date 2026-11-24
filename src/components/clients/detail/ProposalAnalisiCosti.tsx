@@ -5,7 +5,9 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, PlusCircle, X, Download, Package, FileText, Calculator, ArrowLeft, Truck, Save, Undo2 } from "lucide-react"
+import { Loader2, PlusCircle, X, Download, Package, FileText, Calculator, ArrowLeft, Truck, Save, Undo2, Search, Printer, Zap, ChevronDown, HardHat } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { NotchActions, NotchButton } from "@/components/ui/notch-tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { proposalCostAnalysisApi } from "@/lib/services/proposal-cost-analysis"
 import { costAnalysisApi, CostAnalysisRow, CostAnalysisParams, effectiveUnitPrice } from "@/lib/services/cost-analysis"
@@ -14,7 +16,8 @@ import { clientProposalsApi } from "@/lib/services/client-proposals"
 import { ItemSelectorDialog } from "@/components/inventory/ItemSelectorDialog"
 import { notify } from "@/lib/notify"
 import type { InventoryItem, Client } from "@/lib/types"
-import { generateCostAnalysisPDF } from "@/lib/pdf/cost-analysis-pdf"
+import { generateCostAnalysisPDF, generateCostAnalysisPdfBlob } from "@/lib/pdf/cost-analysis-pdf"
+import { printPdfBlob } from "@/lib/document-actions"
 import { generateCostAnalysisExcel } from "@/lib/excel/cost-analysis-excel"
 
 interface Props {
@@ -54,7 +57,12 @@ function InlineTextEdit({ value, onSave, placeholder }: { value: string; onSave:
     return <button className="text-left w-full hover:bg-slate-100 dark:hover:bg-slate-800 rounded px-1 py-0.5 text-sm" onClick={start}>{value || <span className="text-slate-400 italic text-xs">{placeholder}</span>}</button>
 }
 
-function MaterialTable({ rows, onUpdate, onDelete }: { rows: CostAnalysisRow[]; onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual'>>) => void; onDelete: (id: string) => void }) {
+// Casella spenta che somiglia a un campo: nella riga precompilata mostra cosa si potrà compilare
+const GhostBox = ({ text }: { text: string }) => (
+    <div className="ml-auto flex h-7 w-20 items-center justify-end rounded-md border border-slate-200 bg-slate-50/70 px-2 text-xs text-slate-300 dark:border-slate-700 dark:bg-slate-800/40">{text}</div>
+)
+
+function MaterialTable({ rows, onUpdate, onDelete, onAdd }: { rows: CostAnalysisRow[]; onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual'>>) => void; onDelete: (id: string) => void; onAdd: () => void }) {
     const [pendingDelete, setPendingDelete] = useState<string | null>(null)
     const totalEst = rows.reduce((s, r) => s + (effectiveUnitPrice(r) ?? 0) * r.qtyEstimated, 0)
     return (
@@ -99,6 +107,17 @@ function MaterialTable({ rows, onUpdate, onDelete }: { rows: CostAnalysisRow[]; 
                             </tr>
                         )
                     })}
+                    {/* Riga precompilata: diventa una riga vera scegliendo l'articolo */}
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                        <td className="p-2 cursor-pointer select-none" onClick={onAdd}>
+                            <div className="flex items-center gap-2 py-1 text-slate-400"><Search className="h-4 w-4 shrink-0" /><span className="text-sm">Cerca materiale...</span></div>
+                        </td>
+                        <td className="p-2 text-right text-slate-300">—</td>
+                        <td className="p-2"><GhostBox text="0,00" /></td>
+                        <td className="p-2"><GhostBox text="0,00" /></td>
+                        <td className="p-2"></td>
+                        <td className="w-6 p-2"></td>
+                    </tr>
                 </tbody>
                 {rows.length > 0 && <tfoot><tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/60 font-semibold text-sm"><td colSpan={4} className="p-2 text-slate-600 dark:text-slate-400">Totale materiali</td><td className="p-2 text-right font-mono text-blue-700 dark:text-blue-300">€ {fmt(totalEst)}</td><td></td></tr></tfoot>}
             </table>
@@ -106,7 +125,24 @@ function MaterialTable({ rows, onUpdate, onDelete }: { rows: CostAnalysisRow[]; 
     )
 }
 
-function GenericTable({ rows, onUpdate, onDelete, voceLabel = 'Voce', totalLabel = 'Totale voci generiche' }: { rows: CostAnalysisRow[]; voceLabel?: string; totalLabel?: string; onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName'>>) => void; onDelete: (id: string) => void }) {
+// Cella della riga precompilata: al clic diventa un campo; con Invio (o uscendo dal campo) la voce diventa una riga vera
+function NewVoceCell({ placeholder, onAdd }: { placeholder: string; onAdd: (name: string) => void }) {
+    const [editing, setEditing] = useState(false)
+    const [draft, setDraft] = useState('')
+    const commit = () => {
+        const name = draft.trim()
+        setEditing(false); setDraft('')
+        if (name) onAdd(name)
+    }
+    if (editing) return <Input autoFocus className="h-8 text-sm w-full" placeholder={placeholder} value={draft} onChange={e => setDraft(e.target.value)} onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(''); setEditing(false) } }} />
+    return (
+        <button type="button" className="flex w-full items-center gap-2 py-1 text-left text-slate-400 hover:text-slate-600" onClick={() => setEditing(true)}>
+            <PlusCircle className="h-4 w-4 shrink-0" /><span className="text-sm">{placeholder}</span>
+        </button>
+    )
+}
+
+function GenericTable({ rows, onUpdate, onDelete, onAdd, addPlaceholder, voceLabel = 'Voce', totalLabel = 'Totale voci generiche' }: { rows: CostAnalysisRow[]; voceLabel?: string; totalLabel?: string; addPlaceholder: string; onAdd: (name: string) => void; onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName'>>) => void; onDelete: (id: string) => void }) {
     const [pendingDelete, setPendingDelete] = useState<string | null>(null)
     const totalEst = rows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0)
     return (
@@ -143,6 +179,14 @@ function GenericTable({ rows, onUpdate, onDelete, voceLabel = 'Voce', totalLabel
                             </tr>
                         )
                     })}
+                    {/* Riga precompilata: scrivendo il nome diventa una riga vera */}
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                        <td className="p-2 min-w-[160px]"><NewVoceCell placeholder={addPlaceholder} onAdd={onAdd} /></td>
+                        <td className="p-2"><GhostBox text="0,00" /></td>
+                        <td className="p-2"><GhostBox text="0,00" /></td>
+                        <td className="p-2"></td>
+                        <td className="w-6 p-2"></td>
+                    </tr>
                 </tbody>
                 {rows.length > 0 && <tfoot><tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/60 font-semibold text-sm"><td colSpan={3} className="p-2 text-slate-600 dark:text-slate-400">{totalLabel}</td><td className="p-2 text-right font-mono text-blue-700 dark:text-blue-300">€ {fmt(totalEst)}</td><td></td></tr></tfoot>}
             </table>
@@ -178,8 +222,7 @@ export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionN
     const [selectorOpen, setSelectorOpen] = useState(false)
     const [inventory, setInventory] = useState<InventoryItem[]>([])
     const [invLoading, setInvLoading] = useState(false)
-    const [addingKind, setAddingKind] = useState<'generic' | 'transport' | 'posa' | null>(null)
-    const [newVoceName, setNewVoceName] = useState('')
+    const [printing, setPrinting] = useState(false)
     const [proposalTitle, setProposalTitle] = useState('')
     const [client, setClient] = useState<Client | null>(null)
     const [exportingPdf, setExportingPdf] = useState(false)
@@ -267,16 +310,13 @@ export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionN
         } catch { notify.error("Errore durante l'aggiunta dell'articolo") }
     }
 
-    const handleAddVoce = () => {
-        const name = newVoceName.trim()
-        if (!name || !addingKind) return
-        const sameKind = rows.filter(r => r.type === addingKind)
+    const handleAddVoce = (kind: 'generic' | 'transport' | 'posa', name: string) => {
+        const sameKind = rows.filter(r => r.type === kind)
         setRows(prev => [...prev, newLocalRow({
-            type: addingKind, itemId: null, itemName: name,
+            type: kind, itemId: null, itemName: name,
             itemModel: '', itemUnit: '', maxPurchasePrice: null,
             unitPrice: null, qtyEstimated: 0, qtyActual: 0, sortOrder: sameKind.length,
         })])
-        setNewVoceName(''); setAddingKind(null)
     }
 
     const handleUpdate = (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName'>>) => {
@@ -326,7 +366,7 @@ export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionN
         } finally { setSaving(false) }
     }
 
-    const handleDiscard = () => { setRows(savedRows); setParams(savedParams); setAddingKind(null); setNewVoceName('') }
+    const handleDiscard = () => { setRows(savedRows); setParams(savedParams) }
 
     const handleBack = () => { if (dirty) setLeaveOpen(true); else onBack() }
 
@@ -359,16 +399,13 @@ export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionN
         finally { setExportingExcel(false) }
     }
 
-    if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
+    const handlePrint = async () => {
+        try { setPrinting(true); const { blob } = await generateCostAnalysisPdfBlob(exportInput()); await printPdfBlob(blob) }
+        catch { notify.error("Errore durante la stampa") }
+        finally { setPrinting(false) }
+    }
 
-    // Form «nuova voce» condiviso dalle tre sezioni
-    const addVoceForm = (kind: 'generic' | 'transport' | 'posa', placeholder: string) => addingKind === kind && (
-        <div className="flex items-center gap-2 py-3 border-b border-slate-100 dark:border-slate-800">
-            <Input autoFocus placeholder={placeholder} value={newVoceName} onChange={e => setNewVoceName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleAddVoce(); if (e.key === 'Escape') { setAddingKind(null); setNewVoceName('') } }} className="flex-1 text-sm" />
-            <Button size="sm" onClick={handleAddVoce} disabled={!newVoceName.trim()} className="bg-slate-600 hover:bg-slate-700">Aggiungi</Button>
-            <Button size="sm" variant="ghost" onClick={() => { setAddingKind(null); setNewVoceName('') }}>Annulla</Button>
-        </div>
-    )
+    if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-blue-600" /></div>
 
     const paramRows = [
         { label: 'Sfrido', field: 'sfrido', suffix: '%', fromVoci: false, value: 0 },
@@ -381,37 +418,45 @@ export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionN
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            {/* Pulsanti nella striscia scura in alto: Salva sempre visibile, Azioni con PDF / Excel / Stampa */}
+            <NotchActions>
+                {dirty && (
+                    <NotchButton onClick={handleDiscard} disabled={saving}><Undo2 />Annulla modifiche</NotchButton>
+                )}
+                <NotchButton
+                    onClick={() => { void handleSave() }}
+                    disabled={!dirty || saving}
+                    title={dirty ? "Salva le modifiche" : "Nessuna modifica da salvare"}
+                    className="border-emerald-700 bg-emerald-600 text-white hover:bg-emerald-700 hover:text-white disabled:opacity-60 [&_svg]:text-white"
+                >
+                    {saving ? <Loader2 className="animate-spin" /> : <Save />}Salva
+                </NotchButton>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <NotchButton disabled={exportingPdf || exportingExcel || printing}>
+                            {exportingPdf || exportingExcel || printing ? <Loader2 className="animate-spin" /> : <Zap />}Azioni<ChevronDown className="!size-3.5" />
+                        </NotchButton>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuItem onClick={handleExportPdf} className="gap-2"><Download className="h-4 w-4" />Scarica PDF</DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleExportExcel} className="gap-2"><Download className="h-4 w-4" />Scarica Excel</DropdownMenuItem>
+                        <DropdownMenuItem onClick={handlePrint} className="gap-2"><Printer className="h-4 w-4" />Stampa</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </NotchActions>
+
+            <div className="flex flex-wrap items-center gap-3">
                 <Button size="sm" variant="ghost" onClick={handleBack}><ArrowLeft className="h-4 w-4 mr-1" />Torna alle versioni</Button>
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{versionName}</span>
-                    {dirty && <span className="text-xs text-amber-600 dark:text-amber-400">Modifiche non salvate</span>}
-                    {dirty && (
-                        <Button size="sm" variant="outline" onClick={handleDiscard} disabled={saving}>
-                            <Undo2 className="h-4 w-4 mr-1" />Annulla modifiche
-                        </Button>
-                    )}
-                    <Button size="sm" onClick={() => { void handleSave() }} disabled={!dirty || saving} className="bg-emerald-600 hover:bg-emerald-700">
-                        {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}Salva
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleExportPdf} disabled={exportingPdf}>
-                        {exportingPdf ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}PDF
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={handleExportExcel} disabled={exportingExcel}>
-                        {exportingExcel ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}Excel
-                    </Button>
-                </div>
+                {dirty && <span className="text-xs text-amber-600 dark:text-amber-400">Modifiche non salvate · PDF, Excel e stampa le includono</span>}
             </div>
-            {dirty && <p className="text-xs text-slate-500">PDF ed Excel includono anche le modifiche non ancora salvate.</p>}
 
             <Card>
                 <div className="flex items-center gap-3 p-4 border-b">
                     <Package className="h-5 w-5 text-blue-600" />
                     <span className="flex-1 font-semibold text-slate-800 dark:text-slate-100">Materiali da Magazzino</span>
-                    <Button size="sm" onClick={() => setSelectorOpen(true)} className="bg-blue-600 hover:bg-blue-700 h-8 text-xs"><PlusCircle className="h-3.5 w-3.5 mr-1" />Aggiungi articolo</Button>
                 </div>
                 <CardContent className="pt-0 pb-4 px-4">
-                    {inventoryRows.length === 0 ? <p className="text-sm text-slate-400 text-center py-6">Nessun materiale. Usa "Aggiungi articolo" per aggiungerne uno manualmente.</p> : <MaterialTable rows={inventoryRows} onUpdate={handleUpdate} onDelete={handleDelete} />}
+                    <MaterialTable rows={inventoryRows} onUpdate={handleUpdate} onDelete={handleDelete} onAdd={() => setSelectorOpen(true)} />
                 </CardContent>
             </Card>
 
@@ -419,37 +464,31 @@ export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionN
                 <div className="flex items-center gap-3 p-4 border-b">
                     <FileText className="h-5 w-5 text-slate-500" />
                     <span className="flex-1 font-semibold text-slate-800 dark:text-slate-100">Voci Generiche</span>
-                    <Button size="sm" onClick={() => { setNewVoceName(''); setAddingKind('generic') }} className="bg-slate-600 hover:bg-slate-700 h-8 text-xs"><PlusCircle className="h-3.5 w-3.5 mr-1" />Aggiungi voce</Button>
                 </div>
                 <CardContent className="pt-0 pb-4 px-4">
-                    {addVoceForm('generic', 'Nome voce (es. Noleggio gru, Smaltimento…)')}
-                    {genericRows.length === 0 && addingKind !== 'generic' ? <p className="text-sm text-slate-400 text-center py-6">Nessuna voce generica. Usa "Aggiungi voce".</p> : genericRows.length > 0 ? <GenericTable rows={genericRows} onUpdate={handleUpdate} onDelete={handleDelete} /> : null}
+                    <GenericTable rows={genericRows} addPlaceholder="Aggiungi voce (es. Noleggio gru, Smaltimento…)" onAdd={n => handleAddVoce('generic', n)} onUpdate={handleUpdate} onDelete={handleDelete} />
                 </CardContent>
             </Card>
 
             <Card>
                 <div className="flex items-center gap-3 p-4 border-b">
                     <Truck className="h-5 w-5 text-amber-600" />
-                    <span className="flex-1 font-semibold text-slate-800 dark:text-slate-100">Trasporto e posa</span>
+                    <span className="flex-1 font-semibold text-slate-800 dark:text-slate-100">Trasporto (A)</span>
                 </div>
-                <CardContent className="pt-3 pb-4 px-4 space-y-5">
-                    <p className="text-xs text-slate-500">Le voci inserite qui, sommate, definiscono i valori Trasporto (A) e Posa (B) del riepilogo prezzi. Senza voci, A e B restano quelli digitati a mano nei parametri.</p>
-                    <div>
-                        <div className="flex items-center gap-3 pb-1">
-                            <span className="flex-1 text-sm font-semibold text-slate-700 dark:text-slate-200">Trasporto (A)</span>
-                            <Button size="sm" onClick={() => { setNewVoceName(''); setAddingKind('transport') }} className="bg-slate-600 hover:bg-slate-700 h-8 text-xs"><PlusCircle className="h-3.5 w-3.5 mr-1" />Aggiungi voce</Button>
-                        </div>
-                        {addVoceForm('transport', 'Voce di trasporto (es. Camion 5 q.li, Corriere…)')}
-                        {transportRows.length === 0 && addingKind !== 'transport' ? <p className="text-sm text-slate-400 text-center py-4">Nessuna voce di trasporto.</p> : transportRows.length > 0 ? <GenericTable rows={transportRows} voceLabel="Voce di trasporto" totalLabel="Totale trasporto (A)" onUpdate={handleUpdate} onDelete={handleDelete} /> : null}
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-3 pb-1">
-                            <span className="flex-1 text-sm font-semibold text-slate-700 dark:text-slate-200">Posa (B)</span>
-                            <Button size="sm" onClick={() => { setNewVoceName(''); setAddingKind('posa') }} className="bg-slate-600 hover:bg-slate-700 h-8 text-xs"><PlusCircle className="h-3.5 w-3.5 mr-1" />Aggiungi voce</Button>
-                        </div>
-                        {addVoceForm('posa', 'Voce di posa (es. Squadra posatori, Ponteggio…)')}
-                        {posaRows.length === 0 && addingKind !== 'posa' ? <p className="text-sm text-slate-400 text-center py-4">Nessuna voce di posa.</p> : posaRows.length > 0 ? <GenericTable rows={posaRows} voceLabel="Voce di posa" totalLabel="Totale posa (B)" onUpdate={handleUpdate} onDelete={handleDelete} /> : null}
-                    </div>
+                <CardContent className="pt-0 pb-4 px-4">
+                    <p className="text-xs text-slate-500 py-2">Le voci, sommate, definiscono il valore Trasporto (A) del riepilogo prezzi. Senza voci resta quello digitato a mano nei parametri.</p>
+                    <GenericTable rows={transportRows} voceLabel="Voce di trasporto" totalLabel="Totale trasporto (A)" addPlaceholder="Aggiungi voce di trasporto (es. Camion 5 q.li, Corriere…)" onAdd={n => handleAddVoce('transport', n)} onUpdate={handleUpdate} onDelete={handleDelete} />
+                </CardContent>
+            </Card>
+
+            <Card>
+                <div className="flex items-center gap-3 p-4 border-b">
+                    <HardHat className="h-5 w-5 text-amber-600" />
+                    <span className="flex-1 font-semibold text-slate-800 dark:text-slate-100">Posa (B)</span>
+                </div>
+                <CardContent className="pt-0 pb-4 px-4">
+                    <p className="text-xs text-slate-500 py-2">Le voci, sommate, definiscono il valore Posa (B) del riepilogo prezzi. Senza voci resta quello digitato a mano nei parametri.</p>
+                    <GenericTable rows={posaRows} voceLabel="Voce di posa" totalLabel="Totale posa (B)" addPlaceholder="Aggiungi voce di posa (es. Squadra posatori, Ponteggio…)" onAdd={n => handleAddVoce('posa', n)} onUpdate={handleUpdate} onDelete={handleDelete} />
                 </CardContent>
             </Card>
 
