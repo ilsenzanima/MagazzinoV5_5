@@ -26,7 +26,7 @@ interface FloatingAddButtonProps {
 }
 
 // Pulsante «aggiungi» sempre visibile in basso a destra (da PC; su telefono diventa una voce del pannello Azioni): tondo con il +,
-// passandoci sopra si allarga e compare la scritta per intero (o, con più azioni, si divide in tante voci)
+// un solo comportamento per tutte le pagine: al clic il + diventa una X e sopra salgono le pillole delle azioni (una o più)
 export function FloatingAddButton({ href, onClick, label, actions, icon }: FloatingAddButtonProps) {
     // Su telefono e tablet il pulsante non c'e': le sue azioni stanno nel pannello «Azioni» della barra in basso
     useMobileActions(
@@ -38,22 +38,16 @@ export function FloatingAddButton({ href, onClick, label, actions, icon }: Float
         return <FloatingAddMenu actions={actions} icon={icon} />;
     }
 
-    // Una sola azione: il clic sul tasto la esegue, passandoci sopra compare la pillola col nome (stessa grafica del menu)
-    return <FloatingAddMenu actions={[{ href, onClick, label: label ?? "Nuovo" }]} icon={icon} single />;
+    // Anche con una sola azione il comportamento è lo stesso: il tasto si apre (il + diventa X) e sopra sale la pillola
+    return <FloatingAddMenu actions={[{ href, onClick, label: label ?? "Nuovo" }]} icon={icon} />;
 }
 
 const MAIN_BTN = "grid h-14 w-14 place-items-center rounded-full bg-blue-600 text-white ring-[6px] ring-white/80 shadow-[0_10px_18px_rgba(37,99,235,0.35),inset_0_2px_2px_rgba(255,255,255,0.5),inset_0_-5px_8px_rgba(0,0,0,0.25)] transition-all duration-300 hover:bg-blue-700 active:scale-95 dark:ring-white/10";
 
-// Più azioni: il tasto tondo si apre al clic (il + ruota e diventa una X) e sopra compaiono le pillole, a cascata come nel menu da telefono
-function FloatingAddMenu({ actions, icon, single }: { actions: FloatingAddAction[]; icon?: ReactNode; single?: boolean }) {
+// Pulsante flottante unico (una o più azioni): il tasto tondo si apre al clic (il + ruota e diventa una X) e sopra compaiono le pillole, a cascata come nel menu da telefono
+function FloatingAddMenu({ actions, icon }: { actions: FloatingAddAction[]; icon?: ReactNode }) {
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
-    const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    // Con una sola azione il menu si apre passando sopra (con un piccolo ritardo in chiusura, per attraversare lo spazio tra tasto e pillola)
-    const hoverOpen = () => { if (closeTimer.current) clearTimeout(closeTimer.current); setOpen(true); };
-    const hoverClose = () => { closeTimer.current = setTimeout(() => setOpen(false), 250); };
-    useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current); }, []);
-    const only = actions[0];
 
     useEffect(() => {
         if (!open) return;
@@ -65,9 +59,7 @@ function FloatingAddMenu({ actions, icon, single }: { actions: FloatingAddAction
     }, [open]);
 
     return (
-        <div ref={ref} className="fixed bottom-10 right-10 z-20 hidden lg:block"
-            onMouseEnter={single ? hoverOpen : undefined} onMouseLeave={single ? hoverClose : undefined}
-            onFocus={single ? hoverOpen : undefined} onBlur={single ? hoverClose : undefined}>
+        <div ref={ref} className="fixed bottom-10 right-10 z-20 hidden lg:block">
             <div data-open={open} className="dial-wrap dial-right absolute bottom-[4.75rem] right-0 w-[17rem]" style={{ "--n": actions.length } as CSSProperties}>
                 <ul className="flex flex-col-reverse gap-3">
                     {actions.map((a, i) => {
@@ -89,24 +81,16 @@ function FloatingAddMenu({ actions, icon, single }: { actions: FloatingAddAction
                     })}
                 </ul>
             </div>
-            {single ? (
-                only.href ? (
-                    <Link href={only.href} aria-label={only.label} className={MAIN_BTN}>{icon ?? <Plus className="h-7 w-7" />}</Link>
-                ) : (
-                    <button type="button" onClick={only.onClick} aria-label={only.label} className={MAIN_BTN}>{icon ?? <Plus className="h-7 w-7" />}</button>
-                )
-            ) : (
-                <button
-                    type="button"
-                    onClick={() => setOpen(o => !o)}
-                    aria-expanded={open}
-                    aria-label={open ? "Chiudi le azioni" : "Azioni"}
-                    className={`${MAIN_BTN} relative`}
-                >
-                    <span className={`absolute transition-all duration-300 ${open ? "rotate-90 scale-50 opacity-0" : "rotate-0 opacity-100"}`}>{icon ?? <Plus className="h-7 w-7" />}</span>
-                    <span className={`absolute transition-all duration-300 ${open ? "rotate-0 opacity-100" : "-rotate-90 scale-50 opacity-0"}`}><X className="h-7 w-7" /></span>
-                </button>
-            )}
+            <button
+                type="button"
+                onClick={() => setOpen(o => !o)}
+                aria-expanded={open}
+                aria-label={open ? "Chiudi le azioni" : actions.length === 1 ? actions[0].label : "Azioni"}
+                className={`${MAIN_BTN} relative`}
+            >
+                <span className={`absolute transition-all duration-300 ${open ? "rotate-90 scale-50 opacity-0" : "rotate-0 opacity-100"}`}>{icon ?? <Plus className="h-7 w-7" />}</span>
+                <span className={`absolute transition-all duration-300 ${open ? "rotate-0 opacity-100" : "-rotate-90 scale-50 opacity-0"}`}><X className="h-7 w-7" /></span>
+            </button>
         </div>
     );
 }
