@@ -2,6 +2,7 @@ import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import type { CostAnalysisPdfInput } from '@/lib/pdf/cost-analysis-pdf';
 import { costAnalysisFileName } from '@/lib/cost-analysis-filename';
+import { priceUnitSuffix, qtyUnitSuffix } from '@/lib/cost-analysis-units';
 import { effectiveUnitPrice, type CostAnalysisRow } from '@/lib/services/cost-analysis';
 
 const EUR_FMT = '"€ "#,##0.00';
@@ -48,7 +49,7 @@ const tableHdrCell = (v: string) => cell(v, {
     alignment: { vertical: 'center', wrapText: true },
 });
 const dataCell = (v: string, alignRight = false) => cell(v, { font: { sz: 9 }, alignment: { horizontal: alignRight ? 'right' : undefined, vertical: 'center', wrapText: true } });
-const numDataCell = (v: number, currency = true) => cell(v, { font: { sz: 9 }, numFmt: currency ? EUR_FMT : NUM_FMT, alignment: { horizontal: 'right', vertical: 'center' } });
+const numDataCell = (v: number, currency = true, suffix = '') => cell(v, { font: { sz: 9 }, numFmt: (currency ? EUR_FMT : NUM_FMT) + (suffix ? `"${suffix}"` : ''), alignment: { horizontal: 'right', vertical: 'center' } });
 const totalCell = (v: string | number, currency = false) => cell(v, {
     fill: { patternType: 'solid', fgColor: { rgb: 'FF1E3A5F' } },
     font: { bold: true, color: { rgb: 'FFFFFFFF' } },
@@ -142,8 +143,8 @@ export async function generateCostAnalysisExcel(input: CostAnalysisPdfInput): Pr
             const totEst = (price ?? 0) * r.qtyEstimated;
             pushRow([
                 dataCell(label),
-                price !== null ? numDataCell(price) : dataCell('—', true),
-                numDataCell(r.qtyEstimated, false),
+                price !== null ? numDataCell(price, true, priceUnitSuffix(r.itemUnit)) : dataCell('—', true),
+                numDataCell(r.qtyEstimated, false, qtyUnitSuffix(r.itemUnit) ? ` ${qtyUnitSuffix(r.itemUnit)}` : ''),
                 price !== null ? numDataCell(totEst) : dataCell('—', true),
             ], estimateLines(label, COL_WCH[0]));
         }
@@ -159,8 +160,8 @@ export async function generateCostAnalysisExcel(input: CostAnalysisPdfInput): Pr
             const totEst = (r.unitPrice ?? 0) * r.qtyEstimated;
             pushRow([
                 dataCell(r.itemName),
-                r.unitPrice !== null ? numDataCell(r.unitPrice) : dataCell('—', true),
-                numDataCell(r.qtyEstimated, false),
+                r.unitPrice !== null ? numDataCell(r.unitPrice, true, priceUnitSuffix(r.itemUnit)) : dataCell('—', true),
+                numDataCell(r.qtyEstimated, false, qtyUnitSuffix(r.itemUnit) ? ` ${qtyUnitSuffix(r.itemUnit)}` : ''),
                 r.unitPrice !== null ? numDataCell(totEst) : dataCell('—', true),
             ], estimateLines(r.itemName, COL_WCH[0]));
         }
@@ -199,20 +200,20 @@ export async function generateCostAnalysisExcel(input: CostAnalysisPdfInput): Pr
     const totaleFinale = conRicarico + marg_delta;
 
     pushRow([titleCell('Riepilogo Prezzi')]);
-    mergeRange(pushRow([tableHdrCell('Voce'), tableHdrCell(''), tableHdrCell('Incremento'), tableHdrCell('Valore')]), 0, 1);
+    mergeRange(pushRow([tableHdrCell('Voce'), tableHdrCell(''), tableHdrCell(''), tableHdrCell('Valore / incremento')]), 0, 1);
     // Il quarto elemento indica una riga di subtotale (come nel riepilogo a schermo)
-    const summaryRows: [string, string, number, boolean?][] = [
+    const summaryRows: [string, string, number | null, boolean?][] = [
         ['Tot. materiali + voci', '', totBase],
-        [`+ Sfrido (${params.sfrido}%)`, `+€ ${fmt(sfrido_delta)}`, totListino],
+        [`+ Sfrido (${params.sfrido}%)`, `+€ ${fmt(sfrido_delta)}`, null],
         ['TOT materiali listino', '', totListino, true],
-        [`- Sconto (${params.sconto}%)`, `-€ ${fmt(sconto_delta)}`, totSconto],
+        [`- Sconto (${params.sconto}%)`, `-€ ${fmt(sconto_delta)}`, null],
         ['TOT materiali sconto', '', totSconto, true],
-        ['+ Trasporto (A)', `+€ ${fmt(params.trasporto)}`, costoFranco],
+        ['+ Trasporto (A)', `+€ ${fmt(params.trasporto)}`, null],
         ['Costo franco', '', costoFranco, true],
-        ['+ Posa (B)', `+€ ${fmt(params.posa)}`, costoTot],
+        ['+ Posa (B)', `+€ ${fmt(params.posa)}`, null],
         ['Costo TOT (TC)', '', costoTot, true],
-        [`+ Ricarico (${params.ricarico}%)`, `+€ ${fmt(ric_delta)}`, conRicarico],
-        [`+ Margine trattativa (${params.margineTrattativa}%)`, `+€ ${fmt(marg_delta)}`, totaleFinale],
+        [`+ Ricarico (${params.ricarico}%)`, `+€ ${fmt(ric_delta)}`, null],
+        [`+ Margine trattativa (${params.margineTrattativa}%)`, `+€ ${fmt(marg_delta)}`, null],
     ];
     const subFill = { patternType: 'solid', fgColor: { rgb: 'FFF5F7FA' } };
     for (const [label, incremento, valore, isSub] of summaryRows) {
@@ -221,9 +222,9 @@ export async function generateCostAnalysisExcel(input: CostAnalysisPdfInput): Pr
                 cell(label, { fill: subFill, font: { bold: true, sz: 9 }, alignment: { vertical: 'center' } }),
                 cell('', { fill: subFill }),
                 cell('', { fill: subFill }),
-                cell(valore, { fill: subFill, font: { bold: true, sz: 9 }, numFmt: EUR_FMT, alignment: { horizontal: 'right', vertical: 'center' } }),
+                cell(valore ?? 0, { fill: subFill, font: { bold: true, sz: 9 }, numFmt: EUR_FMT, alignment: { horizontal: 'right', vertical: 'center' } }),
             ]
-            : [dataCell(label), blank(), dataCell(incremento, true), numDataCell(valore)];
+            : [dataCell(label), blank(), blank(), valore === null ? dataCell(incremento, true) : numDataCell(valore)];
         mergeRange(pushRow(row, estimateLines(label, MERGED_A_C_WCH)), 0, 1);
     }
     pushRow([grandTotalCell('TOTALE FINALE'), grandTotalCell(''), grandTotalCell(''), grandTotalCell(totaleFinale, true)]);

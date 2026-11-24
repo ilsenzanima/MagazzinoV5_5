@@ -3,6 +3,7 @@ import { it } from 'date-fns/locale';
 import { effectiveUnitPrice, type CostAnalysisRow, type CostAnalysisParams } from '@/lib/services/cost-analysis';
 import type { Client } from '@/lib/types';
 import { costAnalysisFileName } from '@/lib/cost-analysis-filename';
+import { priceUnitSuffix, qtyUnitSuffix } from '@/lib/cost-analysis-units';
 
 const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 , useGrouping: true});
 
@@ -152,7 +153,8 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
     currentY += boxH + 6;
 
     // --- 4. Materiali da Magazzino ---
-    const fmtCell = (n: number | null) => n !== null ? `€ ${fmt(n)}` : '—';
+    const fmtCell = (n: number | null, unit?: string | null) => n !== null ? `€ ${fmt(n)}${priceUnitSuffix(unit)}` : '—';
+    const fmtQty = (q: number, unit?: string | null) => { const u = qtyUnitSuffix(unit); return u ? `${fmt(q)} ${u}` : fmt(q); };
     const totMateriali = input.inventoryRows.reduce((s, r) => s + (effectiveUnitPrice(r) ?? 0) * r.qtyEstimated, 0);
 
     if (input.inventoryRows.length > 0) {
@@ -170,8 +172,8 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
                 const price = effectiveUnitPrice(r);
                 return [
                     r.itemModel ? `${r.itemName} (${r.itemModel})` : r.itemName,
-                    fmtCell(price),
-                    fmt(r.qtyEstimated),
+                    fmtCell(price, r.itemUnit),
+                    fmtQty(r.qtyEstimated, r.itemUnit),
                     price !== null ? `€ ${fmt(price * r.qtyEstimated)}` : '—',
                 ];
             }),
@@ -182,8 +184,8 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
             footStyles: { fillColor: [30, 58, 95], textColor: 255, fontStyle: 'bold', lineWidth: 0 },
             columnStyles: {
                 0: { cellWidth: 'auto' },
-                1: { cellWidth: 28, halign: 'right' },
-                2: { cellWidth: 25, halign: 'right' },
+                1: { cellWidth: 30, halign: 'right' },
+                2: { cellWidth: 28, halign: 'right' },
                 3: { cellWidth: 28, halign: 'right' },
             },
             margin: { left: margin, right: margin },
@@ -207,8 +209,8 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
             head: [['Voce', 'Prezzo unit.', 'Qtà presunta', 'Tot. presunto']],
             body: input.genericRows.map(r => [
                 r.itemName,
-                fmtCell(r.unitPrice),
-                fmt(r.qtyEstimated),
+                fmtCell(r.unitPrice, r.itemUnit),
+                fmtQty(r.qtyEstimated, r.itemUnit),
                 r.unitPrice !== null ? `€ ${fmt(r.unitPrice * r.qtyEstimated)}` : '—',
             ]),
             foot: [['Totale voci generiche', '', '', `€ ${fmt(totGeneriche)}`]],
@@ -218,8 +220,8 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
             footStyles: { fillColor: [30, 58, 95], textColor: 255, fontStyle: 'bold', lineWidth: 0 },
             columnStyles: {
                 0: { cellWidth: 'auto' },
-                1: { cellWidth: 28, halign: 'right' },
-                2: { cellWidth: 25, halign: 'right' },
+                1: { cellWidth: 30, halign: 'right' },
+                2: { cellWidth: 28, halign: 'right' },
                 3: { cellWidth: 28, halign: 'right' },
             },
             margin: { left: margin, right: margin },
@@ -244,7 +246,7 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
             if (rows.length === 0) return;
             body.push([{ content: title, colSpan: 4, styles: { fontStyle: 'bold', fillColor: [250, 250, 250] } }]);
             for (const r of rows) {
-                body.push([r.itemName, fmtCell(r.unitPrice), fmt(r.qtyEstimated), r.unitPrice !== null ? `€ ${fmt(r.unitPrice * r.qtyEstimated)}` : '—']);
+                body.push([r.itemName, fmtCell(r.unitPrice, r.itemUnit), fmtQty(r.qtyEstimated, r.itemUnit), r.unitPrice !== null ? `€ ${fmt(r.unitPrice * r.qtyEstimated)}` : '—']);
             }
             body.push([{ content: `Totale ${title.toLowerCase()}`, colSpan: 3, styles: { fontStyle: 'bold', halign: 'right' } }, { content: `€ ${fmt(sumRows(rows))}`, styles: { fontStyle: 'bold' } }]);
         };
@@ -260,8 +262,8 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
             headStyles: { fillColor: grayBg, textColor: 0, fontStyle: 'bold', lineColor: borderColor, lineWidth: 0.1 },
             columnStyles: {
                 0: { cellWidth: 'auto' },
-                1: { cellWidth: 28, halign: 'right' },
-                2: { cellWidth: 25, halign: 'right' },
+                1: { cellWidth: 30, halign: 'right' },
+                2: { cellWidth: 28, halign: 'right' },
                 3: { cellWidth: 28, halign: 'right' },
             },
             margin: { left: margin, right: margin },
@@ -304,19 +306,19 @@ async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ d
 
     autoTable(doc, {
         startY: currentY,
-        head: [['Voce', 'Incremento', 'Valore']],
+        head: [['Voce', '', 'Valore / incremento']],
         body: [
             ['Tot. materiali + voci', '', `€ ${fmt(totBase)}`],
-            [`+ Sfrido (${params.sfrido}%)`, `+€ ${fmt(sfrido_delta)}`, `€ ${fmt(totListino)}`],
+            [`+ Sfrido (${params.sfrido}%)`, '', `+€ ${fmt(sfrido_delta)}`],
             subRow('TOT materiali listino', totListino),
-            [`- Sconto (${params.sconto}%)`, `-€ ${fmt(sconto_delta)}`, `€ ${fmt(totSconto)}`],
+            [`- Sconto (${params.sconto}%)`, '', `-€ ${fmt(sconto_delta)}`],
             subRow('TOT materiali sconto', totSconto),
-            [`+ Trasporto (A)`, `+€ ${fmt(params.trasporto)}`, `€ ${fmt(costoFranco)}`],
+            [`+ Trasporto (A)`, '', `+€ ${fmt(params.trasporto)}`],
             subRow('Costo franco', costoFranco),
-            [`+ Posa (B)`, `+€ ${fmt(params.posa)}`, `€ ${fmt(costoTot)}`],
+            [`+ Posa (B)`, '', `+€ ${fmt(params.posa)}`],
             subRow('Costo TOT (TC)', costoTot),
-            [`+ Ricarico (${params.ricarico}%)`, `+€ ${fmt(ric_delta)}`, `€ ${fmt(conRicarico)}`],
-            [`+ Margine trattativa (${params.margineTrattativa}%)`, `+€ ${fmt(marg_delta)}`, `€ ${fmt(totaleFinale)}`],
+            [`+ Ricarico (${params.ricarico}%)`, '', `+€ ${fmt(ric_delta)}`],
+            [`+ Margine trattativa (${params.margineTrattativa}%)`, '', `+€ ${fmt(marg_delta)}`],
         ],
         foot: [['TOTALE FINALE', '', `€ ${fmt(totaleFinale)}`]],
         theme: 'plain',

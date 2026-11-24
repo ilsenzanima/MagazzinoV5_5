@@ -18,6 +18,7 @@ import { notify } from "@/lib/notify"
 import type { InventoryItem, Client } from "@/lib/types"
 import { generateCostAnalysisPDF, generateCostAnalysisPdfBlob } from "@/lib/pdf/cost-analysis-pdf"
 import { printPdfBlob } from "@/lib/document-actions"
+import { VOCE_UNITS, priceUnitSuffix, qtyUnitSuffix } from "@/lib/cost-analysis-units"
 import { generateCostAnalysisExcel } from "@/lib/excel/cost-analysis-excel"
 
 interface Props {
@@ -91,7 +92,7 @@ function MaterialTable({ rows, onUpdate, onDelete, onAdd }: { rows: CostAnalysis
                                     {row.maxPurchasePrice !== null ? <span className="text-xs font-mono text-slate-600"><span className="text-slate-400 text-[10px] mr-0.5">{unitPfx}</span>{fmt(row.maxPurchasePrice)}</span> : <Badge variant="outline" className="text-xs text-slate-400 border-slate-300">N/D</Badge>}
                                 </td>
                                 <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><span className="text-[10px] text-slate-400">{unitPfx}</span><EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })} placeholder={row.maxPurchasePrice !== null ? fmt(row.maxPurchasePrice) : '—'} /></div></td>
-                                <td className="p-2 text-right"><EditCell value={row.qtyEstimated || null} onSave={v => onUpdate(row.id, { qtyEstimated: v ?? 0 })} /></td>
+                                <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><EditCell value={row.qtyEstimated || null} onSave={v => onUpdate(row.id, { qtyEstimated: v ?? 0 })} />{row.itemUnit && <span className="text-[10px] text-slate-400 w-8 text-left">{qtyUnitSuffix(row.itemUnit)}</span>}</div></td>
                                 <td className={`p-2 text-right font-mono text-xs ${usingMax ? 'italic text-slate-500' : 'text-slate-700 dark:text-slate-300 font-medium'}`} title={usingMax ? 'Prezzo non impostato: usato in automatico il prezzo massimo di acquisto' : undefined}>{price !== null ? `€ ${fmt(totEst)}` : '—'}</td>
                                 <td className="p-2 text-right whitespace-nowrap">
                                     {pendingDelete === row.id ? (
@@ -142,7 +143,7 @@ function NewVoceCell({ placeholder, onAdd }: { placeholder: string; onAdd: (name
     )
 }
 
-function GenericTable({ rows, onUpdate, onDelete, onAdd, addPlaceholder, voceLabel = 'Voce', totalLabel = 'Totale voci generiche' }: { rows: CostAnalysisRow[]; voceLabel?: string; totalLabel?: string; addPlaceholder: string; onAdd: (name: string) => void; onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName'>>) => void; onDelete: (id: string) => void }) {
+function GenericTable({ rows, onUpdate, onDelete, onAdd, addPlaceholder, voceLabel = 'Voce', totalLabel = 'Totale voci generiche' }: { rows: CostAnalysisRow[]; voceLabel?: string; totalLabel?: string; addPlaceholder: string; onAdd: (name: string) => void; onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName' | 'itemUnit'>>) => void; onDelete: (id: string) => void }) {
     const [pendingDelete, setPendingDelete] = useState<string | null>(null)
     const totalEst = rows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0)
     return (
@@ -150,7 +151,8 @@ function GenericTable({ rows, onUpdate, onDelete, onAdd, addPlaceholder, voceLab
             <table className="w-full text-sm">
                 <thead><tr className="border-b bg-slate-100/80 dark:bg-slate-800/70">
                     <th className="text-left p-2 font-medium text-slate-500">{voceLabel}</th>
-                    <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Prezzo unit. (€)</th>
+                    <th className="text-left p-2 font-medium text-slate-500 whitespace-nowrap w-32">U.M.</th>
+                    <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Prezzo unit.</th>
                     <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Qtà presunta</th>
                     <th className="text-right p-2 font-medium text-slate-500 whitespace-nowrap">Tot. presunto</th>
                     <th className="w-6 p-2"></th>
@@ -159,11 +161,23 @@ function GenericTable({ rows, onUpdate, onDelete, onAdd, addPlaceholder, voceLab
                     {rows.map((row, idx) => {
                         const totEst = (row.unitPrice ?? 0) * row.qtyEstimated
                         const stripe = idx % 2 === 1 ? 'bg-slate-50/80 dark:bg-slate-800/30' : ''
+                        const known = VOCE_UNITS.some(u => u.value === row.itemUnit)
                         return (
                             <tr key={row.id} className={`border-b border-slate-100 dark:border-slate-800 ${stripe}`}>
                                 <td className="p-2 min-w-[160px]"><InlineTextEdit value={row.itemName} onSave={v => onUpdate(row.id, { itemName: v })} placeholder="Descrizione voce…" /></td>
-                                <td className="p-2 text-right"><EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })} /></td>
-                                <td className="p-2 text-right"><EditCell value={row.qtyEstimated || null} onSave={v => onUpdate(row.id, { qtyEstimated: v ?? 0 })} /></td>
+                                <td className="p-2">
+                                    <select
+                                        value={row.itemUnit}
+                                        onChange={e => onUpdate(row.id, { itemUnit: e.target.value })}
+                                        aria-label="Unità di misura"
+                                        className="h-7 w-full rounded-md border border-slate-200 bg-white px-1 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                                    >
+                                        {!known && <option value={row.itemUnit}>{row.itemUnit}</option>}
+                                        {VOCE_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                                    </select>
+                                </td>
+                                <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><span className="text-[10px] text-slate-400">€{priceUnitSuffix(row.itemUnit)}</span><EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })} /></div></td>
+                                <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><EditCell value={row.qtyEstimated || null} onSave={v => onUpdate(row.id, { qtyEstimated: v ?? 0 })} />{qtyUnitSuffix(row.itemUnit) && <span className="text-[10px] text-slate-400 w-8 text-left">{qtyUnitSuffix(row.itemUnit)}</span>}</div></td>
                                 <td className="p-2 text-right font-mono text-xs font-medium text-slate-700 dark:text-slate-300">{row.unitPrice !== null ? `€ ${fmt(totEst)}` : '—'}</td>
                                 <td className="p-2 text-right whitespace-nowrap">
                                     {pendingDelete === row.id ? (
@@ -182,25 +196,32 @@ function GenericTable({ rows, onUpdate, onDelete, onAdd, addPlaceholder, voceLab
                     {/* Riga precompilata: scrivendo il nome diventa una riga vera */}
                     <tr className="border-b border-slate-100 dark:border-slate-800">
                         <td className="p-2 min-w-[160px]"><NewVoceCell placeholder={addPlaceholder} onAdd={onAdd} /></td>
+                        <td className="p-2"></td>
                         <td className="p-2"><GhostBox text="0,00" /></td>
                         <td className="p-2"><GhostBox text="0,00" /></td>
                         <td className="p-2"></td>
                         <td className="w-6 p-2"></td>
                     </tr>
                 </tbody>
-                {rows.length > 0 && <tfoot><tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/60 font-semibold text-sm"><td colSpan={3} className="p-2 text-slate-600 dark:text-slate-400">{totalLabel}</td><td className="p-2 text-right font-mono text-blue-700 dark:text-blue-300">€ {fmt(totalEst)}</td><td></td></tr></tfoot>}
+                {rows.length > 0 && <tfoot><tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/60 font-semibold text-sm"><td colSpan={4} className="p-2 text-slate-600 dark:text-slate-400">{totalLabel}</td><td className="p-2 text-right font-mono text-blue-700 dark:text-blue-300">€ {fmt(totalEst)}</td><td></td></tr></tfoot>}
             </table>
         </div>
     )
 }
 
+// Riga del calcolo: con un incremento (delta) mostra solo quello; il valore compare sulla riga di partenza e sui subtotali,
+// così lo stesso numero non si ripete su due righe consecutive
 function SummaryRow({ label, value, delta, subtotal }: { label: string; value: number; delta?: number; subtotal?: string }) {
     return (
         <>
             <tr className="border-b border-slate-100 dark:border-slate-800">
                 <td className="py-1.5 px-2 text-slate-600 dark:text-slate-400 text-xs">{label}</td>
-                <td className="py-1.5 px-2 text-right font-mono text-xs text-slate-500">{delta !== undefined && delta !== 0 && <span className={delta > 0 ? 'text-emerald-600' : 'text-red-500'}>{delta > 0 ? '+' : ''}€ {fmt(Math.abs(delta))}</span>}</td>
-                <td className="py-1.5 px-2 text-right font-mono text-xs text-slate-600 dark:text-slate-400">€ {fmt(value)}</td>
+                <td className="py-1.5 px-2 text-right font-mono text-xs text-slate-500"></td>
+                <td className="py-1.5 px-2 text-right font-mono text-xs text-slate-600 dark:text-slate-400">
+                    {delta !== undefined
+                        ? <span className={delta > 0 ? 'text-emerald-600' : delta < 0 ? 'text-red-500' : 'text-slate-400'}>{delta < 0 ? '−' : '+'}€ {fmt(Math.abs(delta))}</span>
+                        : <>€ {fmt(value)}</>}
+                </td>
             </tr>
             {subtotal && <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/30"><td className="py-1.5 px-2 text-xs font-semibold text-slate-700 dark:text-slate-300">{subtotal}</td><td></td><td className="py-1.5 px-2 text-right font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">€ {fmt(value)}</td></tr>}
         </>
@@ -269,7 +290,7 @@ export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionN
     )
 
     // Modifiche non ancora salvate
-    const rowSig = (list: CostAnalysisRow[]) => JSON.stringify(list.map(r => [r.id, r.type, r.itemId, r.itemName, r.unitPrice, r.qtyEstimated]))
+    const rowSig = (list: CostAnalysisRow[]) => JSON.stringify(list.map(r => [r.id, r.type, r.itemId, r.itemName, r.itemUnit, r.unitPrice, r.qtyEstimated]))
     const paramSig = (p: CostAnalysisParams) => JSON.stringify([p.sfrido, p.sconto, p.trasporto, p.posa, p.ricarico, p.margineTrattativa])
     const dirty = useMemo(
         () => rowSig(rows) !== rowSig(savedRows) || paramSig(effParams) !== paramSig(savedParams),
@@ -319,7 +340,7 @@ export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionN
         })])
     }
 
-    const handleUpdate = (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName'>>) => {
+    const handleUpdate = (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName' | 'itemUnit'>>) => {
         setRows(prev => prev.map(r => r.id === id ? { ...r, ...fields } : r))
     }
 
@@ -347,8 +368,8 @@ export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionN
                         maxPurchasePrice: r.maxPurchasePrice, unitPrice: r.unitPrice,
                         qtyEstimated: r.qtyEstimated, qtyActual: r.qtyActual, sortOrder: idx,
                     }))
-                } else if (old.unitPrice !== r.unitPrice || old.qtyEstimated !== r.qtyEstimated || old.itemName !== r.itemName) {
-                    ops.push(proposalCostAnalysisApi.update(r.id, { unitPrice: r.unitPrice, qtyEstimated: r.qtyEstimated, itemName: r.itemName }))
+                } else if (old.unitPrice !== r.unitPrice || old.qtyEstimated !== r.qtyEstimated || old.itemName !== r.itemName || old.itemUnit !== r.itemUnit) {
+                    ops.push(proposalCostAnalysisApi.update(r.id, { unitPrice: r.unitPrice, qtyEstimated: r.qtyEstimated, itemName: r.itemName, itemUnit: r.itemUnit }))
                 }
             })
             // Il valore di Trasporto (A) e Posa (B) salvato è sempre quello effettivo (somma delle voci, se presenti)
@@ -410,8 +431,6 @@ export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionN
     const paramRows = [
         { label: 'Sfrido', field: 'sfrido', suffix: '%', fromVoci: false, value: 0 },
         { label: 'Sconto', field: 'sconto', suffix: '%', fromVoci: false, value: 0 },
-        { label: 'Trasporto (A)', field: 'trasporto', suffix: '€', fromVoci: transportRows.length > 0, value: trasportoTot },
-        { label: 'Posa (B)', field: 'posa', suffix: '€', fromVoci: posaRows.length > 0, value: posaTot },
         { label: 'Ricarico', field: 'ricarico', suffix: '%', fromVoci: false, value: 0 },
         { label: 'Margine Trattativa', field: 'margineTrattativa', suffix: '%', fromVoci: false, value: 0 },
     ] as const
