@@ -14,7 +14,12 @@ export function useDocSelection() {
         if (next.has(id)) next.delete(id); else next.add(id)
         return next
     }), [])
-    const setAll = useCallback((all: string[], on: boolean) => setIds(on ? new Set(all) : new Set()), [])
+    // Aggiunge o toglie solo queste voci: si puo' filtrare, selezionare, cambiare filtro e selezionare ancora
+    const setAll = useCallback((all: string[], on: boolean) => setIds(prev => {
+        const next = new Set(prev)
+        all.forEach(id => (on ? next.add(id) : next.delete(id)))
+        return next
+    }), [])
     const clear = useCallback(() => setIds(new Set()), [])
     return { ids, toggle, setAll, clear }
 }
