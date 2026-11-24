@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Upload, Loader2, FileText, Pencil, Trash2, X, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react"
+import { Upload, Loader2, FileText, Pencil, Trash2, X, ArrowUp, ArrowDown, ArrowUpDown, ExternalLink, Printer, Download } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { RowActionsButton } from "@/components/ui/row-actions"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DocumentBulkBar, useDocSelection, printOne, downloadOne } from "@/components/documents/DocumentBulkBar"
 import { costAnalysisDocumentsApi, CostAnalysisDocument } from "@/lib/services/cost-analysis-documents"
 import { createClient } from "@/lib/supabase/client"
 import { format } from "date-fns"
@@ -184,6 +188,11 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
             : dir * String(a.createdAt).localeCompare(String(b.createdAt))
     })
 
+    // Selezione multipla: resta anche cambiando la ricerca
+    const sel = useDocSelection()
+    const selectedDocs = documents.filter(d => sel.ids.has(d.id))
+    const allShownSelected = shown.length > 0 && shown.every(d => sel.ids.has(d.id))
+
     return (
         <div className="space-y-4">
             <NotchActions>
@@ -205,18 +214,22 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
             ) : shown.length === 0 ? (
                 <p className="py-12 text-center text-sm text-slate-400">Nessun documento corrisponde alla ricerca.</p>
             ) : (
+                <>
+                <DocumentBulkBar docs={selectedDocs} onClear={sel.clear} />
                 <Table className="border-collapse">
                     <TableHeader>
                         <TableRow className="bg-slate-100 hover:bg-slate-100 dark:bg-muted">
+                            <TableHead className="w-10 border-r"><Checkbox checked={allShownSelected ? true : selectedDocs.length > 0 ? "indeterminate" : false} onCheckedChange={v => sel.setAll(shown.map(d => d.id), v === true)} aria-label="Seleziona tutti" /></TableHead>
                             <TableHead className="w-1/3 border-r text-xs font-semibold uppercase tracking-wide text-slate-600"><button type="button" onClick={() => toggleSort('name')} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">Nome{sortIcon('name')}</button></TableHead>
                             <TableHead className="border-r text-xs font-semibold uppercase tracking-wide text-slate-600">Note</TableHead>
                             <TableHead className="w-36 border-r text-xs font-semibold uppercase tracking-wide text-slate-600"><button type="button" onClick={() => toggleSort('date')} className="inline-flex items-center gap-1 uppercase hover:text-slate-900">Caricato il{sortIcon('date')}</button></TableHead>
-                            <TableHead className="w-16" />
+                            <TableHead className="w-24" />
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {shown.map(doc => (
                             <TableRow key={doc.id} className="cursor-pointer" onClick={() => handleOpenDocument(doc.fileUrl)}>
+                                <TableCell className="border-r py-2" onClick={e => e.stopPropagation()}><Checkbox checked={sel.ids.has(doc.id)} onCheckedChange={() => sel.toggle(doc.id)} aria-label="Seleziona documento" /></TableCell>
                                 <TableCell className="border-r py-2">
                                     <span className="flex items-center gap-2 font-medium text-slate-900 dark:text-white">
                                         <span className="shrink-0">{getFileIcon(doc.fileType)}</span>
@@ -227,13 +240,24 @@ export function CostAnalysisDocuments({ jobId, proposalId, jobLabel }: Props) {
                                 <TableCell className="border-r py-2 text-sm text-slate-600 dark:text-slate-300">{format(new Date(doc.createdAt), 'dd/MM/yyyy', { locale: it })}</TableCell>
                                 <TableCell className="py-2">
                                     <div className="flex justify-end">
-                                        <button onClick={e => { e.stopPropagation(); openEdit(doc) }} title="Modifica" className="p-1 text-slate-400 hover:text-blue-600"><Pencil className="h-4 w-4" /></button>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild><RowActionsButton aria-label="Azioni documento" /></DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                                                <DropdownMenuItem onClick={() => handleOpenDocument(doc.fileUrl)}><ExternalLink className="mr-2 h-4 w-4" />Apri</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => printOne(doc)}><Printer className="mr-2 h-4 w-4" />Stampa</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => downloadOne(doc)}><Download className="mr-2 h-4 w-4" />Scarica</DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => openEdit(doc)}><Pencil className="mr-2 h-4 w-4" />Modifica</DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem onClick={() => { setActiveDoc(doc); setDeleteOpen(true) }} className="text-red-600 focus:text-red-600"><Trash2 className="mr-2 h-4 w-4" />Elimina</DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
                                     </div>
                                 </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
                 </Table>
+                </>
             )}
 
             <FloatingAddButton onClick={openUpload} label="Carica analisi costi" />
