@@ -589,9 +589,9 @@ export default function InvoiceDetailPage() {
                 </div>
 
                 <div className="space-y-6">
-                    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
+                    <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
                     {/* ── Dati fattura ── */}
-                    <Card>
+                    <Card className="h-full">
                         <CardHeader className="flex flex-row items-center justify-between py-4">
                             <CardTitle>Dati Fattura</CardTitle>
                         </CardHeader>
@@ -667,7 +667,7 @@ export default function InvoiceDetailPage() {
                         </CardContent>
                     </Card>
 
-                    <div className="space-y-6">
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     {/* ── Documenti ── */}
                     <InvoiceDocuments
                         ref={invoiceDocsRef}
