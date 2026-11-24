@@ -400,3 +400,155 @@ div[class~="border"]:has(> [data-slot="table-container"]):not([data-slot="card"]
   0%, 18% { transform: translateX(0); }
   82%, 100% { transform: translateX(var(--shift)); }
 }
+
+/* Menu «Azioni» da telefono: pulsanti a pillola tutti uguali (icona tonda + nome) che salgono dal tasto centrale a cascata e rientrano al contrario */
+.dial-wrap {
+  pointer-events: none;
+  visibility: hidden;
+  transition: visibility 0s linear calc(var(--n, 1) * 40ms + 380ms);
+}
+.dial-wrap[data-open="true"] {
+  visibility: visible;
+  transition-delay: 0s;
+}
+.dial-item,
+.dial-slot > * {
+  --o: calc(var(--i, 0) * 55ms);
+  --c: calc((var(--n, 1) - 1 - var(--i, 0)) * 40ms);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(calc(var(--i, 0) * 3.6rem + 2.5rem)) scale(0.6);
+  transition: transform 0.38s cubic-bezier(0.5, 0, 0.75, 0), opacity 0.25s ease-in;
+  transition-delay: var(--c);
+}
+.dial-wrap[data-open="true"] .dial-item,
+.dial-wrap[data-open="true"] .dial-slot > * {
+  pointer-events: auto;
+  opacity: 1;
+  transform: none;
+  transition: transform 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.15), opacity 0.3s ease-out;
+  transition-delay: var(--o);
+}
+.dial-pill,
+.dial-slot > :is(button, a) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  height: 3rem;
+  width: min(17rem, 100%);
+  margin-inline: auto;
+  padding: 0.25rem 1.25rem;
+  border: 0;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #ffffff, #e6edfb);
+  color: #1e293b;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: left;
+  line-height: 1.1;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.35), inset 0 1px 0 #fff, inset 0 -3px 4px rgba(15, 23, 42, 0.1);
+}
+.dial-slot > :is(button, a):hover {
+  background: linear-gradient(135deg, #ffffff, #e6edfb);
+  color: #1e293b;
+}
+.dial-pill:has(> .dial-ico),
+.dial-slot > :is(button, a):has(> svg:first-child) {
+  padding-left: 0.25rem;
+}
+.dial-ico,
+.dial-slot > :is(button, a) > svg:first-child {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0.6rem;
+  border-radius: 9999px;
+  color: #fff;
+  background: radial-gradient(circle at 32% 24%, #60a5fa, #2563eb 62%);
+  box-shadow: 0 3px 6px rgba(15, 23, 42, 0.35), inset 0 2px 3px rgba(255, 255, 255, 0.45), inset 0 -3px 5px rgba(0, 0, 0, 0.25);
+}
+.dial-ico > svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.dial-slot > :is(button, a) > svg:last-child:not(:first-child) {
+  margin-left: auto;
+  width: 1rem;
+  height: 1rem;
+  color: #64748b;
+}
+
+/* Pannelli Naviga e Cerca: scorrono su dalla barra e vi rientrano; lo sfondo sfuma */
+@keyframes sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes sheet-down { from { transform: none; } to { transform: translateY(100%); } }
+@keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+.sheet-in { animation: sheet-up 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+.sheet-out { animation: sheet-down 0.34s cubic-bezier(0.5, 0, 0.75, 0) both; }
+.backdrop-in { animation: backdrop-in 0.3s ease-out both; }
+.backdrop-out { animation: backdrop-out 0.34s ease-in both; }
+
+/* Pulsanti del menu di pagine che li avvolgono in un link (<a><button>…): il link e' la pillola, il pulsante dentro diventa trasparente */
+.dial-slot > a:has(> button) { padding: 0.25rem 1.25rem; }
+.dial-slot > a:has(> button > svg:first-child) { padding-left: 0.25rem; }
+.dial-slot > a > button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+}
+.dial-slot > a > button > svg:first-child {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0.6rem;
+  border-radius: 9999px;
+  color: #fff;
+  background: radial-gradient(circle at 32% 24%, #60a5fa, #2563eb 62%);
+  box-shadow: 0 3px 6px rgba(15, 23, 42, 0.35), inset 0 2px 3px rgba(255, 255, 255, 0.45), inset 0 -3px 5px rgba(0, 0, 0, 0.25);
+}
+/* Pulsante con la sola icona: il nome (title / aria-label) viene scritto accanto */
+.dial-slot [data-iconly]::after { content: attr(data-dial-label); }
+/* Azione che elimina: icona rossa */
+.dial-slot > [data-dial-danger] svg:first-child,
+.dial-slot > [data-dial-danger] > button > svg:first-child {
+  background: radial-gradient(circle at 32% 24%, #f87171, #dc2626 62%);
+}
+/* Dal PC: le pillole si allineano a destra, sopra il tasto tondo */
+.dial-right .dial-pill { margin-left: auto; margin-right: 0; }
+.dial-item[data-dial-danger] .dial-ico {
+  background: radial-gradient(circle at 32% 24%, #f87171, #dc2626 62%);
+}
+.dial-slot > [data-dial-save] svg:first-child,
+.dial-slot > [data-dial-save] > button > svg:first-child,
+.dial-item[data-dial-save] .dial-ico {
+  background: radial-gradient(circle at 32% 24%, #4ade80, #16a34a 62%);
+}
+.dial-slot > [data-dial-cancel],
+.dial-slot > a:has(> [data-dial-cancel]) { padding-left: 0.25rem; }
+.dial-slot [data-dial-cancel]::before {
+  content: "\2715";
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  color: #fff;
+  font-size: 1rem;
+  background: radial-gradient(circle at 32% 24%, #94a3b8, #64748b 62%);
+  box-shadow: 0 3px 6px rgba(15, 23, 42, 0.35), inset 0 2px 3px rgba(255, 255, 255, 0.45), inset 0 -3px 5px rgba(0, 0, 0, 0.25);
+}

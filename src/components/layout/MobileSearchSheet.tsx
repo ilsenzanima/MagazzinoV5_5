@@ -10,7 +10,7 @@ interface Hit { cat: string; id: string; title: string; subtitle?: string; href:
 interface Category { key: string; label: string }
 
 // Ricerca unica da telefono: scrivi e i risultati compaiono divisi per categoria, i chip restringono a una sola
-export function MobileSearchSheet({ onClose }: { onClose: () => void }) {
+export function MobileSearchSheet({ onClose, className }: { onClose: () => void; className?: string }) {
   const open = true
   const onOpenChange = (_: boolean) => onClose()
   const router = useRouter()
@@ -89,7 +89,7 @@ export function MobileSearchSheet({ onClose }: { onClose: () => void }) {
 
   // Pannello che sale dalla barra: stessa tinta scura, il tasto Cerca diventa Chiudi
   return (
-    <div className="relative -mb-[38px] flex max-h-[calc(100dvh-9rem)] flex-col gap-3 rounded-t-3xl bg-slate-800 px-3 pb-[50px] pt-4 text-slate-100 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] animate-in slide-in-from-bottom-6 fade-in duration-200">
+    <div className={cn("relative -mb-[38px] flex max-h-[calc(100dvh-9rem)] flex-col gap-3 rounded-t-3xl bg-slate-800 px-3 pb-[50px] pt-4 text-slate-100 shadow-[0_-8px_24px_rgba(0,0,0,0.35)]", className)}>
       {pageSearch && (
         <div className="flex gap-2">
           <button type="button" className={chip(tab === "page")} onClick={() => setTab("page")}>{pageSearch.title}</button>
