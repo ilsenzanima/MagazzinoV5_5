@@ -537,3 +537,18 @@ div[class~="border"]:has(> [data-slot="table-container"]):not([data-slot="card"]
 .dial-item[data-dial-save] .dial-ico {
   background: radial-gradient(circle at 32% 24%, #4ade80, #16a34a 62%);
 }
+.dial-slot > [data-dial-cancel],
+.dial-slot > a:has(> [data-dial-cancel]) { padding-left: 0.25rem; }
+.dial-slot [data-dial-cancel]::before {
+  content: "\2715";
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  color: #fff;
+  font-size: 1rem;
+  background: radial-gradient(circle at 32% 24%, #94a3b8, #64748b 62%);
+  box-shadow: 0 3px 6px rgba(15, 23, 42, 0.35), inset 0 2px 3px rgba(255, 255, 255, 0.45), inset 0 -3px 5px rgba(0, 0, 0, 0.25);
+}

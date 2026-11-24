@@ -42,6 +42,8 @@ const RECENT_KEY = "mobile-recent-pages";
 
 // Azioni che eliminano: icona sempre rossa
 const DANGER_WORDS = /elimin|cancell|rimuov|svuota/i;
+// Annulla / chiudi senza icona: nel menu prendono una X grigia
+const CANCEL_WORDS = /annull|chiudi|indietro/i;
 // Azioni che salvano o confermano: icona sempre verde
 const SAVE_WORDS = /salva|conferma/i;
 
@@ -84,6 +86,9 @@ export function MobileNavBar() {
                 const label = btn.getAttribute("aria-label") || btn.getAttribute("title") || "";
                 if (!(btn.textContent ?? "").trim() && label) { btn.setAttribute("data-iconly", ""); btn.setAttribute("data-dial-label", label); }
                 else btn.removeAttribute("data-iconly");
+                // Annulla e simili, senza icona: nel menu ne ha una tonda grigia con la X
+                if (!btn.querySelector("svg") && CANCEL_WORDS.test(btn.textContent ?? "")) btn.setAttribute("data-dial-cancel", "");
+                else btn.removeAttribute("data-dial-cancel");
                 if (DANGER_WORDS.test(`${btn.textContent ?? ""} ${label}`) || /\bred-\d/.test(btn.className) || /\bred-\d/.test(k.className)) k.setAttribute("data-dial-danger", "");
                 else k.removeAttribute("data-dial-danger");
                 if (!k.hasAttribute("data-dial-danger") && SAVE_WORDS.test(`${btn.textContent ?? ""} ${label} ${btn.getAttribute("title") ?? ""}`)) k.setAttribute("data-dial-save", "");
