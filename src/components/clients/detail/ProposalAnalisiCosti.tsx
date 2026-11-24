@@ -18,7 +18,8 @@ import { notify } from "@/lib/notify"
 import type { InventoryItem, Client } from "@/lib/types"
 import { generateCostAnalysisPDF, generateCostAnalysisPdfBlob } from "@/lib/pdf/cost-analysis-pdf"
 import { printPdfBlob } from "@/lib/document-actions"
-import { VOCE_UNITS, priceUnitSuffix, qtyUnitSuffix } from "@/lib/cost-analysis-units"
+import { loadVoceUnits, getVoceUnits, priceUnitSuffix, qtyUnitSuffix } from "@/lib/cost-analysis-units"
+import type { CostAnalysisVoceUnit } from "@/lib/services/cost-analysis-voce-units"
 import { generateCostAnalysisExcel } from "@/lib/excel/cost-analysis-excel"
 
 interface Props {
@@ -143,7 +144,7 @@ function NewVoceCell({ placeholder, onAdd }: { placeholder: string; onAdd: (name
     )
 }
 
-function GenericTable({ rows, onUpdate, onDelete, onAdd, addPlaceholder, voceLabel = 'Voce', totalLabel = 'Totale voci generiche' }: { rows: CostAnalysisRow[]; voceLabel?: string; totalLabel?: string; addPlaceholder: string; onAdd: (name: string) => void; onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName' | 'itemUnit'>>) => void; onDelete: (id: string) => void }) {
+function GenericTable({ rows, units, onUpdate, onDelete, onAdd, addPlaceholder, voceLabel = 'Voce', totalLabel = 'Totale voci generiche' }: { rows: CostAnalysisRow[]; voceLabel?: string; totalLabel?: string; units: CostAnalysisVoceUnit[]; addPlaceholder: string; onAdd: (name: string) => void; onUpdate: (id: string, fields: Partial<Pick<CostAnalysisRow, 'unitPrice' | 'qtyEstimated' | 'qtyActual' | 'itemName' | 'itemUnit'>>) => void; onDelete: (id: string) => void }) {
     const [pendingDelete, setPendingDelete] = useState<string | null>(null)
     const totalEst = rows.reduce((s, r) => s + (r.unitPrice ?? 0) * r.qtyEstimated, 0)
     return (
@@ -161,7 +162,7 @@ function GenericTable({ rows, onUpdate, onDelete, onAdd, addPlaceholder, voceLab
                     {rows.map((row, idx) => {
                         const totEst = (row.unitPrice ?? 0) * row.qtyEstimated
                         const stripe = idx % 2 === 1 ? 'bg-slate-50/80 dark:bg-slate-800/30' : ''
-                        const known = VOCE_UNITS.some(u => u.value === row.itemUnit)
+                        const known = !row.itemUnit || units.some(u => u.name === row.itemUnit)
                         return (
                             <tr key={row.id} className={`border-b border-slate-100 dark:border-slate-800 ${stripe}`}>
                                 <td className="p-2 min-w-[160px]"><InlineTextEdit value={row.itemName} onSave={v => onUpdate(row.id, { itemName: v })} placeholder="Descrizione voce…" /></td>
@@ -172,8 +173,9 @@ function GenericTable({ rows, onUpdate, onDelete, onAdd, addPlaceholder, voceLab
                                         aria-label="Unità di misura"
                                         className="h-7 w-full rounded-md border border-slate-200 bg-white px-1 text-xs text-slate-700 outline-none focus:ring-2 focus:ring-blue-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                                     >
-                                        {!known && <option value={row.itemUnit}>{row.itemUnit}</option>}
-                                        {VOCE_UNITS.map(u => <option key={u.value} value={u.value}>{u.label}</option>)}
+                                        <option value="">Nessuna (€)</option>
+                                        {!known && <option value={row.itemUnit}>€/{row.itemUnit}</option>}
+                                        {units.map(u => <option key={u.id} value={u.name}>€/{u.name}</option>)}
                                     </select>
                                 </td>
                                 <td className="p-2 text-right"><div className="flex items-center justify-end gap-0.5"><span className="text-[10px] text-slate-400">€{priceUnitSuffix(row.itemUnit)}</span><EditCell value={row.unitPrice} onSave={v => onUpdate(row.id, { unitPrice: v })} /></div></td>
@@ -244,6 +246,8 @@ export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionN
     const [inventory, setInventory] = useState<InventoryItem[]>([])
     const [invLoading, setInvLoading] = useState(false)
     const [printing, setPrinting] = useState(false)
+    const [units, setUnits] = useState<CostAnalysisVoceUnit[]>(getVoceUnits())
+    useEffect(() => { loadVoceUnits().then(setUnits) }, [])
     const [proposalTitle, setProposalTitle] = useState('')
     const [client, setClient] = useState<Client | null>(null)
     const [exportingPdf, setExportingPdf] = useState(false)
@@ -485,7 +489,7 @@ export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionN
                     <span className="flex-1 font-semibold text-slate-800 dark:text-slate-100">Voci Generiche</span>
                 </div>
                 <CardContent className="pt-0 pb-4 px-4">
-                    <GenericTable rows={genericRows} addPlaceholder="Aggiungi voce (es. Noleggio gru, Smaltimento…)" onAdd={n => handleAddVoce('generic', n)} onUpdate={handleUpdate} onDelete={handleDelete} />
+                    <GenericTable units={units} rows={genericRows} addPlaceholder="Aggiungi voce (es. Noleggio gru, Smaltimento…)" onAdd={n => handleAddVoce('generic', n)} onUpdate={handleUpdate} onDelete={handleDelete} />
                 </CardContent>
             </Card>
 
@@ -496,7 +500,7 @@ export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionN
                 </div>
                 <CardContent className="pt-0 pb-4 px-4">
                     <p className="text-xs text-slate-500 py-2">Le voci, sommate, definiscono il valore Trasporto (A) del riepilogo prezzi. Senza voci resta quello digitato a mano nei parametri.</p>
-                    <GenericTable rows={transportRows} voceLabel="Voce di trasporto" totalLabel="Totale trasporto (A)" addPlaceholder="Aggiungi voce di trasporto (es. Camion 5 q.li, Corriere…)" onAdd={n => handleAddVoce('transport', n)} onUpdate={handleUpdate} onDelete={handleDelete} />
+                    <GenericTable units={units} rows={transportRows} voceLabel="Voce di trasporto" totalLabel="Totale trasporto (A)" addPlaceholder="Aggiungi voce di trasporto (es. Camion 5 q.li, Corriere…)" onAdd={n => handleAddVoce('transport', n)} onUpdate={handleUpdate} onDelete={handleDelete} />
                 </CardContent>
             </Card>
 
@@ -507,7 +511,7 @@ export function ProposalAnalisiCosti({ proposalId, jobLabel, versionId, versionN
                 </div>
                 <CardContent className="pt-0 pb-4 px-4">
                     <p className="text-xs text-slate-500 py-2">Le voci, sommate, definiscono il valore Posa (B) del riepilogo prezzi. Senza voci resta quello digitato a mano nei parametri.</p>
-                    <GenericTable rows={posaRows} voceLabel="Voce di posa" totalLabel="Totale posa (B)" addPlaceholder="Aggiungi voce di posa (es. Squadra posatori, Ponteggio…)" onAdd={n => handleAddVoce('posa', n)} onUpdate={handleUpdate} onDelete={handleDelete} />
+                    <GenericTable units={units} rows={posaRows} voceLabel="Voce di posa" totalLabel="Totale posa (B)" addPlaceholder="Aggiungi voce di posa (es. Squadra posatori, Ponteggio…)" onAdd={n => handleAddVoce('posa', n)} onUpdate={handleUpdate} onDelete={handleDelete} />
                 </CardContent>
             </Card>
 

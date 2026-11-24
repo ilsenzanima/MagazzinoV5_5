@@ -1,26 +1,33 @@
-// Unità di misura delle voci (generiche, trasporto, posa) dell'analisi costi.
-// Servono solo a rendere leggibile la voce: «€/ora» sul prezzo, «ore» sulla quantità. Non cambiano i calcoli.
-// Il valore vuoto è «solo euro» (a corpo).
+import { costAnalysisVoceUnitsApi, type CostAnalysisVoceUnit } from '@/lib/services/cost-analysis-voce-units'
 
-export interface VoceUnit { value: string; label: string; qty: string }
+// Unità di misura opzionali delle voci non di magazzino dell'analisi costi (generiche, trasporto, posa).
+// L'elenco si gestisce da Impostazioni → Elenchi. Servono solo a rendere leggibile la voce («€/ora» sul prezzo,
+// «ore» sulla quantità) e non cambiano i calcoli. Senza unità la voce è «solo euro».
+// Sulla riga si salva il nome dell'unità: se poi viene tolta dall'elenco, le righe già fatte restano leggibili.
 
-export const VOCE_UNITS: VoceUnit[] = [
-    { value: '', label: '€ (a corpo)', qty: '' },
-    { value: 'ora', label: '€/ora', qty: 'ore' },
-    { value: 'giorno', label: '€/giorno', qty: 'giorni' },
-    { value: 'mese', label: '€/mese', qty: 'mesi' },
-    { value: 'pz', label: '€/pz', qty: 'pz' },
-    { value: 'm', label: '€/m', qty: 'm' },
-    { value: 'ml', label: '€/m lineare', qty: 'ml' },
-    { value: 'mq', label: '€/m²', qty: 'm²' },
-    { value: 'kg', label: '€/kg', qty: 'kg' },
-]
+const DEFAULTS: CostAnalysisVoceUnit[] = [
+    ['ora', 'ore'], ['giorno', 'giorni'], ['mese', 'mesi'], ['pz', 'pz'], ['m', 'm'], ['ml', 'ml'], ['m²', 'm²'], ['kg', 'kg'],
+].map(([name, qtyLabel], i) => ({ id: `default-${i}`, name, qtyLabel, sortOrder: i + 1 }))
 
-// Suffisso del prezzo: «/ora» (vuoto se a corpo). Per i materiali l'unità è quella dell'articolo (es. PZ, ML).
+let cache: CostAnalysisVoceUnit[] | null = null
+
+// Carica l'elenco (una volta sola, finché non viene modificato) e lo tiene per PDF, Excel e tabelle
+export async function loadVoceUnits(force = false): Promise<CostAnalysisVoceUnit[]> {
+    if (cache && !force) return cache
+    try { cache = await costAnalysisVoceUnitsApi.getAll() }
+    catch { cache = cache ?? DEFAULTS }
+    return cache
+}
+
+export const getVoceUnits = () => cache ?? DEFAULTS
+export const invalidateVoceUnits = () => { cache = null }
+
+// Suffisso del prezzo: «/ora» (vuoto se la voce è a corpo). Per i materiali l'unità è quella dell'articolo (es. PZ, ML).
 export const priceUnitSuffix = (unit: string | null | undefined) => unit ? `/${unit}` : ''
 
-// Suffisso della quantità: «ore», «pz»… Per un'unità non in elenco (materiali) resta quella dell'articolo.
+// Suffisso della quantità: «ore», «pz»… Per un'unità non in elenco (materiali, o tolta dall'elenco) resta il nome stesso.
 export const qtyUnitSuffix = (unit: string | null | undefined) => {
     if (!unit) return ''
-    return VOCE_UNITS.find(u => u.value === unit)?.qty ?? unit
+    const found = getVoceUnits().find(u => u.name === unit)
+    return found ? (found.qtyLabel || found.name) : unit
 }

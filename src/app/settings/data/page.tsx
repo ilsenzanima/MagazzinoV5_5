@@ -22,6 +22,8 @@ import { complianceDocumentTypesApi, ComplianceDocumentTypeConfig } from "@/lib/
 import { jobSiteDocumentTypesApi, JobSiteDocumentType } from "@/lib/services/job-site-document-types";
 import { jobConformitaDocumentTypesApi, JobConformitaDocumentType } from "@/lib/services/job-conformita-document-types";
 import type { Warehouse } from "@/lib/types";
+import { costAnalysisVoceUnitsApi, CostAnalysisVoceUnit } from "@/lib/services/cost-analysis-voce-units";
+import { invalidateVoceUnits } from "@/lib/cost-analysis-units";
 
 type RenameTarget = {
     kind: "brand" | "type" | "unit" | "warehouse" | "docType" | "complianceDocType" | "jobSiteDocType" | "jobConformitaDocType";
@@ -98,6 +100,17 @@ export default function SettingsInventoryPage() {
     const [newJobConformitaDocTypeAllowsFolders, setNewJobConformitaDocTypeAllowsFolders] = useState(false);
     const [addingJobConformitaDocType, setAddingJobConformitaDocType] = useState(false);
 
+    // Unità di misura delle voci di analisi costi (opzionali)
+    const [voceUnits, setVoceUnits] = useState<CostAnalysisVoceUnit[]>([]);
+    const [loadingVoceUnits, setLoadingVoceUnits] = useState(true);
+    const [newVoceUnitName, setNewVoceUnitName] = useState("");
+    const [newVoceUnitQty, setNewVoceUnitQty] = useState("");
+    const [addingVoceUnit, setAddingVoceUnit] = useState(false);
+    const [editVoceUnit, setEditVoceUnit] = useState<CostAnalysisVoceUnit | null>(null);
+    const [editVoceUnitName, setEditVoceUnitName] = useState("");
+    const [editVoceUnitQty, setEditVoceUnitQty] = useState("");
+    const [savingVoceUnit, setSavingVoceUnit] = useState(false);
+
     // Rename dialog state
     const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
     const [renameValue, setRenameValue] = useState("");
@@ -109,6 +122,7 @@ export default function SettingsInventoryPage() {
         loadBrands();
         loadTypes();
         loadUnits();
+        loadVoceUnitsList();
         loadWarehouses();
         loadDocTypes();
         loadComplianceDocTypes();
@@ -370,6 +384,80 @@ export default function SettingsInventoryPage() {
         } catch (error) {
             console.error("Failed to delete type", error);
             notify.error("Errore nell'eliminazione del tipo");
+        }
+    };
+
+    const loadVoceUnitsList = async () => {
+        try {
+            setLoadingVoceUnits(true);
+            setVoceUnits(await costAnalysisVoceUnitsApi.getAll());
+        } catch (error) {
+            console.error("Failed to load cost analysis units", error);
+            notify.error("Errore nel caricamento delle unità delle analisi costi");
+        } finally {
+            setLoadingVoceUnits(false);
+        }
+    };
+
+    const handleAddVoceUnit = async () => {
+        const name = newVoceUnitName.trim();
+        if (!name) return;
+        if (voceUnits.some(u => u.name.toLowerCase() === name.toLowerCase())) {
+            notify.warning("Esiste già un'unità con questo nome.");
+            return;
+        }
+        try {
+            setAddingVoceUnit(true);
+            const created = await costAnalysisVoceUnitsApi.create(name, newVoceUnitQty.trim(), Math.max(0, ...voceUnits.map(u => u.sortOrder)) + 1);
+            setVoceUnits([...voceUnits, created]);
+            setNewVoceUnitName("");
+            setNewVoceUnitQty("");
+            invalidateVoceUnits();
+        } catch (error) {
+            console.error("Failed to add cost analysis unit", error);
+            notify.error("Errore nell'aggiunta dell'unità");
+        } finally {
+            setAddingVoceUnit(false);
+        }
+    };
+
+    const openEditVoceUnit = (u: CostAnalysisVoceUnit) => {
+        setEditVoceUnit(u);
+        setEditVoceUnitName(u.name);
+        setEditVoceUnitQty(u.qtyLabel);
+    };
+
+    const handleSaveVoceUnit = async () => {
+        if (!editVoceUnit) return;
+        const name = editVoceUnitName.trim();
+        if (!name) return;
+        if (voceUnits.some(u => u.id !== editVoceUnit.id && u.name.toLowerCase() === name.toLowerCase())) {
+            notify.warning("Esiste già un'unità con questo nome.");
+            return;
+        }
+        try {
+            setSavingVoceUnit(true);
+            const updated = await costAnalysisVoceUnitsApi.update(editVoceUnit.id, editVoceUnit.name, name, editVoceUnitQty.trim());
+            setVoceUnits(prev => prev.map(u => u.id === updated.id ? updated : u));
+            invalidateVoceUnits();
+            setEditVoceUnit(null);
+        } catch (error) {
+            console.error("Failed to update cost analysis unit", error);
+            notify.error("Errore nel salvataggio dell'unità");
+        } finally {
+            setSavingVoceUnit(false);
+        }
+    };
+
+    const handleDeleteVoceUnit = async (id: string) => {
+        if (!await confirmDialog("Sei sicuro di voler eliminare questa unità? Le voci che già la usano la mantengono come testo.")) return;
+        try {
+            await costAnalysisVoceUnitsApi.delete(id);
+            setVoceUnits(voceUnits.filter(u => u.id !== id));
+            invalidateVoceUnits();
+        } catch (error) {
+            console.error("Failed to delete cost analysis unit", error);
+            notify.error("Errore nell'eliminazione dell'unità");
         }
     };
 
@@ -709,6 +797,7 @@ export default function SettingsInventoryPage() {
                     <TabsTrigger value="brands">Marche</TabsTrigger>
                     <TabsTrigger value="types">Tipologie</TabsTrigger>
                     <TabsTrigger value="units">Unità di Misura</TabsTrigger>
+                    <TabsTrigger value="voceUnits">Unità Analisi Costi</TabsTrigger>
                     <TabsTrigger value="warehouses">Magazzini</TabsTrigger>
                     <TabsTrigger value="docTypes">Documenti Offerte</TabsTrigger>
                     <TabsTrigger value="complianceDocTypes">Documenti Conformità</TabsTrigger>
@@ -935,6 +1024,66 @@ export default function SettingsInventoryPage() {
                                     ))}
                                     {units.length === 0 && (
                                         <p className="text-sm text-muted-foreground italic">Nessuna unità presente.</p>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="voceUnits" className="space-y-4 mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Unità Analisi Costi</CardTitle>
+                            <CardDescription>
+                                Unità di misura opzionali per le voci generiche, di trasporto e di posa delle analisi costi (es. €/ora con quantità in «ore»).
+                                Servono solo a rendere leggibile la voce: chi non le vuole usare lascia «Nessuna». I materiali di magazzino usano in automatico l'unità dell'articolo.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex flex-wrap gap-2">
+                                <Input
+                                    placeholder="Nome unità (es. ora)..."
+                                    className="max-w-[14rem]"
+                                    value={newVoceUnitName}
+                                    onChange={(e) => setNewVoceUnitName(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddVoceUnit()}
+                                />
+                                <Input
+                                    placeholder="Sulla quantità (es. ore) — facoltativo"
+                                    className="max-w-xs"
+                                    value={newVoceUnitQty}
+                                    onChange={(e) => setNewVoceUnitQty(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleAddVoceUnit()}
+                                />
+                                <Button
+                                    size="icon"
+                                    className="bg-blue-600 hover:bg-blue-700"
+                                    onClick={handleAddVoceUnit}
+                                    disabled={addingVoceUnit || !newVoceUnitName.trim()}
+                                >
+                                    {addingVoceUnit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                                </Button>
+                            </div>
+                            {loadingVoceUnits ? (
+                                <div className="flex items-center gap-2 text-slate-500">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Caricamento unità...
+                                </div>
+                            ) : (
+                                <div className="flex flex-wrap gap-2">
+                                    {voceUnits.map(unit => (
+                                        <Badge key={unit.id} variant="outline" className="pl-3 pr-1 py-1 flex items-center gap-1 text-sm">
+                                            €/{unit.name}{unit.qtyLabel && unit.qtyLabel !== unit.name && <span className="text-xs text-muted-foreground"> · qtà in {unit.qtyLabel}</span>}
+                                            <button className="hover:bg-slate-100 rounded-full p-0.5 transition-colors" onClick={() => openEditVoceUnit(unit)}>
+                                                <Pencil className="h-3 w-3 text-slate-500" />
+                                            </button>
+                                            <button className="hover:bg-slate-100 rounded-full p-0.5 transition-colors" onClick={() => handleDeleteVoceUnit(unit.id)}>
+                                                <X className="h-3 w-3 text-slate-500" />
+                                            </button>
+                                        </Badge>
+                                    ))}
+                                    {voceUnits.length === 0 && (
+                                        <p className="text-sm text-muted-foreground italic">Nessuna unità presente: le voci restano «solo euro».</p>
                                     )}
                                 </div>
                             )}
@@ -1386,6 +1535,30 @@ export default function SettingsInventoryPage() {
                         <Button variant="outline" onClick={() => setGroupDialogOpen(false)}>Annulla</Button>
                         <Button onClick={handleSaveGroup} disabled={savingGroup || !groupName.trim()}>
                             {savingGroup && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Salva
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Modifica unità analisi costi */}
+            <Dialog open={!!editVoceUnit} onOpenChange={(v) => !v && setEditVoceUnit(null)}>
+                <DialogContent>
+                    <DialogHeader><DialogTitle>Modifica unità</DialogTitle></DialogHeader>
+                    <div className="space-y-3 py-2">
+                        <div className="space-y-1">
+                            <Label>Nome (sul prezzo, es. €/ora)</Label>
+                            <Input value={editVoceUnitName} onChange={(e) => setEditVoceUnitName(e.target.value)} autoFocus />
+                        </div>
+                        <div className="space-y-1">
+                            <Label>Sulla quantità (es. ore) — facoltativo</Label>
+                            <Input value={editVoceUnitQty} onChange={(e) => setEditVoceUnitQty(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSaveVoceUnit()} />
+                        </div>
+                        <p className="text-xs text-muted-foreground">Cambiando il nome, le voci che usavano il vecchio nome passano al nuovo.</p>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditVoceUnit(null)}>Annulla</Button>
+                        <Button onClick={handleSaveVoceUnit} disabled={savingVoceUnit || !editVoceUnitName.trim()}>
+                            {savingVoceUnit && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}Salva
                         </Button>
                     </DialogFooter>
                 </DialogContent>

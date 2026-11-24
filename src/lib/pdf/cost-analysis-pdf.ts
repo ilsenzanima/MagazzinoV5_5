@@ -3,7 +3,7 @@ import { it } from 'date-fns/locale';
 import { effectiveUnitPrice, type CostAnalysisRow, type CostAnalysisParams } from '@/lib/services/cost-analysis';
 import type { Client } from '@/lib/types';
 import { costAnalysisFileName } from '@/lib/cost-analysis-filename';
-import { priceUnitSuffix, qtyUnitSuffix } from '@/lib/cost-analysis-units';
+import { loadVoceUnits, priceUnitSuffix, qtyUnitSuffix } from '@/lib/cost-analysis-units';
 
 const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 , useGrouping: true});
 
@@ -24,6 +24,7 @@ export interface CostAnalysisPdfInput {
  * Generates a PDF for a cost analysis (Analisi Costi) of a client proposal
  */
 async function buildCostAnalysisPdfDoc(input: CostAnalysisPdfInput): Promise<{ doc: any; filename: string }> {
+    await loadVoceUnits();
     // Dynamic import of jsPDF to reduce initial bundle size
     const { default: jsPDF } = await import('jspdf');
     const { default: autoTable } = await import('jspdf-autotable');

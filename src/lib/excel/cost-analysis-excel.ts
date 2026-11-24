@@ -2,7 +2,7 @@ import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import type { CostAnalysisPdfInput } from '@/lib/pdf/cost-analysis-pdf';
 import { costAnalysisFileName } from '@/lib/cost-analysis-filename';
-import { priceUnitSuffix, qtyUnitSuffix } from '@/lib/cost-analysis-units';
+import { loadVoceUnits, priceUnitSuffix, qtyUnitSuffix } from '@/lib/cost-analysis-units';
 import { effectiveUnitPrice, type CostAnalysisRow } from '@/lib/services/cost-analysis';
 
 const EUR_FMT = '"€ "#,##0.00';
@@ -71,6 +71,7 @@ const fmt = (n: number) => n.toLocaleString('it-IT', { minimumFractionDigits: 2,
  * (intestazione azienda, dati committente/offerta, tabelle) del PDF equivalente.
  */
 export async function generateCostAnalysisExcel(input: CostAnalysisPdfInput): Promise<void> {
+    await loadVoceUnits();
     const xlsxModule = await import('xlsx-js-style');
     // xlsx-js-style is CJS-only: some ESM interop paths land the exports under `.default`.
     const XLSX = 'utils' in xlsxModule ? xlsxModule : (xlsxModule as unknown as { default: typeof xlsxModule }).default;
