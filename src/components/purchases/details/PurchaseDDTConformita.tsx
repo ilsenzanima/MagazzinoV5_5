@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, forwardRef, useImperativeHandle } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { NotchButton } from "@/components/ui/notch-tabs"
+import { DocumentScanner } from "@/components/ui/document-scanner"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -22,7 +22,6 @@ import {
 } from "@/components/ui/select"
 import {
     ShieldCheck,
-    Upload,
     Unlink,
     Loader2,
     ExternalLink,
@@ -46,14 +45,22 @@ interface PurchaseDDTConformitaProps {
     supplierId: string
     supplierName?: string
     onUpdate?: () => void
+    // L'eliminazione / disassociazione compare solo in modifica
+    canDelete?: boolean
 }
 
-export function PurchaseDDTConformita({
+// Carica e scansiona si avviano da fuori (pulsante flottante a pillole)
+export interface PurchaseDDTConformitaHandle { openUpload: () => void; openScanner: () => void }
+
+export const PurchaseDDTConformita = forwardRef<PurchaseDDTConformitaHandle, PurchaseDDTConformitaProps>(function PurchaseDDTConformita({
     purchaseId,
     supplierId,
     supplierName,
     onUpdate,
-}: PurchaseDDTConformitaProps) {
+    canDelete = false,
+}, ref) {
+    const [showScanner, setShowScanner] = useState(false)
+    useImperativeHandle(ref, () => ({ openUpload: () => openUpload(), openScanner: () => setShowScanner(true) }))
     const [ownDocs, setOwnDocs] = useState<ComplianceDocument[]>([])
     const [associations, setAssociations] = useState<PurchaseComplianceAssociation[]>([])
     const [docTypes, setDocTypes] = useState<ComplianceDocumentTypeConfig[]>([])
@@ -159,7 +166,7 @@ export function PurchaseDDTConformita({
     return (
         <>
             <Card
-                className={`transition-colors duration-200 ${cardDragOver ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : ""}`}
+                className={`h-full transition-colors duration-200 ${cardDragOver ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : ""}`}
                 onDragOver={e => { e.preventDefault(); setCardDragOver(true) }}
                 onDragLeave={e => { e.preventDefault(); setCardDragOver(false) }}
                 onDrop={handleCardDrop}
@@ -169,12 +176,6 @@ export function PurchaseDDTConformita({
                         <ShieldCheck className="h-4 w-4 text-green-600" />
                         Conformità associate al DDT
                     </CardTitle>
-                    <div className="flex gap-2 shrink-0">
-                        <NotchButton type="button" onClick={() => openUpload()}>
-                            <Upload />
-                            <span className="hidden sm:inline">Carica</span>
-                        </NotchButton>
-                    </div>
                 </CardHeader>
                 <CardContent>
                     {loading ? (
@@ -185,7 +186,7 @@ export function PurchaseDDTConformita({
                         <div className="text-center py-6 text-slate-400 dark:text-slate-500 border-2 border-dashed dark:border-slate-600 rounded-md bg-slate-50/50 dark:bg-slate-800/50">
                             <ShieldCheck className="h-8 w-8 mx-auto mb-2 opacity-40" />
                             <p className="text-sm">
-                                {cardDragOver ? "Rilascia il file qui..." : "Nessun documento di conformità associato, trascina qui un file o usa il pulsante Carica"}
+                                {cardDragOver ? "Rilascia il file qui..." : "Nessun documento di conformità associato, trascina qui un file o usa il pulsante + in basso"}
                             </p>
                         </div>
                     ) : (
@@ -223,10 +224,10 @@ export function PurchaseDDTConformita({
                                             </button>
                                         </div>
                                     </div>
-                                    <Button
+                                    {canDelete && <Button
                                         variant="ghost"
                                         size="icon"
-                                        className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 flex-shrink-0 opacity-0 group-hover:opacity-100"
+                                        className="text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 flex-shrink-0"
                                         onClick={() =>
                                             assocId
                                                 ? confirmDisassoc(associations.find(a => a.id === assocId)!)
@@ -235,13 +236,19 @@ export function PurchaseDDTConformita({
                                         title={assocId ? "Disassocia" : "Elimina"}
                                     >
                                         {assocId ? <Unlink className="h-4 w-4" /> : <X className="h-4 w-4" />}
-                                    </Button>
+                                    </Button>}
                                 </div>
                             ))}
                         </div>
                     )}
                 </CardContent>
             </Card>
+
+            <DocumentScanner
+                open={showScanner}
+                onOpenChange={setShowScanner}
+                onScanComplete={async (pdfBlob: Blob) => openUpload([new File([pdfBlob], `scan_${Date.now()}.pdf`, { type: "application/pdf" })])}
+            />
 
             <ComplianceUploadDialog
                 open={uploadOpen}
@@ -273,4 +280,4 @@ export function PurchaseDDTConformita({
             />
         </>
     )
-}
+})

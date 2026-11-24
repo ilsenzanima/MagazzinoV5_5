@@ -130,7 +130,7 @@ export const PurchaseDocuments = forwardRef<PurchaseDocumentsHandle, PurchaseDoc
   return (
     <>
       <Card
-        className={`transition-colors duration-200 ${isDragging ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : ""}`}
+        className={`h-full transition-colors duration-200 ${isDragging ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : ""}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}

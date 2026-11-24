@@ -34,7 +34,7 @@ import {
 import { JobSelectorDialog } from "@/components/jobs/JobSelectorDialog";
 import { PurchaseLineDialog, PurchaseLineResult } from "@/components/purchases/PurchaseLineDialog";
 import { PurchaseDocuments, type PurchaseDocumentsHandle } from "@/components/purchases/details/PurchaseDocuments";
-import { PurchaseDDTConformita } from "@/components/purchases/details/PurchaseDDTConformita";
+import { PurchaseDDTConformita, type PurchaseDDTConformitaHandle } from "@/components/purchases/details/PurchaseDDTConformita";
 import { useAuth } from "@/components/auth-provider";
 import { formatCurrency } from "@/lib/utils/format";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
@@ -122,6 +122,7 @@ export default function PurchaseDetailPage() {
     // Edit Header State
     const [isEditingHeader, setIsEditingHeader] = useState(false);
     const docsRef = useRef<PurchaseDocumentsHandle>(null);
+    const ddtRef = useRef<PurchaseDDTConformitaHandle>(null);
     const [editNumber, setEditNumber] = useState("");
     const [editDate, setEditDate] = useState("");
     const [editSupplierId, setEditSupplierId] = useState("");
@@ -853,10 +854,21 @@ export default function PurchaseDetailPage() {
                     >
                         {(userRole === 'admin' || userRole === 'operativo') && (
                             <NotchActions>
-                                <ActionsMenu items={[
-                                    { label: "Aggiungi", icon: <Plus />, onClick: () => setIsAddPopupOpen(true) },
-                                    { label: "Elimina", icon: <Trash2 />, onClick: () => setDeleteDialogOpen(true), danger: true },
-                                ]} />
+                                {isEditingHeader ? (
+                                    <>
+                                        <NotchButton type="button" onClick={cancelEditingHeader}>
+                                            <X /> Annulla
+                                        </NotchButton>
+                                        <NotchButton type="button" onClick={saveEditingHeader} className="border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white">
+                                            <Save /> Salva
+                                        </NotchButton>
+                                    </>
+                                ) : (
+                                    <ActionsMenu items={[
+                                        { label: "Modifica", icon: <Pen />, onClick: startEditingHeader },
+                                        { label: "Elimina", icon: <Trash2 />, onClick: () => setDeleteDialogOpen(true), danger: true },
+                                    ]} />
+                                )}
                             </NotchActions>
                         )}
                     </NotchTabs>
@@ -869,25 +881,11 @@ export default function PurchaseDetailPage() {
                 </div>
 
                 <div className="grid gap-6">
+                    <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
                     {/* Header Info */}
-                    <Card>
+                    <Card className="h-full">
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Informazioni Generali</CardTitle>
-                            {(userRole === 'admin' || userRole === 'operativo') && !isEditingHeader && (
-                                <NotchButton type="button" onClick={startEditingHeader}>
-                                    <Pen /> Modifica
-                                </NotchButton>
-                            )}
-                            {isEditingHeader && (
-                                <div className="flex gap-2">
-                                    <NotchButton type="button" onClick={cancelEditingHeader}>
-                                        Annulla
-                                    </NotchButton>
-                                    <NotchButton type="button" onClick={saveEditingHeader} className="border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white">
-                                        <Save /> Salva
-                                    </NotchButton>
-                                </div>
-                            )}
                         </CardHeader>
                         <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
@@ -1094,7 +1092,30 @@ export default function PurchaseDetailPage() {
                         </CardContent>
                     </Card>
 
-                    {/* Modale dettaglio documento conformità */}
+                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                        <PurchaseDocuments
+                            ref={docsRef}
+                            canDelete={isEditingHeader}
+                            purchaseId={id}
+                            documentUrls={purchase.documentUrls}
+                            onUpdate={loadData}
+                            isOrder={isOrder}
+                            supplierName={purchase.supplierName}
+                        />
+                        {!isOrder && (
+                            <PurchaseDDTConformita
+                                ref={ddtRef}
+                                canDelete={isEditingHeader}
+                                purchaseId={id}
+                                supplierId={purchase.supplierId}
+                                supplierName={purchase.supplierName}
+                                onUpdate={loadData}
+                            />
+                        )}
+                    </div>
+                    </div>
+
+                     {/* Modale dettaglio documento conformità */}
                     <Dialog open={!!complianceModalDoc} onOpenChange={(v) => !v && setComplianceModalDoc(null)}>
                         <DialogContent className="max-w-md">
                             <DialogHeader>
@@ -1136,26 +1157,6 @@ export default function PurchaseDetailPage() {
                             </div>
                         </DialogContent>
                     </Dialog>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <PurchaseDocuments
-                            ref={docsRef}
-                            canDelete={isEditingHeader}
-                            purchaseId={id}
-                            documentUrls={purchase.documentUrls}
-                            onUpdate={loadData}
-                            isOrder={isOrder}
-                            supplierName={purchase.supplierName}
-                        />
-                        {!isOrder && (
-                            <PurchaseDDTConformita
-                                purchaseId={id}
-                                supplierId={purchase.supplierId}
-                                supplierName={purchase.supplierName}
-                                onUpdate={loadData}
-                            />
-                        )}
-                    </div>
 
                     {/* Items List */}
                     <Card>
@@ -2169,8 +2170,13 @@ export default function PurchaseDetailPage() {
                 <FloatingAddButton
                     icon={<Upload className="h-6 w-6" />}
                     actions={[
+                        { label: "Aggiungi articoli", onClick: () => setIsAddPopupOpen(true) },
                         { label: "Carica documento", onClick: () => docsRef.current?.openPicker() },
                         { label: "Scansiona documento", onClick: () => docsRef.current?.openScanner() },
+                        ...(isOrder ? [] : [
+                            { label: "Carica conformità DDT", onClick: () => ddtRef.current?.openUpload() },
+                            { label: "Scansiona conformità DDT", onClick: () => ddtRef.current?.openScanner() },
+                        ]),
                     ]}
                 />
             )}
