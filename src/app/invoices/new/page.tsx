@@ -42,14 +42,14 @@ function PriceLine({ item, onPrice }: { item: UnlinkedPurchase["items"][number];
     const [total, setTotal] = useState(item.price > 0 ? (item.price * item.quantity).toFixed(2) : "");
     return (
         <tr className="border-b border-slate-100 last:border-0 dark:border-slate-700/50">
-            <td className="py-1.5 pr-2 text-xs">
+            <td className="px-4 py-2.5 text-sm">
                 <span className="font-medium text-slate-700 dark:text-slate-300">{item.itemName || "—"}</span>
                 {item.itemModel && <span className="ml-1 text-slate-400">({item.itemModel})</span>}
             </td>
-            <td className="w-16 py-1.5 text-right text-xs text-slate-600 dark:text-slate-400">{item.quantity}</td>
-            <td className="w-32 py-1 pl-2">
+            <td className="w-20 py-2.5 text-right text-sm text-slate-600 dark:text-slate-400">{item.quantity}</td>
+            <td className="w-44 py-1.5 pl-3">
                 <div className="flex items-center gap-1">
-                    <span className="shrink-0 text-xs text-slate-400">€</span>
+                    <span className="shrink-0 text-sm text-slate-400">€</span>
                     <Input
                         type="number" inputMode="decimal" min="0" step="0.00001"
                         value={unit} placeholder="0.00000" aria-label="Prezzo unitario"
@@ -58,13 +58,13 @@ function PriceLine({ item, onPrice }: { item: UnlinkedPurchase["items"][number];
                             const p = parseFloat(e.target.value);
                             if (!isNaN(p)) { setTotal((p * item.quantity).toFixed(2)); onPrice(p); }
                         }}
-                        className="h-7 w-24 px-1 text-right text-xs"
+                        className="h-9 w-32 px-2 text-right text-sm"
                     />
                 </div>
             </td>
-            <td className="w-32 py-1 pl-2">
+            <td className="w-44 py-1.5 pl-3">
                 <div className="flex items-center gap-1">
-                    <span className="shrink-0 text-xs text-slate-400">€</span>
+                    <span className="shrink-0 text-sm text-slate-400">€</span>
                     <Input
                         type="number" inputMode="decimal" min="0" step="0.01"
                         value={total} placeholder="0.00" aria-label="Totale riga"
@@ -75,7 +75,7 @@ function PriceLine({ item, onPrice }: { item: UnlinkedPurchase["items"][number];
                             const p = parseFloat((t / item.quantity).toFixed(5));
                             setUnit(p.toFixed(5)); setTotal(t.toFixed(2)); onPrice(p);
                         }}
-                        className="h-7 w-24 px-1 text-right text-xs"
+                        className="h-9 w-32 px-2 text-right text-sm"
                     />
                 </div>
             </td>
@@ -453,14 +453,15 @@ export default function NewInvoicePage() {
                                                 </TableRow>
                                                 {purchase.selected && purchase.items.length > 0 && (
                                                     <TableRow key={`${purchase.id}-lines`} className="bg-slate-50 hover:bg-slate-50 dark:bg-slate-800/50">
-                                                        <TableCell colSpan={4} className="px-4 py-2">
+                                                        <TableCell colSpan={4} className="px-4 py-4">
+                                                          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
                                                             <table className="w-full">
                                                                 <thead>
-                                                                    <tr className="border-b border-slate-200 text-xs text-slate-400 dark:border-slate-700">
-                                                                        <th className="py-1 text-left font-normal">Articolo</th>
-                                                                        <th className="w-16 py-1 text-right font-normal">Qtà</th>
-                                                                        <th className="w-32 py-1 pl-2 text-left font-normal">Prezzo unit.</th>
-                                                                        <th className="w-32 py-1 pl-2 text-left font-normal">Totale riga</th>
+                                                                    <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700">
+                                                                        <th className="px-4 py-2.5 text-left font-semibold">Articolo</th>
+                                                                        <th className="w-20 py-2.5 text-right font-semibold">Qtà</th>
+                                                                        <th className="w-44 py-2.5 pl-3 text-left font-semibold">Prezzo unit.</th>
+                                                                        <th className="w-44 py-2.5 pl-3 text-left font-semibold">Totale riga</th>
                                                                     </tr>
                                                                 </thead>
                                                                 <tbody>
@@ -469,24 +470,25 @@ export default function NewInvoicePage() {
                                                                     ))}
                                                                 </tbody>
                                                             </table>
-                                                            <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-2 dark:border-slate-700">
+                                                            <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
                                                                 <Truck className="h-4 w-4 shrink-0 text-amber-500" />
-                                                                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Costo trasporto:</span>
+                                                                <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Costo trasporto:</span>
                                                                 {purchase.items.some(i => i.transportApplied) ? (
-                                                                    <span className="text-xs text-green-600">già applicato a questa bolla ({formatCurrency(purchase.transportCost)})</span>
+                                                                    <span className="text-sm text-green-600">già applicato a questa bolla ({formatCurrency(purchase.transportCost)})</span>
                                                                 ) : (
                                                                     <>
-                                                                        <span className="text-xs text-slate-400">€</span>
+                                                                        <span className="text-sm text-slate-400">€</span>
                                                                         <Input
                                                                             type="number" inputMode="decimal" min="0" step="0.01" placeholder="0.00"
-                                                                            aria-label="Costo trasporto" className="h-7 w-24 px-1 text-right text-xs"
+                                                                            aria-label="Costo trasporto" className="h-9 w-28 px-2 text-right text-sm"
                                                                             value={transport[purchase.id] ?? ""}
                                                                             onChange={e => setTransport(prev => ({ ...prev, [purchase.id]: e.target.value }))}
                                                                         />
-                                                                        <span className="text-xs text-slate-400">si divide sulle righe di questa bolla</span>
+                                                                        <span className="text-sm text-slate-400">si divide sulle righe di questa bolla</span>
                                                                     </>
                                                                 )}
                                                             </div>
+                                                          </div>
                                                         </TableCell>
                                                     </TableRow>
                                                 )}
