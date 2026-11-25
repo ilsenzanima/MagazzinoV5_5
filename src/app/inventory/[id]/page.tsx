@@ -589,7 +589,7 @@ export default function InventoryDetailPage() {
     .reduce<{ price: number; date: string } | null>((best, l) => (!best || new Date(l.date) > new Date(best.date) ? { price: l.price as number, date: l.date } : best), null);
 
   const statCards = (
-        <div className={isEditing ? "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5" : "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"}>
+        <div className={isEditing ? "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5" : "grid grid-cols-1 gap-3 sm:grid-cols-2"}>
           <Card>
             <CardContent className="space-y-1.5 p-3">
               <div className="flex items-center justify-between gap-2">
@@ -1091,9 +1091,9 @@ export default function InventoryDetailPage() {
         </div>
           </>
         ) : (
-          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-9">
             {/* Scheda prodotto: 1/3 */}
-            <Card>
+            <Card className="lg:col-span-3 lg:col-start-1 lg:row-start-1">
               <CardContent className="space-y-4 p-4">
                 <div className="mx-auto h-40 w-40 overflow-hidden rounded-md border bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
                   <img
@@ -1130,10 +1130,16 @@ export default function InventoryDetailPage() {
               </CardContent>
             </Card>
 
-            {/* Tutte le altre schede: 2/3 */}
-            <div className="space-y-6 lg:col-span-2">
-              {statCards}
-              <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2">
+            {/* QR e codice a barre: sotto le info, stessa larghezza */}
+            <Card className="lg:col-span-3 lg:col-start-1 lg:row-start-2">
+              <CardContent className="flex flex-wrap items-center justify-center gap-4 p-4">
+                <div className="rounded border bg-white p-2 dark:border-slate-700"><QRCode value={item.code} size={110} /></div>
+                <div className="max-w-full overflow-hidden rounded border bg-white p-2 dark:border-slate-700"><Barcode value={item.code} width={1.3} height={50} fontSize={12} /></div>
+              </CardContent>
+            </Card>
+
+            {/* Altri codici fornitore: accanto alle info, alta fino a fine QR */}
+            <div className="lg:col-span-2 lg:col-start-4 lg:row-span-2 lg:row-start-1 lg:self-stretch">
                 <Card className="h-full">
                   <CardHeader><CardTitle className="text-base">Altri Codici Fornitore</CardTitle></CardHeader>
                   <CardContent className="space-y-2">
@@ -1155,14 +1161,11 @@ export default function InventoryDetailPage() {
                     ))}
                   </CardContent>
                 </Card>
-                <Card className="h-full">
-                  <CardHeader><CardTitle className="text-base">QR e codice a barre</CardTitle></CardHeader>
-                  <CardContent className="flex flex-wrap items-center justify-center gap-4">
-                    <div className="rounded border bg-white p-2 dark:border-slate-700"><QRCode value={item.code} size={110} /></div>
-                    <div className="max-w-full overflow-hidden rounded border bg-white p-2 dark:border-slate-700"><Barcode value={item.code} width={1.3} height={50} fontSize={12} /></div>
-                  </CardContent>
-                </Card>
-              </div>
+            </div>
+
+            {/* Le altre schede: nello spazio che avanza */}
+            <div className="lg:col-span-4 lg:col-start-6 lg:row-span-2 lg:row-start-1">
+              {statCards}
             </div>
           </div>
         )}
