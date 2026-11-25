@@ -1,5 +1,6 @@
 "use client";
 
+import { FloatingAddButton } from "@/components/ui/floating-add-button";
 import { useState, useEffect } from "react";
 import { confirmDialog } from "@/components/ui/confirm-host";
 import { useParams, useRouter } from "next/navigation";
@@ -102,6 +103,7 @@ export default function InventoryDetailPage() {
 
   // Edit Mode State
   const [isEditing, setIsEditing] = useState(false);
+  const [showAddCode, setShowAddCode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [types, setTypes] = useState<ItemType[]>([]);
@@ -586,58 +588,8 @@ export default function InventoryDetailPage() {
     .filter(l => l.price != null && l.price > 0)
     .reduce<{ price: number; date: string } | null>((best, l) => (!best || new Date(l.date) > new Date(best.date) ? { price: l.price as number, date: l.date } : best), null);
 
-  return (
-    <>
-    <DashboardLayout>
-      <ImageCropper
-        open={isCropperOpen}
-        onOpenChange={setIsCropperOpen}
-        imageSrc={tempImageSrc}
-        onCropComplete={handleCropComplete}
-        title="Ritaglia Foto Articolo"
-      />
-      <div className="mx-auto max-w-[1700px] space-y-6 pb-20">
-        {/* Intestazione: striscia scura con nome, codice e azioni */}
-        <div className="space-y-2">
-          <Link href="/inventory" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-300">
-            <ArrowLeft className="mr-1 h-4 w-4" /> Inventario
-          </Link>
-          <NotchTabs
-            title={
-              <span className="flex flex-wrap items-baseline gap-x-2">
-                <span>{item.name}</span>
-                {item.model && <span className="font-normal normal-case text-slate-300">({item.model})</span>}
-                <span className="font-mono text-xs font-normal normal-case tracking-normal text-slate-400">{item.code}</span>
-              </span>
-            }
-          >
-            {(userRole === 'admin' || userRole === 'operativo') && (
-              <NotchActions>
-                {isEditing ? (
-                  <>
-                    <NotchButton type="button" onClick={handleCancelEdit} disabled={isSaving}>
-                      <X /> Annulla
-                    </NotchButton>
-                    <NotchButton
-                      type="button" onClick={handleSaveEdit} disabled={isSaving}
-                      className="border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white"
-                    >
-                      {isSaving ? <Loader2 className="animate-spin" /> : <Save />} Salva
-                    </NotchButton>
-                  </>
-                ) : (
-                  <ActionsMenu items={[
-                    { label: "Modifica", icon: <Pencil />, onClick: handleEdit },
-                    { label: "Elimina", icon: <Trash2 />, onClick: () => setDeleteDialogOpen(true), danger: true, hidden: userRole !== 'admin' },
-                  ]} />
-                )}
-              </NotchActions>
-            )}
-          </NotchTabs>
-        </div>
-
-        {/* Numeri principali (schede compatte) */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
+  const statCards = (
+        <div className={isEditing ? "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5" : "grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3"}>
           <Card>
             <CardContent className="space-y-1.5 p-3">
               <div className="flex items-center justify-between gap-2">
@@ -752,6 +704,59 @@ export default function InventoryDetailPage() {
             </Card>
           )}
         </div>
+  );
+
+  return (
+    <>
+    <DashboardLayout>
+      <ImageCropper
+        open={isCropperOpen}
+        onOpenChange={setIsCropperOpen}
+        imageSrc={tempImageSrc}
+        onCropComplete={handleCropComplete}
+        title="Ritaglia Foto Articolo"
+      />
+      <div className="mx-auto max-w-[1700px] space-y-6 pb-20">
+        {/* Intestazione: striscia scura con nome, codice e azioni */}
+        <div className="space-y-2">
+          <Link href="/inventory" className="inline-flex items-center text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-300">
+            <ArrowLeft className="mr-1 h-4 w-4" /> Inventario
+          </Link>
+          <NotchTabs
+            title={
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <span>{item.name}</span>
+                {item.model && <span className="font-normal normal-case text-slate-300">({item.model})</span>}
+                <span className="font-mono text-xs font-normal normal-case tracking-normal text-slate-400">{item.code}</span>
+              </span>
+            }
+          >
+            {(userRole === 'admin' || userRole === 'operativo') && (
+              <NotchActions>
+                {isEditing ? (
+                  <>
+                    <NotchButton type="button" onClick={handleCancelEdit} disabled={isSaving}>
+                      <X /> Annulla
+                    </NotchButton>
+                    <NotchButton
+                      type="button" onClick={handleSaveEdit} disabled={isSaving}
+                      className="border-blue-700 bg-blue-600 text-white hover:bg-blue-700 hover:text-white [&_svg]:text-white"
+                    >
+                      {isSaving ? <Loader2 className="animate-spin" /> : <Save />} Salva
+                    </NotchButton>
+                  </>
+                ) : (
+                  <ActionsMenu items={[
+                    { label: "Modifica", icon: <Pencil />, onClick: handleEdit },
+                    { label: "Elimina", icon: <Trash2 />, onClick: () => setDeleteDialogOpen(true), danger: true, hidden: userRole !== 'admin' },
+                  ]} />
+                )}
+              </NotchActions>
+            )}
+          </NotchTabs>
+        </div>
+
+        {isEditing && statCards}
 
         {isEditing ? (
           <>
@@ -1086,10 +1091,11 @@ export default function InventoryDetailPage() {
         </div>
           </>
         ) : (
-          <Card>
-            <CardContent className="p-4">
-              <div className="grid gap-4 md:grid-cols-[96px_minmax(0,1fr)]">
-                <div className="h-24 w-24 overflow-hidden rounded-md border bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+            {/* Scheda prodotto: 1/3 */}
+            <Card>
+              <CardContent className="space-y-4 p-4">
+                <div className="mx-auto h-40 w-40 overflow-hidden rounded-md border bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
                   <img
                     src={item.image || typeImage}
                     alt={item.name}
@@ -1097,95 +1103,94 @@ export default function InventoryDetailPage() {
                     onError={(e) => { { const img = e.target as HTMLImageElement; img.src = img.src.endsWith(typeImage) || typeImage === "/placeholder.svg" ? "/placeholder.svg" : typeImage; } }}
                   />
                 </div>
-                <div className="min-w-0 space-y-4">
-                  <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 xl:grid-cols-6">
-                    {([
-                      ["Marca", item.brand],
-                      ["Tipologia", item.type],
-                      ["Unità di misura", item.unit],
-                      ["Confezione", item.packQuantity ? `${item.packQuantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} ${item.unit}` : null],
-                      ["Scorta minima", item.minStock != null ? String(item.minStock) : null],
-                      ["Coeff. moltiplicazione", item.coefficient !== 1 ? String(item.coefficient) : null],
-                      ["Modello / variante", item.model],
-                      ["Codice fornitore", item.supplierCode],
-                      ["Codice articolo", item.code],
-                    ] as [string, string | null | undefined][]).filter(([, v]) => v).map(([label, value]) => (
-                      <div key={label} className="min-w-0">
-                        <p className="text-[11px] text-slate-400 dark:text-slate-500">{label}</p>
-                        <p className="truncate text-sm text-slate-900 dark:text-slate-100" title={value ?? undefined}>{value}</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                  {([
+                    ["Marca", item.brand],
+                    ["Tipologia", item.type],
+                    ["Unità di misura", item.unit],
+                    ["Confezione", item.packQuantity ? `${item.packQuantity.toLocaleString('it-IT', { maximumFractionDigits: 2 })} ${item.unit}` : null],
+                    ["Scorta minima", item.minStock != null ? String(item.minStock) : null],
+                    ["Coeff. moltiplicazione", item.coefficient !== 1 ? String(item.coefficient) : null],
+                    ["Modello / variante", item.model],
+                    ["Codice fornitore", item.supplierCode],
+                    ["Codice articolo", item.code],
+                  ] as [string, string | null | undefined][]).filter(([, v]) => v).map(([label, value]) => (
+                    <div key={label} className="min-w-0">
+                      <p className="text-[11px] text-slate-400 dark:text-slate-500">{label}</p>
+                      <p className="break-words text-sm text-slate-900 dark:text-slate-100">{value}</p>
+                    </div>
+                  ))}
+                </div>
+                {item.description && (
+                  <div>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">Descrizione</p>
+                    <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{item.description}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Tutte le altre schede: 2/3 */}
+            <div className="space-y-6 lg:col-span-2">
+              {statCards}
+              <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2">
+                <Card className="h-full">
+                  <CardHeader><CardTitle className="text-base">Altri Codici Fornitore</CardTitle></CardHeader>
+                  <CardContent className="space-y-2">
+                    {supplierCodes.length === 0 && (
+                      <p className="text-sm text-slate-400">Nessun altro codice. Usa il pulsante + in basso per aggiungerne uno.</p>
+                    )}
+                    {supplierCodes.map(code => (
+                      <div key={code.id} className="flex items-center justify-between rounded border bg-slate-50 p-2.5 text-sm dark:border-slate-700 dark:bg-muted">
+                        <div className="flex flex-col">
+                          <span className="font-mono font-bold">{code.code}</span>
+                          {code.supplierName && <span className="text-xs text-slate-500 dark:text-slate-400">{code.supplierName}</span>}
+                        </div>
+                        {(userRole === 'admin' || userRole === 'operativo') && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" onClick={() => handleDeleteSupplierCode(code.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     ))}
-                  </div>
-                  {item.description && (
-                    <div>
-                      <p className="text-[11px] text-slate-400 dark:text-slate-500">Descrizione</p>
-                      <p className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">{item.description}</p>
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                  <div className="space-y-2">
-                    <Label>Altri Codici Fornitore</Label>
-                    <div className="space-y-2">
-                      {supplierCodes.map(code => (
-                        <div key={code.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-muted rounded border dark:border-slate-700 text-sm">
-                          <div className="flex flex-col">
-                            <span className="font-mono font-bold">{code.code}</span>
-                            {code.supplierName && <span className="text-xs text-slate-500 dark:text-slate-400">{code.supplierName}</span>}
-                          </div>
-                          {(userRole === 'admin' || userRole === 'operativo') && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-red-500" onClick={() => handleDeleteSupplierCode(code.id)}>
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                      {(userRole === 'admin' || userRole === 'operativo') && (
-                        <div className="flex gap-2 items-end pt-2">
-                          <div className="flex-1 space-y-1">
-                            <Input
-                              placeholder="Nuovo codice"
-                              value={newSupplierCode.code}
-                              onChange={(e) => setNewSupplierCode({ ...newSupplierCode, code: e.target.value })}
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                          <div className="w-1/3 space-y-1">
-                            <SearchableSelect
-                              options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
-                              value={newSupplierCode.supplierId}
-                              onValueChange={(val) => setNewSupplierCode({ ...newSupplierCode, supplierId: val })}
-                              placeholder="Fornitore"
-                              searchPlaceholder="Scrivi per cercare fornitore..."
-                            />
-                          </div>
-                          <Button size="sm" onClick={handleAddSupplierCode} disabled={!newSupplierCode.code} className="h-8">
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
+                <Card className="h-full">
+                  <CardHeader><CardTitle className="text-base">QR e codice a barre</CardTitle></CardHeader>
+                  <CardContent className="flex flex-wrap items-center justify-center gap-4">
+                    <div className="rounded border bg-white p-2 dark:border-slate-700"><QRCode value={item.code} size={110} /></div>
+                    <div className="max-w-full overflow-hidden rounded border bg-white p-2 dark:border-slate-700"><Barcode value={item.code} width={1.3} height={50} fontSize={12} /></div>
+                  </CardContent>
+                </Card>
               </div>
-              <div className="mt-3 flex justify-end">
-                <Button variant="outline" size="sm" onClick={() => setShowCodes(true)}>
-                  <QrCode className="mr-2 h-4 w-4" /> QR e codice a barre
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
 
-        <Dialog open={showCodes} onOpenChange={setShowCodes}>
-          <DialogContent className="sm:max-w-sm">
+        {(userRole === 'admin' || userRole === 'operativo') && !isEditing && (
+          <FloatingAddButton actions={[{ label: "Aggiungi codice fornitore", onClick: () => setShowAddCode(true) }]} />
+        )}
+
+        <Dialog open={showAddCode} onOpenChange={setShowAddCode}>
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Codice identificativo</DialogTitle>
-              <DialogDescription>{item.code}</DialogDescription>
+              <DialogTitle>Nuovo codice fornitore</DialogTitle>
+              <DialogDescription>Un altro codice con cui questo articolo è venduto da un fornitore.</DialogDescription>
             </DialogHeader>
-            <div className="flex flex-col items-center gap-4 py-2">
-              <div className="rounded border bg-white p-2 dark:border-slate-700"><QRCode value={item.code} size={160} /></div>
-              <div className="max-w-full overflow-hidden rounded border bg-white p-2 dark:border-slate-700"><Barcode value={item.code} width={1.5} height={50} fontSize={12} /></div>
+            <div className="space-y-3">
+              <Input placeholder="Nuovo codice" value={newSupplierCode.code} onChange={(e) => setNewSupplierCode({ ...newSupplierCode, code: e.target.value })} />
+              <SearchableSelect
+                options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                value={newSupplierCode.supplierId}
+                onValueChange={(val) => setNewSupplierCode({ ...newSupplierCode, supplierId: val })}
+                placeholder="Fornitore"
+                searchPlaceholder="Scrivi per cercare fornitore..."
+              />
+              <div className="flex justify-end">
+                <Button onClick={async () => { await handleAddSupplierCode(); setShowAddCode(false); }} disabled={!newSupplierCode.code}>
+                  <Plus className="mr-1 h-4 w-4" /> Aggiungi
+                </Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
