@@ -1097,13 +1097,16 @@ export default function InventoryDetailPage() {
             {/* Scheda prodotto: 1/3 */}
             <Card className="lg:col-span-3">
               <CardContent className="space-y-4 p-4">
-                <div className="mx-auto h-40 w-40 overflow-hidden rounded-md border bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
+                <div className="flex flex-wrap items-center justify-center gap-4">
+                <div className="h-40 w-40 overflow-hidden rounded-md border bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
                   <img
                     src={item.image || typeImage}
                     alt={item.name}
                     className="h-full w-full object-cover"
                     onError={(e) => { { const img = e.target as HTMLImageElement; img.src = img.src.endsWith(typeImage) || typeImage === "/placeholder.svg" ? "/placeholder.svg" : typeImage; } }}
                   />
+                </div>
+                <div className="rounded-md border bg-white p-2 dark:border-slate-700"><QRCode value={item.code} size={140} /></div>
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   {([
@@ -1154,12 +1157,6 @@ export default function InventoryDetailPage() {
                         )}
                       </div>
                     ))}
-                  </CardContent>
-                </Card>
-                <Card className="shrink-0">
-                  <CardContent className="flex flex-col items-center gap-3 p-3">
-                    <div className="rounded border bg-white p-2 dark:border-slate-700"><QRCode value={item.code} size={96} /></div>
-                    <div className="max-w-full rounded border bg-white p-1 dark:border-slate-700 [&_svg]:h-auto [&_svg]:max-w-full"><Barcode value={item.code} width={1.3} height={40} fontSize={12} /></div>
                   </CardContent>
                 </Card>
               </div>
