@@ -1092,8 +1092,10 @@ export default function InventoryDetailPage() {
           </>
         ) : (
           <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-9">
+            {/* Info + colonna codici/QR: l'altezza la decide la scheda info */}
+            <div className="grid grid-cols-1 gap-6 lg:col-span-5 lg:grid-cols-5">
             {/* Scheda prodotto: 1/3 */}
-            <Card className="lg:col-span-3 lg:col-start-1 lg:row-start-1">
+            <Card className="lg:col-span-3">
               <CardContent className="space-y-4 p-4">
                 <div className="mx-auto h-40 w-40 overflow-hidden rounded-md border bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
                   <img
@@ -1130,17 +1132,10 @@ export default function InventoryDetailPage() {
               </CardContent>
             </Card>
 
-            {/* QR e codice a barre: sotto le info, stessa larghezza */}
-            <Card className="lg:col-span-3 lg:col-start-1 lg:row-start-2">
-              <CardContent className="flex flex-wrap items-center justify-center gap-4 p-4">
-                <div className="rounded border bg-white p-2 dark:border-slate-700"><QRCode value={item.code} size={110} /></div>
-                <div className="max-w-full overflow-hidden rounded border bg-white p-2 dark:border-slate-700"><Barcode value={item.code} width={1.3} height={50} fontSize={12} /></div>
-              </CardContent>
-            </Card>
-
-            {/* Altri codici fornitore: accanto alle info, alta fino a fine QR */}
-            <div className="lg:col-span-2 lg:col-start-4 lg:row-span-2 lg:row-start-1 lg:self-stretch">
-                <Card className="h-full">
+            {/* Altri codici fornitore e QR sotto: insieme non superano la scheda info */}
+            <div className="relative lg:col-span-2">
+              <div className="flex flex-col gap-6 lg:absolute lg:inset-0">
+                <Card className="lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
                   <CardHeader><CardTitle className="text-base">Altri Codici Fornitore</CardTitle></CardHeader>
                   <CardContent className="space-y-2">
                     {supplierCodes.length === 0 && (
@@ -1161,10 +1156,18 @@ export default function InventoryDetailPage() {
                     ))}
                   </CardContent>
                 </Card>
+                <Card className="shrink-0">
+                  <CardContent className="flex flex-col items-center gap-3 p-3">
+                    <div className="rounded border bg-white p-2 dark:border-slate-700"><QRCode value={item.code} size={96} /></div>
+                    <div className="max-w-full rounded border bg-white p-1 dark:border-slate-700 [&_svg]:h-auto [&_svg]:max-w-full"><Barcode value={item.code} width={1.3} height={40} fontSize={12} /></div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
             </div>
 
             {/* Le altre schede: nello spazio che avanza */}
-            <div className="lg:col-span-4 lg:col-start-6 lg:row-span-2 lg:row-start-1">
+            <div className="lg:col-span-4">
               {statCards}
             </div>
           </div>
