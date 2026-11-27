@@ -233,7 +233,6 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
   const initialSort = searchParams.get("sort") || "name";
   const initialDir: "asc" | "desc" = searchParams.get("dir") === "desc" ? "desc" : "asc";
 
-  const scannerRef = useRef<Html5Qrcode | null>(null);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(initialSearch);
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -402,6 +401,20 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
 
   useEffect(() => {
     if (isScanning) {
+      let closed = false;
+      let scanner: Html5Qrcode | null = null;
+
+      // stop() lancia in modo sincrono se la fotocamera non è mai partita:
+      // l'await dentro try intercetta sia quel caso sia la promise rifiutata
+      const stopScanner = async (target: Html5Qrcode) => {
+        try {
+          await target.stop();
+          target.clear();
+        } catch (err) {
+          console.warn("Scanner non fermato", err);
+        }
+      };
+
       // Small delay to ensure DOM is ready
       const timer = setTimeout(async () => {
         try {
@@ -409,9 +422,9 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
           if (document.getElementById("reader")) {
             // Initialize scanner dynamically to avoid SSR issues
             const { Html5Qrcode } = await import("html5-qrcode");
+            if (closed) return;
 
             const html5QrCode = new Html5Qrcode("reader");
-            scannerRef.current = html5QrCode;
 
             // Start scanning
             await html5QrCode.start(
@@ -429,25 +442,21 @@ export default function InventoryClient({ initialItems, initialTotal, initialTyp
                 // ignore parsing errors
               }
             );
+
+            // Finestra chiusa mentre la fotocamera si stava avviando: spegnila
+            if (closed) await stopScanner(html5QrCode);
+            else scanner = html5QrCode;
           }
         } catch (err) {
           console.error("Scanner setup error", err);
-          notify.error("Impossibile avviare la fotocamera per lo scanner");
+          if (!closed) notify.error("Impossibile avviare la fotocamera per lo scanner");
         }
       }, 200);
 
       return () => {
+        closed = true;
         clearTimeout(timer);
-        if (scannerRef.current) {
-          scannerRef.current.stop().then(() => {
-            scannerRef.current?.clear();
-            scannerRef.current = null;
-          }).catch((err) => {
-            console.error("Failed to stop scanner", err);
-            scannerRef.current?.clear();
-            scannerRef.current = null;
-          });
-        }
+        if (scanner) stopScanner(scanner);
       };
     }
   }, [isScanning]);
