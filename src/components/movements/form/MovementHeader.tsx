@@ -24,6 +24,7 @@ interface MovementHeaderProps {
     toWarehouseId: string;
     onFromWarehouseSelect: (id: string) => void;
     onToWarehouseSelect: (id: string) => void;
+    numberHint?: React.ReactNode;
     children?: React.ReactNode; // For JobSelector
 }
 
@@ -34,7 +35,7 @@ export function MovementHeader({
     pickupLocation, setPickupLocation,
     deliveryLocation, setDeliveryLocation,
     warehouses, activeTab, fromWarehouseId, toWarehouseId, onFromWarehouseSelect, onToWarehouseSelect,
-    children
+    numberHint, children
 }: MovementHeaderProps) {
     const showFrom = activeTab === "exit" || activeTab === "sale" || activeTab === "transfer";
     const showTo = activeTab === "entry" || activeTab === "transfer" || activeTab === "waste";
@@ -59,6 +60,7 @@ export function MovementHeader({
                             />
                             <span className="text-slate-500 font-mono text-sm">/PP{yearSuffix}</span>
                         </div>
+                        {numberHint}
                     </div>
                     <div>
                         <Label>Data</Label>

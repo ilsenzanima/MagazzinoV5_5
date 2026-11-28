@@ -70,6 +70,35 @@ const mapDeliveryNoteToDb = (note: Partial<DeliveryNote>) => {
 };
 
 export const deliveryNotesApi = {
+    // Numero più alto già usato nell'anno (bolle e bozze) e controllo se quello scritto esiste già
+    getNumberInfo: async (yearSuffix: string, number: string, excludeDraftId?: string) => {
+        const latest = (table: 'delivery_notes' | 'delivery_note_drafts') => {
+            let query = supabase
+                .from(table)
+                .select('id, number, number_int, date')
+                .like('number', `%/PP${yearSuffix}`)
+                .not('number_int', 'is', null)
+                .order('number_int', { ascending: false })
+                .limit(1);
+            if (table === 'delivery_note_drafts' && excludeDraftId) query = query.neq('id', excludeDraftId);
+            return query;
+        };
+        const [notes, drafts, same] = await Promise.all([
+            latest('delivery_notes'),
+            latest('delivery_note_drafts'),
+            supabase.from('delivery_notes').select('id').eq('number', number).limit(1),
+        ]);
+        const error = notes.error || drafts.error || same.error;
+        if (error) throw error;
+
+        const toLast = (row: any) => (row ? { number: row.number as string, numberInt: row.number_int as number, date: row.date as string } : null);
+        return {
+            lastNote: toLast(notes.data?.[0]),
+            lastDraft: toLast(drafts.data?.[0]),
+            alreadyUsed: (same.data?.length ?? 0) > 0,
+        };
+    },
+
     getAll: async () => {
         console.time('deliveryNotesApi.getAll');
         try {

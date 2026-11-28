@@ -25,6 +25,8 @@ export interface NotePlanEntry {
     rows: PlanRow[];
     batches: any[];
     available: number;
+    // Materiale che c'è ma in un altro magazzino, es. "3 in SEDE OPERATIVA"
+    elsewhere?: string;
 }
 
 // Valore del lotto per le righe fittizie (nessun lotto reale)
@@ -155,6 +157,7 @@ export function NoteImportReview({ plan, totals, onChange, onBack, onConfirm, li
                                     <span>
                                         Disponibilità insufficiente: solo {fmtQty(e.available)} su {fmtQty(total)}. Puoi controllare e lasciarla in sospeso, oppure
                                         importarla lo stesso: i pezzi in più sono proposti come fittizi.
+                                        {e.elsewhere && ` Attenzione: ce ne sono altri ${e.elsewhere}: se vanno presi da lì, registra prima un trasferimento.`}
                                     </span>
                                 </div>
                             )}

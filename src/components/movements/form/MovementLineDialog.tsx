@@ -60,7 +60,7 @@ export function MovementLineDialog({
 
     // Lotti da cui si può prelevare / rendere. Per il reso da cantiere: anche i lotti fittizi dello stesso articolo.
     const lots = useMemo(() => {
-        if (!line) return [] as { id: string; label: string; remaining: number; isFictitious: boolean; purchaseRef?: string; date?: string }[];
+        if (!line) return [] as { id: string; label: string; remaining: number; isFictitious: boolean; purchaseRef?: string; date?: string; elsewhere?: string; away?: { name: string; quantity: number }[] }[];
         if (isReturnFromJob) {
             return jobBatchAvailability
                 .filter(b => b.itemId === line.itemId)
@@ -72,15 +72,20 @@ export function MovementLineDialog({
                     isFictitious: !!b.isFictitious,
                     purchaseRef: b.purchaseRef,
                     date: b.date,
+                    // il materiale è in cantiere, non in un magazzino
+                    elsewhere: undefined as string | undefined,
+                    away: undefined as { name: string; quantity: number }[] | undefined,
                 }));
         }
         return line.availableBatches.map((b: any) => ({
             id: b.id as string,
             label: b.purchaseRef || "Nessun Rif.",
-            remaining: Number(b.remainingQty ?? 0),
+            remaining: Number(b.hereQty ?? b.remainingQty ?? 0),
             isFictitious: false,
             purchaseRef: b.purchaseRef,
             date: b.date,
+            elsewhere: b.elsewhere as string | undefined,
+            away: b.away as { name: string; quantity: number }[] | undefined,
         }));
     }, [line, isReturnFromJob, jobBatchAvailability]);
 
@@ -88,10 +93,15 @@ export function MovementLineDialog({
 
     const quantity = parseFloat(line.quantity);
     const selectedLot = lots.find(l => l.id === line.purchaseItemId);
-    const checksRemaining = !isTransfer && !isWaste && !line.isFictitious && !!selectedLot;
+    // Nel trasferimento (riga fittizia) conta comunque quanto c'è nel magazzino di partenza
+    const checksRemaining = !isWaste && (isTransfer ? !!selectedLot && selectedLot.remaining > 0.001 : !line.isFictitious && !!selectedLot);
     const exceeds = checksRemaining && quantity > selectedLot!.remaining + 0.001;
+    const blocksElsewhere = isTransfer || !line.isFictitious;
+    const awayTotals = new Map<string, number>();
+    if (blocksElsewhere) lots.forEach(l => l.away?.forEach(a => awayTotals.set(a.name, (awayTotals.get(a.name) ?? 0) + a.quantity)));
+    const awayText = [...awayTotals].map(([name, q]) => `${round2(q)} ${unit} in ${name}`).join(", ");
     const plan = exceeds
-        ? planLotSplit(quantity, lots.filter(l => !l.isFictitious || isReturnFromJob).map(l => ({ id: l.id, remaining: l.remaining })), line.purchaseItemId)
+        ? planLotSplit(quantity, lots.filter(l => !l.elsewhere && (!l.isFictitious || isReturnFromJob)).map(l => ({ id: l.id, remaining: l.remaining })), line.purchaseItemId)
         : null;
 
     const applySplit = () => {
@@ -101,7 +111,7 @@ export function MovementLineDialog({
             return {
                 purchaseItemId: lot.id,
                 purchaseRef: lot.purchaseRef,
-                isFictitious: lot.isFictitious,
+                isFictitious: isTransfer || lot.isFictitious,
                 quantity: String(a.quantity),
                 pieces: coefficient !== 1 ? (a.quantity / coefficient).toFixed(2) : String(a.quantity),
                 availableBatches: isReturnFromJob
@@ -177,18 +187,25 @@ export function MovementLineDialog({
                                         <SelectTrigger><SelectValue placeholder="Seleziona lotto..." /></SelectTrigger>
                                         <SelectContent>
                                             {lots.map(l => (
-                                                <SelectItem key={l.id} value={l.id}>
+                                                <SelectItem key={l.id} value={l.id} disabled={blocksElsewhere && !!l.elsewhere}>
                                                     <span className="font-medium">{l.label}</span>
                                                     <span className="ml-1 text-xs text-muted-foreground">
-                                                        {l.isFictitious ? "· fittizio " : ""}— {isReturnFromJob ? "in cantiere" : "rimasti"} {l.remaining} {unit}
-                                                        {packQuantity ? ` · ${round2(l.remaining / packQuantity)} conf.` : ""}
+                                                        {l.isFictitious ? "· fittizio " : ""}— {l.elsewhere ? "" : `${isReturnFromJob ? "in cantiere" : "rimasti"} ${l.remaining} ${unit}`}
+                                                        {!l.elsewhere && packQuantity ? ` · ${round2(l.remaining / packQuantity)} conf.` : ""}
                                                         {l.date ? ` (${format(new Date(l.date), "dd/MM/yy")})` : ""}
+                                                        {l.elsewhere ? ` · in ${l.elsewhere}` : ""}
                                                     </span>
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
+                            )}
+
+                            {awayText && (
+                                <p className="rounded border border-blue-200 bg-blue-50 p-2 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200">
+                                    Di questo articolo ci sono anche {awayText}: per usarli cambia magazzino di partenza o registra prima un trasferimento.
+                                </p>
                             )}
 
                             {/* Confezioni + pezzi in più o in meno (solo per gli articoli con la confezione) */}
@@ -253,7 +270,7 @@ export function MovementLineDialog({
                                         </>
                                     ) : (
                                         <p className="text-xs">
-                                            Anche sommando tutti i lotti mancano {plan.missing} {unit}. {isReturnFromJob ? "Riduci la quantità del reso." : "Usa «Fittizio» per la parte restante."}
+                                            Anche sommando tutti i lotti mancano {plan.missing} {unit}. {isReturnFromJob ? "Riduci la quantità del reso." : isTransfer ? "Riduci la quantità del trasferimento." : "Usa «Fittizio» per la parte restante."}
                                         </p>
                                     )}
                                 </div>

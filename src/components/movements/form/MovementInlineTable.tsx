@@ -34,6 +34,8 @@ interface MovementInlineTableProps {
     activeTab: "entry" | "exit" | "sale" | "waste" | "transfer";
     selectedJob?: Job | null;
     jobBatchAvailability: any[];
+    // Magazzino di partenza (vuoto se il movimento non preleva da un magazzino)
+    fromWarehouseId: string;
     inventory: InventoryItem[];
     itemsLoading: boolean;
     onItemSearch: (term: string) => Promise<void>;
@@ -60,6 +62,7 @@ export function MovementInlineTable({
     activeTab,
     selectedJob,
     jobBatchAvailability,
+    fromWarehouseId,
     inventory,
     itemsLoading,
     onItemSearch,
@@ -172,6 +175,14 @@ export function MovementInlineTable({
                                     // Cantiere batch info for entry lotto badge
                                     const cantiereBatch = line.availableBatches[0];
 
+                                    // Lotti in un altro magazzino: non si possono scaricare da qui (le righe fittizie sì)
+                                    const blocksElsewhere = activeTab === "transfer" || !line.isFictitious;
+                                    const elsewhere = !blocksElsewhere
+                                        ? undefined
+                                        : line.purchaseItemId
+                                            ? line.availableBatches.find((b) => b.id === line.purchaseItemId)?.elsewhere
+                                            : line.availableBatches.every((b) => b.elsewhere) ? line.availableBatches[0]?.elsewhere : undefined;
+
                                     // Lock fittizio when all lots are exhausted (exit/sale only)
                                     const allBatchesExhausted =
                                         (activeTab === "exit" || activeTab === "sale") &&
@@ -195,6 +206,14 @@ export function MovementInlineTable({
                                                         <div className="font-medium text-sm leading-tight">
                                                             {line.itemName}
                                                         </div>
+                                                        {elsewhere && (
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="border-blue-300 bg-blue-50 text-[10px] font-normal text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300"
+                                                            >
+                                                                In {elsewhere}
+                                                            </Badge>
+                                                        )}
                                                     </div>
                                                 ) : (
                                                     <div className="flex items-center gap-2 text-muted-foreground py-1">
@@ -213,11 +232,11 @@ export function MovementInlineTable({
                                                 <TableCell className="py-1 px-2">
                                                     {line.batchesLoading ? (
                                                         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                                    ) : (activeTab === "exit" || activeTab === "sale") &&
+                                                    ) : (activeTab === "exit" || activeTab === "sale" || activeTab === "transfer") &&
                                                       line.itemId ? (
                                                         line.availableBatches.length === 0 ? (
                                                             <span className="text-xs text-amber-600">
-                                                                Nessun lotto — usa Fittizio
+                                                                {activeTab === "transfer" ? "Nessun lotto" : "Nessun lotto — usa Fittizio"}
                                                             </span>
                                                         ) : (
                                                             <Select
@@ -243,6 +262,7 @@ export function MovementInlineTable({
                                                                             <SelectItem
                                                                                 key={batch.id}
                                                                                 value={batch.id}
+                                                                                disabled={blocksElsewhere && !!batch.elsewhere}
                                                                                 className={
                                                                                     isExhausted
                                                                                         ? "opacity-60"
@@ -257,12 +277,14 @@ export function MovementInlineTable({
                                                                                     {" "}
                                                                                     {isExhausted
                                                                                         ? "— Esaurito"
-                                                                                        : `— Pz: ${batch.remainingPieces ?? batch.remainingQty} / ${batch.remainingQty}`}
+                                                                                        : `— Pz: ${batch.herePieces ?? (batch.hereQty ?? batch.remainingPieces ?? batch.remainingQty)} / ${batch.hereQty ?? batch.remainingQty}`}
                                                                                     {batch.date &&
                                                                                         ` (${format(
                                                                                             new Date(batch.date),
                                                                                             "dd/MM/yy"
                                                                                         )})`}
+                                                                                    {batch.elsewhere && ` · in ${batch.elsewhere}`}
+                                                                                    {batch.hereQty != null && ` · altri ${batch.away.map((a: any) => `${a.quantity} in ${a.name}`).join(", ")}`}
                                                                                 </span>
                                                                             </SelectItem>
                                                                         );
@@ -475,6 +497,7 @@ export function MovementInlineTable({
                 activeTab={activeTab}
                 selectedJob={selectedJob}
                 jobBatchAvailability={jobBatchAvailability}
+                fromWarehouseId={fromWarehouseId}
                 inventory={inventory}
                 itemsLoading={itemsLoading}
                 onItemSearch={onItemSearch}

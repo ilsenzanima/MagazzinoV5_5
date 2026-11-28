@@ -28,6 +28,7 @@ import {
 import { InventoryItem, Job, LoadNote, LoadNoteItem, Purchase } from "@/lib/types";
 import { loadNotesService } from "@/lib/services/load-notes";
 import { inventoryApi } from "@/lib/services/inventory";
+import { warehousesApi } from "@/lib/services/warehouses";
 import { purchasesApi } from "@/lib/services/purchases";
 import { PurchaseItemToImport, NoteLineToImport } from "@/hooks/useMovementForm";
 import { NoteImportReview, NotePlanEntry, NO_BATCH } from "./NoteImportReview";
@@ -36,6 +37,7 @@ import { it } from "date-fns/locale";
 import { HelpTip } from "@/components/ui/help-tip";
 import { NotchTabs, NotchHelp } from "@/components/ui/notch-tabs";
 import { notify } from "@/lib/notify";
+import { isElsewhere, locateLot, shortWarehouseName, WarehouseQty } from "@/lib/utils/lot-warehouse";
 
 interface MovementMaterialDialogProps {
     open: boolean;
@@ -44,6 +46,7 @@ interface MovementMaterialDialogProps {
     activeTab: "entry" | "exit" | "sale" | "waste" | "transfer";
     selectedJob?: Job | null;
     jobBatchAvailability: any[];
+    fromWarehouseId: string;
     inventory: InventoryItem[];
     itemsLoading: boolean;
     onItemSearch: (term: string) => Promise<void>;
@@ -75,6 +78,7 @@ interface CombinedPurchaseItem {
     remainingQty: number;
     remainingPieces?: number;
     batchDate?: string;
+    stockByWarehouse?: WarehouseQty[];
 }
 
 interface PurchaseDetail {
@@ -89,6 +93,7 @@ export function MovementMaterialDialog({
     activeTab,
     selectedJob,
     jobBatchAvailability,
+    fromWarehouseId,
     inventory,
     itemsLoading,
     onItemSearch,
@@ -125,6 +130,31 @@ export function MovementMaterialDialog({
     const [selectedPurchaseItemIds, setSelectedPurchaseItemIds] = useState<Set<string>>(new Set());
 
     const showPurchaseTab = activeTab === "exit" || activeTab === "sale" || activeTab === "transfer";
+
+    // Quantità degli articoli elencati che stanno in un magazzino diverso da quello di partenza
+    const [otherStock, setOtherStock] = useState<Record<string, { name: string; quantity: number }[]>>({});
+
+    useEffect(() => {
+        setOtherStock({});
+        if (!open || !fromWarehouseId || inventory.length === 0) return;
+        let cancelled = false;
+        Promise.all([inventoryApi.getStockByWarehouse(inventory.map((i) => i.id)), warehousesApi.getAll()])
+            .then(([stock, warehouses]) => {
+                if (cancelled) return;
+                const map: Record<string, { name: string; quantity: number }[]> = {};
+                stock.forEach((rows, itemId) => {
+                    map[itemId] = rows
+                        .filter((r) => r.warehouseId !== fromWarehouseId)
+                        .map((r) => ({
+                            name: shortWarehouseName(warehouses.find((w) => w.id === r.warehouseId)?.name),
+                            quantity: round4(r.quantity),
+                        }));
+                });
+                setOtherStock(map);
+            })
+            .catch((error) => console.error("Failed to load stock by warehouse", error));
+        return () => { cancelled = true; };
+    }, [open, fromWarehouseId, inventory]);
 
     useEffect(() => {
         if (open) {
@@ -308,6 +338,7 @@ export function MovementMaterialDialog({
         const pool = new Map<string, number>(); // disponibilità residua per lotto, condivisa tra righe dello stesso articolo
         const totals: Record<string, number> = {};
         const batchCache = new Map<string, any[]>();
+        const otherCache = new Map<string, string>(); // articolo -> materiale che sta in un altro magazzino
 
         const batchesFor = async (inventoryId: string): Promise<any[]> => {
             const cached = batchCache.get(inventoryId);
@@ -328,11 +359,23 @@ export function MovementMaterialDialog({
                     .sort((a, b) => Number(a.isFictitious) - Number(b.isFictitious));
             } else {
                 const all = await inventoryApi.getAvailableBatches(inventoryId);
-                list = all.filter((b: any) => (b.remainingQty ?? 0) > 0.0001);
+                const withStock = all.filter((b: any) => (b.remainingQty ?? 0) > 0.0001);
+                const away = new Map<string, number>();
+                list = [];
+                for (const b of withStock) {
+                    const location = locateLot(b.stockByWarehouse, fromWarehouseId);
+                    location?.away.forEach((a) => away.set(a.name, (away.get(a.name) ?? 0) + a.quantity));
+                    // hereQty: la parte del lotto che si trova nel magazzino di partenza
+                    const hereQty = location ? Math.min(Number(b.remainingQty), location.quantity) : Number(b.remainingQty);
+                    if (hereQty > 0.0001) list.push({ ...b, hereQty });
+                }
+                if (away.size > 0) {
+                    otherCache.set(inventoryId, [...away].map(([name, q]) => `${fmtQty(q)} in ${name}`).join(", "));
+                }
             }
             list.forEach((b) => {
-                pool.set(b.id, b.remainingQty);
-                totals[b.id] = b.remainingQty;
+                pool.set(b.id, b.hereQty ?? b.remainingQty);
+                totals[b.id] = b.hereQty ?? b.remainingQty;
             });
             batchCache.set(inventoryId, list);
             return list;
@@ -350,6 +393,7 @@ export function MovementMaterialDialog({
             }
 
             const batches = await batchesFor(item.inventoryId);
+            const elsewhere = otherCache.get(item.inventoryId);
             // Reso di un articolo mai portato in commessa: non si può scaricare
             if (batches.length === 0 && isEntryWithJob) {
                 plan.push({ ...base, kind: "blocked", decision: "skip", reason: "mai portato in questa commessa" });
@@ -378,7 +422,7 @@ export function MovementMaterialDialog({
                     ...base,
                     kind: "blocked",
                     decision: "skip",
-                    reason: `a magazzino ce ne sono solo ${fmtQty(available)} su ${fmtQty(qty)}`,
+                    reason: `a magazzino ce ne sono solo ${fmtQty(available)} su ${fmtQty(qty)}${elsewhere ? ` (altri ${elsewhere})` : ""}`,
                 });
                 continue;
             }
@@ -401,6 +445,7 @@ export function MovementMaterialDialog({
                 batches,
                 rows,
                 available: round4(available),
+                elsewhere: short ? elsewhere : undefined,
             });
         }
         return { plan, totals };
@@ -499,6 +544,7 @@ export function MovementMaterialDialog({
                     remainingQty: avail?.remainingQty ?? 0,
                     remainingPieces: avail?.remainingPieces,
                     batchDate: avail?.date,
+                    stockByWarehouse: avail?.stockByWarehouse,
                 };
             });
             setPurchaseDetailsMap((prev) => ({
@@ -550,6 +596,7 @@ export function MovementMaterialDialog({
                         remainingQty: item.remainingQty,
                         remainingPieces: item.remainingPieces,
                         batchDate: item.batchDate,
+                        stockByWarehouse: item.stockByWarehouse,
                     });
                 }
             }
@@ -783,6 +830,11 @@ export function MovementMaterialDialog({
                                                         >
                                                             {item.quantity} {item.unit}
                                                         </Badge>
+                                                        {otherStock[item.id]?.map((s) => (
+                                                            <div key={s.name} className="mt-0.5 text-[10px] text-blue-700 dark:text-blue-300">
+                                                                di cui {s.quantity} in {s.name}
+                                                            </div>
+                                                        ))}
                                                     </TableCell>
                                                     <TableCell className="py-2 text-center">
                                                         <Button
@@ -1117,6 +1169,9 @@ export function MovementMaterialDialog({
                                                                 item.remainingQty <= 0 &&
                                                                 (item.remainingPieces == null ||
                                                                     item.remainingPieces <= 0);
+                                                            const location = locateLot(item.stockByWarehouse, fromWarehouseId);
+                                                            const elsewhere = !isExhausted && isElsewhere(location);
+                                                            const unavailable = isExhausted || elsewhere;
 
                                                             return (
                                                                 <div
@@ -1124,20 +1179,22 @@ export function MovementMaterialDialog({
                                                                     className={`flex items-center gap-2 p-2 rounded border text-sm transition-colors ${
                                                                         isExhausted
                                                                             ? "opacity-40 cursor-not-allowed bg-muted/20"
+                                                                            : elsewhere
+                                                                            ? "cursor-not-allowed bg-blue-50/50 dark:bg-blue-950/20"
                                                                             : isSelected
                                                                             ? "bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800 cursor-pointer"
                                                                             : "bg-background hover:border-primary/50 cursor-pointer"
                                                                     }`}
                                                                     onClick={() =>
-                                                                        !isExhausted &&
+                                                                        !unavailable &&
                                                                         togglePurchaseItem(item.id)
                                                                     }
                                                                 >
                                                                     <Checkbox
                                                                         checked={isSelected}
-                                                                        disabled={isExhausted}
+                                                                        disabled={unavailable}
                                                                         onCheckedChange={() =>
-                                                                            !isExhausted &&
+                                                                            !unavailable &&
                                                                             togglePurchaseItem(item.id)
                                                                         }
                                                                     />
@@ -1161,6 +1218,16 @@ export function MovementMaterialDialog({
                                                                         {isExhausted && (
                                                                             <span className="text-muted-foreground ml-1 font-normal">
                                                                                 (esaurito)
+                                                                            </span>
+                                                                        )}
+                                                                        {elsewhere && (
+                                                                            <span className="ml-1 font-normal text-blue-700 dark:text-blue-300">
+                                                                                (in {location?.away.map((a) => a.name).join(", ")})
+                                                                            </span>
+                                                                        )}
+                                                                        {!elsewhere && !isExhausted && !!location?.away.length && (
+                                                                            <span className="ml-1 font-normal text-blue-700 dark:text-blue-300">
+                                                                                (di cui {location.away.map((a) => `${a.quantity} in ${a.name}`).join(", ")})
                                                                             </span>
                                                                         )}
                                                                     </div>

@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { shortWarehouseName, stockByLot } from '@/lib/utils/lot-warehouse';
 import { Purchase, PurchaseItem } from '@/lib/types';
 import { fetchWithTimeout, getSoftDeletePayload } from './utils';
 import { compressImageIfNeeded } from '@/lib/image-compress';
@@ -330,6 +331,12 @@ export const purchasesApi = {
             .in('purchase_item_id', ids);
 
         if (error) throw error;
+        const { data: stock, error: stockError } = await supabase
+            .from('purchase_item_warehouse_stock')
+            .select('*')
+            .in('purchase_item_id', ids);
+        if (stockError) throw stockError;
+        const stockMap = stockByLot(stock ?? []);
         return data.map((b: any) => ({
             id: b.purchase_item_id,
             purchaseRef: b.purchase_ref,
@@ -339,7 +346,8 @@ export const purchasesApi = {
             originalPieces: b.original_pieces,
             remainingPieces: b.remaining_pieces,
             price: b.unit_price,
-            coefficient: b.coefficient
+            coefficient: b.coefficient,
+            stockByWarehouse: stockMap.get(b.purchase_item_id),
         }));
     },
 
@@ -364,6 +372,22 @@ export const purchasesApi = {
         const currentWarehouseByItemId = new Map(
             (currentWarehouses ?? []).map((cw: any) => [cw.purchase_item_id, cw])
         );
+
+        const { data: stock } = itemIds.length > 0
+            ? await supabase.from('purchase_item_warehouse_stock').select('*').in('purchase_item_id', itemIds).gt('quantity', 0.001)
+            : { data: [] as any[] };
+        stockByLot(stock ?? []).forEach((rows, id) => {
+            // il magazzino non principale per primo: è quello che la scheda mette in evidenza
+            const ordered = [...rows].sort((a, b) =>
+                Number((stock ?? []).some((s: any) => s.warehouse_id === a.warehouseId && s.warehouse_is_primary)) -
+                Number((stock ?? []).some((s: any) => s.warehouse_id === b.warehouseId && s.warehouse_is_primary)));
+            currentWarehouseByItemId.set(id, {
+                warehouse_id: ordered[0].warehouseId,
+                warehouse_name: ordered.length === 1
+                    ? ordered[0].warehouseName
+                    : ordered.map((r) => `${shortWarehouseName(r.warehouseName)}: ${r.quantity}`).join(' · '),
+            });
+        });
 
         return data.map((item: any) => ({
             id: item.id,

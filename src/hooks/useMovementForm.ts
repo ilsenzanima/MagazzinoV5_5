@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { inventoryApi } from "@/lib/services/inventory";
 import { jobsApi } from "@/lib/services/jobs";
@@ -6,6 +6,7 @@ import { warehousesApi } from "@/lib/services/warehouses";
 import { InventoryItem, Job, Warehouse, DeliveryNote } from "@/lib/types";
 import { createMovement, updateMovement } from "@/app/movements/actions";
 import { notify } from "@/lib/notify";
+import { isElsewhere, locateLot, WarehouseQty } from "@/lib/utils/lot-warehouse";
 import { deliveryNoteDraftsApi } from "@/lib/services/delivery-note-drafts";
 
 export interface PurchaseItemToImport {
@@ -19,6 +20,7 @@ export interface PurchaseItemToImport {
     remainingQty: number;
     remainingPieces?: number;
     batchDate?: string;
+    stockByWarehouse?: WarehouseQty[];
 }
 
 // Riga pronta da una nota di carico: lotto già scelto e lotti tra cui poter cambiare
@@ -162,6 +164,39 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
 
     const [jobInventory, setJobInventory] = useState<any[]>([]);
     const [jobBatchAvailability, setJobBatchAvailability] = useState<any[]>([]);
+
+    // Magazzino da cui si preleva: solo uscita, vendita e trasferimento ne hanno uno
+    const restrictedWarehouseId =
+        activeTab === "exit" || activeTab === "sale" || activeTab === "transfer" ? fromWarehouseId : "";
+
+    // Righe come le vede la pagina: per ogni lotto si dice quanto c'è nel magazzino di partenza
+    // (hereQty / herePieces), quanto sta altrove (away) e se è tutto in un altro magazzino (elsewhere).
+    const markedLines = useMemo(() => {
+        // Quanto questa bolla ha già preso da un lotto torna disponibile, se non cambia magazzino
+        const ownItems = isEditing && fromWarehouseId === initialNote?.fromWarehouseId ? initialNote?.items ?? [] : [];
+        const ownOf = (lotId: string) =>
+            ownItems
+                .filter((i) => i.purchaseItemId === lotId && (initialNote?.type === "transfer" || !i.isFictitious))
+                .reduce(
+                    (sum, i) => ({ quantity: sum.quantity + (i.quantity ?? 0), pieces: sum.pieces + (i.pieces ?? 0) }),
+                    { quantity: 0, pieces: 0 }
+                );
+        return lines.map((line) => ({
+            ...line,
+            availableBatches: line.availableBatches.map((b: any) => {
+                const location = locateLot(b.stockByWarehouse, restrictedWarehouseId, ownOf(b.id));
+                const elsewhere = isElsewhere(location);
+                const split = !!location && !elsewhere && location.away.length > 0;
+                return {
+                    ...b,
+                    elsewhere: elsewhere ? location!.away.map((a) => a.name).join(", ") : undefined,
+                    away: location?.away,
+                    hereQty: split ? Math.min(b.remainingQty, location.quantity) : undefined,
+                    herePieces: split && b.remainingPieces != null ? Math.min(b.remainingPieces, location.pieces) : undefined,
+                };
+            }),
+        }));
+    }, [lines, restrictedWarehouseId, fromWarehouseId, isEditing, initialNote]);
 
     const yearSuffix = date
         ? new Date(date).getFullYear().toString().slice(-2)
@@ -544,6 +579,8 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
                     // All lots exhausted: show them anyway and auto-flag as fittizio
                     const allExhausted = validBatches.length === 0 && batches.length > 0;
                     const batchesToShow = allExhausted ? batches : validBatches;
+                    // Si propone il primo lotto che si trova nel magazzino di partenza
+                    const preferred = batchesToShow.find((b: any) => !isElsewhere(locateLot(b.stockByWarehouse, fromWarehouseId)));
                     setLines((prev) =>
                         prev.map((line) => {
                             if (line.tempId !== rowId) return line;
@@ -551,8 +588,8 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
                                 ...line,
                                 batchesLoading: false,
                                 availableBatches: batchesToShow,
-                                purchaseItemId: batchesToShow.length > 0 ? batchesToShow[0].id : undefined,
-                                purchaseRef: batchesToShow.length > 0 ? batchesToShow[0].purchaseRef : undefined,
+                                purchaseItemId: preferred?.id,
+                                purchaseRef: preferred?.purchaseRef,
                                 isFictitious: allExhausted ? true : line.isFictitious,
                             };
                         })
@@ -569,7 +606,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
                 }
             }
         },
-        [activeTab]
+        [activeTab, fromWarehouseId]
     );
 
     const handleInlineReturnBatchSelect = useCallback(
@@ -713,7 +750,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
                         setLines((prev) =>
                             prev.map((l) => {
                                 if (l.tempId !== rowId) return l;
-                                const preferred = validBatches[0];
+                                const preferred = validBatches.find((b: any) => !isElsewhere(locateLot(b.stockByWarehouse, fromWarehouseId)));
                                 return {
                                     ...l,
                                     batchesLoading: false,
@@ -733,7 +770,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
                     });
             }
         }
-    }, [activeTab]);
+    }, [activeTab, fromWarehouseId]);
 
     const handleInlineLineRemove = useCallback((rowId: string) => {
         setLines((prev) => {
@@ -795,6 +832,11 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
             const tab = activeTab;
             setLines((prev) => {
                 const filledLines = prev.filter((l) => l.itemId || l.quantity || l.pieces);
+                // Da un lotto diviso tra più magazzini si importa solo quello che c'è in quello di partenza
+                const here = (item: PurchaseItemToImport) => {
+                    const location = locateLot(item.stockByWarehouse, tab === "waste" ? "" : fromWarehouseId);
+                    return location && location.away.length > 0 ? location : null;
+                };
                 const newLines: MovementLine[] = items.map((item) => ({
                     tempId: Math.random().toString(36).substr(2, 9),
                     itemId: item.itemId,
@@ -802,8 +844,8 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
                     itemCode: item.itemCode || "",
                     itemUnit: item.itemUnit || "PZ",
                     coefficient: item.coefficient || 1,
-                    quantity: tab === "waste" ? "1" : item.remainingQty.toString(),
-                    pieces: tab !== "waste" ? (item.remainingPieces?.toString() || "") : "",
+                    quantity: tab === "waste" ? "1" : (here(item)?.quantity ?? item.remainingQty).toString(),
+                    pieces: tab !== "waste" ? ((here(item)?.pieces ?? item.remainingPieces)?.toString() || "") : "",
                     kgEccedenza: "",
                     purchaseItemId: item.purchaseItemId,
                     purchaseRef: item.purchaseRef,
@@ -815,6 +857,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
                             remainingQty: item.remainingQty,
                             remainingPieces: item.remainingPieces,
                             date: item.batchDate,
+                            stockByWarehouse: item.stockByWarehouse,
                         },
                     ],
                     batchesLoading: false,
@@ -822,7 +865,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
                 return ensureTrailingEmpty([...filledLines, ...newLines]);
             });
         },
-        [activeTab]
+        [activeTab, fromWarehouseId]
     );
 
     const handleNoteItemsImport = useCallback((items: NoteLineToImport[]) => {
@@ -933,7 +976,7 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
             return;
         }
 
-        const validLines = lines.filter((l) => {
+        const validLines = markedLines.filter((l) => {
             if (!l.itemId) return false;
             if (activeTab === "waste") return !!l.kgEccedenza && parseFloat(l.kgEccedenza) > 0;
             return !!l.quantity && parseFloat(l.quantity) > 0;
@@ -948,6 +991,26 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
         }
 
         for (const line of validLines) {
+            // Non si preleva da un lotto che sta in un altro magazzino (le righe fittizie di uscita/vendita sì)
+            if (activeTab === "transfer" || ((activeTab === "exit" || activeTab === "sale") && !line.isFictitious)) {
+                const elsewhere = line.purchaseItemId
+                    ? line.availableBatches.find((b: any) => b.id === line.purchaseItemId)?.elsewhere
+                    : line.availableBatches.every((b: any) => b.elsewhere) ? line.availableBatches[0]?.elsewhere : undefined;
+                if (elsewhere) {
+                    notify.warning(
+                        `"${line.itemName || 'articolo'}" si trova in ${elsewhere}: scegli un lotto di questo magazzino, cambia magazzino di partenza o registra prima un trasferimento`
+                    );
+                    return;
+                }
+                // Lotto diviso tra più magazzini: non oltre quanto c'è in quello di partenza
+                const lot = line.availableBatches.find((b: any) => b.id === line.purchaseItemId);
+                if (lot?.hereQty != null && parseFloat(line.quantity) > lot.hereQty + 0.001) {
+                    notify.warning(
+                        `Quantità eccessiva per "${line.itemName}": nel magazzino di partenza ce ne sono ${lot.hereQty}, il resto è in ${lot.away.map((a: any) => a.name).join(", ")}`
+                    );
+                    return;
+                }
+            }
             if ((activeTab === "exit" || activeTab === "sale") && !line.isFictitious) {
                 // Validazione: il lotto deve essere selezionato per movimenti di uscita/vendita non fittizi
                 if (!line.purchaseItemId) {
@@ -1099,7 +1162,8 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
         setPackagesCount,
         notes,
         setNotes,
-        lines,
+        lines: markedLines,
+        restrictedWarehouseId,
         jobBatchAvailability,
         jobInventory,
         yearSuffix,
