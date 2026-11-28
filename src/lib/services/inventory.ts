@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { stockByLot } from '@/lib/utils/lot-warehouse';
 import { InventoryItem, InventorySupplierCode, Brand, ItemType, Unit } from '@/lib/types';
 import { fetchWithTimeout, getSoftDeletePayload, getVerifiedPayload } from './utils';
 
@@ -570,6 +571,12 @@ export const inventoryApi = {
             .order('purchase_date', { ascending: true }); // FIFO by default
 
         if (error) throw error;
+        const { data: stock, error: stockError } = await supabase
+            .from('purchase_item_warehouse_stock')
+            .select('*')
+            .eq('item_id', itemId);
+        if (stockError) throw stockError;
+        const stockMap = stockByLot(stock ?? []);
         return data.map((b: any) => ({
             id: b.purchase_item_id,
             purchaseId: b.purchase_id,
@@ -579,7 +586,8 @@ export const inventoryApi = {
             remainingQty: b.remaining_quantity,
             originalPieces: b.original_pieces,
             remainingPieces: b.remaining_pieces,
-            price: b.unit_price
+            price: b.unit_price,
+            stockByWarehouse: stockMap.get(b.purchase_item_id),
         }));
     },
 

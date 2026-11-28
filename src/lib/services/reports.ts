@@ -3,6 +3,23 @@ import { supabase } from '@/lib/supabase';
 // Le somme di decimali (es. 4,05 + 26,9) in JavaScript danno code come 30,950000000000003: si arrotonda a 5 decimali
 const round5 = (n: number) => Math.round(n * 1e5) / 1e5;
 
+// Lotti di una sede, con le sole quantità presenti lì (un lotto può essere diviso tra più magazzini)
+const lotsInWarehouse = async (lots: any[], warehouseId: string): Promise<any[]> => {
+    const { data, error } = await supabase
+        .from('purchase_item_warehouse_stock')
+        .select('purchase_item_id, quantity, pieces')
+        .eq('warehouse_id', warehouseId);
+    if (error) throw error;
+    const here = new Map((data || []).map((r: any) => [r.purchase_item_id, r]));
+    return lots
+        .filter(lot => here.has(lot.purchase_item_id))
+        .map(lot => ({
+            ...lot,
+            remaining_quantity: here.get(lot.purchase_item_id).quantity,
+            remaining_pieces: here.get(lot.purchase_item_id).pieces,
+        }));
+};
+
 export interface ArticleLot {
     itemId: string;
     itemCode: string;
@@ -60,7 +77,7 @@ export const getArticlesWithStock = async (targetDate?: string, warehouseId?: st
             lots = data || [];
 
             if (warehouseId) {
-                lots = lots.filter(lot => lot.current_warehouse_id === warehouseId);
+                lots = await lotsInWarehouse(lots, warehouseId);
             }
         }
 
@@ -167,7 +184,7 @@ export const getInventoryCountData = async (warehouseId?: string): Promise<Inven
         }
 
         const filteredLots = warehouseId
-            ? (lots || []).filter(lot => lot.current_warehouse_id === warehouseId)
+            ? await lotsInWarehouse(lots || [], warehouseId)
             : (lots || []);
 
         // Get ALL inventory items

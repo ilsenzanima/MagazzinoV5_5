@@ -21,6 +21,7 @@ import { useAuth } from "@/components/auth-provider";
 import { useMovementForm } from "@/hooks/useMovementForm";
 
 import { MovementHeader } from "./form/MovementHeader";
+import { LastNumberHint } from "./form/LastNumberHint";
 import { MovementJobSelector } from "./form/MovementJobSelector";
 import { MovementFooter } from "./form/MovementFooter";
 import { MovementInlineTable } from "./form/MovementInlineTable";
@@ -143,6 +144,7 @@ export default function NewMovementContent({
                         numberPart={form.numberPart}
                         setNumberPart={form.setNumberPart}
                         yearSuffix={form.yearSuffix}
+                        numberPrefix={form.transferNumbering ? "T" : undefined}
                         date={form.date}
                         setDate={form.setDate}
                         causal={form.causal}
@@ -157,6 +159,15 @@ export default function NewMovementContent({
                         toWarehouseId={form.toWarehouseId}
                         onFromWarehouseSelect={form.handleFromWarehouseSelect}
                         onToWarehouseSelect={form.handleToWarehouseSelect}
+                        numberHint={!form.isEditing && (
+                            <LastNumberHint
+                                numberPart={form.numberPart}
+                                yearSuffix={form.yearSuffix}
+                                draftId={form.draftId}
+                                transfer={form.transferNumbering}
+                                onUse={form.setNumberPart}
+                            />
+                        )}
                     >
                         <MovementJobSelector
                             selectedJob={form.selectedJob}
@@ -175,6 +186,7 @@ export default function NewMovementContent({
                         activeTab={form.activeTab}
                         selectedJob={form.selectedJob}
                         jobBatchAvailability={form.jobBatchAvailability}
+                        fromWarehouseId={form.restrictedWarehouseId}
                         inventory={form.inventory}
                         itemsLoading={form.itemsLoading}
                         onItemSearch={form.handleItemSearch}

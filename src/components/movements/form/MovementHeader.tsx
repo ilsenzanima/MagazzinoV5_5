@@ -10,6 +10,7 @@ interface MovementHeaderProps {
     numberPart: string;
     setNumberPart: (v: string) => void;
     yearSuffix: string;
+    numberPrefix?: string;
     date: string;
     setDate: (v: string) => void;
     causal: string;
@@ -24,17 +25,18 @@ interface MovementHeaderProps {
     toWarehouseId: string;
     onFromWarehouseSelect: (id: string) => void;
     onToWarehouseSelect: (id: string) => void;
+    numberHint?: React.ReactNode;
     children?: React.ReactNode; // For JobSelector
 }
 
 export function MovementHeader({
-    numberPart, setNumberPart, yearSuffix,
+    numberPart, setNumberPart, yearSuffix, numberPrefix,
     date, setDate,
     causal, setCausal,
     pickupLocation, setPickupLocation,
     deliveryLocation, setDeliveryLocation,
     warehouses, activeTab, fromWarehouseId, toWarehouseId, onFromWarehouseSelect, onToWarehouseSelect,
-    children
+    numberHint, children
 }: MovementHeaderProps) {
     const showFrom = activeTab === "exit" || activeTab === "sale" || activeTab === "transfer";
     const showTo = activeTab === "entry" || activeTab === "transfer" || activeTab === "waste";
@@ -51,6 +53,7 @@ export function MovementHeader({
                     <div>
                         <Label>Numero</Label>
                         <div className="flex items-center gap-2">
+                            {numberPrefix && <span className="text-slate-500 font-mono text-sm">{numberPrefix}</span>}
                             <Input
                                 placeholder="N."
                                 value={numberPart}
@@ -59,6 +62,7 @@ export function MovementHeader({
                             />
                             <span className="text-slate-500 font-mono text-sm">/PP{yearSuffix}</span>
                         </div>
+                        {numberHint}
                     </div>
                     <div>
                         <Label>Data</Label>

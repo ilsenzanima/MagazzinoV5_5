@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { DeliveryNote, DeliveryNoteItem } from '@/lib/types';
 import { fetchWithTimeout } from './utils';
+import { transferSequence } from '@/lib/utils/note-number';
 
 export const mapDbToDeliveryNote = (db: any): DeliveryNote => ({
     id: db.id,
@@ -70,6 +71,43 @@ const mapDeliveryNoteToDb = (note: Partial<DeliveryNote>) => {
 };
 
 export const deliveryNotesApi = {
+    // Numero più alto già usato nell'anno (bolle e bozze) e controllo se quello scritto esiste già
+    // I trasferimenti (T01/PP26) hanno una numerazione loro; per loro number_int è vuoto
+    getNumberInfo: async (yearSuffix: string, number: string, excludeDraftId?: string, transfer = false) => {
+        const latest = (table: 'delivery_notes' | 'delivery_note_drafts') => {
+            let query = supabase
+                .from(table)
+                .select('id, number, number_int, date')
+                .like('number', `${transfer ? 'T' : ''}%/PP${yearSuffix}`);
+            if (!transfer) query = query.not('number_int', 'is', null).order('number_int', { ascending: false }).limit(1);
+            if (table === 'delivery_note_drafts' && excludeDraftId) query = query.neq('id', excludeDraftId);
+            return query;
+        };
+        const [notes, drafts, same] = await Promise.all([
+            latest('delivery_notes'),
+            latest('delivery_note_drafts'),
+            supabase.from('delivery_notes').select('id').eq('number', number).limit(1),
+        ]);
+        const error = notes.error || drafts.error || same.error;
+        if (error) throw error;
+
+        // La bolla col progressivo più alto
+        const toLast = (rows: any[] | null) =>
+            (rows ?? [])
+                .map((row) => ({
+                    number: row.number as string,
+                    numberInt: (transfer ? transferSequence(row.number) : row.number_int) as number,
+                    date: row.date as string,
+                }))
+                .filter((row) => row.numberInt != null)
+                .sort((a, b) => b.numberInt - a.numberInt)[0] ?? null;
+        return {
+            lastNote: toLast(notes.data),
+            lastDraft: toLast(drafts.data),
+            alreadyUsed: (same.data?.length ?? 0) > 0,
+        };
+    },
+
     getAll: async () => {
         console.time('deliveryNotesApi.getAll');
         try {
