@@ -795,7 +795,12 @@ export function MovementMaterialDialog({
                                                 </TableCell>
                                             </TableRow>
                                         ) : (
-                                            inventory.map((item) => (
+                                            inventory.map((item) => {
+                                                const away = (otherStock[item.id] ?? []).filter((s) => s.quantity > 0.001);
+                                                const here = away.length
+                                                    ? Math.max(0, round4(away.reduce((rest, s) => rest - s.quantity, item.quantity)))
+                                                    : item.quantity;
+                                                return (
                                                 <TableRow
                                                     key={item.id}
                                                     className="cursor-pointer hover:bg-muted/50"
@@ -823,16 +828,18 @@ export function MovementMaterialDialog({
                                                             className={
                                                                 item.quantity <= 0
                                                                     ? "text-red-600 border-red-200"
+                                                                    : here <= 0
+                                                                    ? "text-blue-700 border-blue-200 dark:text-blue-300"
                                                                     : item.quantity <= item.minStock
                                                                     ? "text-amber-600 border-amber-200"
                                                                     : ""
                                                             }
                                                         >
-                                                            {item.quantity} {item.unit}
+                                                            {here} {item.unit}
                                                         </Badge>
-                                                        {otherStock[item.id]?.map((s) => (
+                                                        {away.map((s) => (
                                                             <div key={s.name} className="mt-0.5 text-[10px] text-blue-700 dark:text-blue-300">
-                                                                di cui {s.quantity} in {s.name}
+                                                                {here > 0 ? "altri " : ""}{s.quantity} disponibili in {s.name}
                                                             </div>
                                                         ))}
                                                     </TableCell>
@@ -850,7 +857,8 @@ export function MovementMaterialDialog({
                                                         </Button>
                                                     </TableCell>
                                                 </TableRow>
-                                            ))
+                                                );
+                                            })
                                         )}
                                     </TableBody>
                                 </Table>
@@ -1172,6 +1180,11 @@ export function MovementMaterialDialog({
                                                             const location = locateLot(item.stockByWarehouse, fromWarehouseId);
                                                             const elsewhere = !isExhausted && isElsewhere(location);
                                                             const unavailable = isExhausted || elsewhere;
+                                                            const split = !isExhausted && !!location?.away.length;
+                                                            const shownQty = split ? Math.min(item.remainingQty, location!.quantity) : item.remainingQty;
+                                                            const shownPieces = split && item.remainingPieces != null
+                                                                ? Math.min(item.remainingPieces, location!.pieces)
+                                                                : item.remainingPieces;
 
                                                             return (
                                                                 <div
@@ -1209,25 +1222,19 @@ export function MovementMaterialDialog({
                                                                         )}
                                                                     </div>
                                                                     <div className="text-xs font-semibold whitespace-nowrap">
-                                                                        {item.remainingPieces != null &&
-                                                                        item.remainingPieces > 0
-                                                                            ? `${item.remainingPieces} pz / `
+                                                                        {shownPieces != null && shownPieces > 0
+                                                                            ? `${shownPieces} pz / `
                                                                             : ""}
-                                                                        {item.remainingQty}{" "}
+                                                                        {shownQty}{" "}
                                                                         {item.itemUnit || ""}
                                                                         {isExhausted && (
                                                                             <span className="text-muted-foreground ml-1 font-normal">
                                                                                 (esaurito)
                                                                             </span>
                                                                         )}
-                                                                        {elsewhere && (
+                                                                        {split && (
                                                                             <span className="ml-1 font-normal text-blue-700 dark:text-blue-300">
-                                                                                (in {location?.away.map((a) => a.name).join(", ")})
-                                                                            </span>
-                                                                        )}
-                                                                        {!elsewhere && !isExhausted && !!location?.away.length && (
-                                                                            <span className="ml-1 font-normal text-blue-700 dark:text-blue-300">
-                                                                                (di cui {location.away.map((a) => `${a.quantity} in ${a.name}`).join(", ")})
+                                                                                ({elsewhere ? "" : "altri "}{location!.away.map((a) => `${a.quantity} disponibili in ${a.name}`).join(", ")})
                                                                             </span>
                                                                         )}
                                                                     </div>

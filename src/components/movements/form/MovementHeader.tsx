@@ -10,6 +10,7 @@ interface MovementHeaderProps {
     numberPart: string;
     setNumberPart: (v: string) => void;
     yearSuffix: string;
+    numberPrefix?: string;
     date: string;
     setDate: (v: string) => void;
     causal: string;
@@ -29,7 +30,7 @@ interface MovementHeaderProps {
 }
 
 export function MovementHeader({
-    numberPart, setNumberPart, yearSuffix,
+    numberPart, setNumberPart, yearSuffix, numberPrefix,
     date, setDate,
     causal, setCausal,
     pickupLocation, setPickupLocation,
@@ -52,6 +53,7 @@ export function MovementHeader({
                     <div>
                         <Label>Numero</Label>
                         <div className="flex items-center gap-2">
+                            {numberPrefix && <span className="text-slate-500 font-mono text-sm">{numberPrefix}</span>}
                             <Input
                                 placeholder="N."
                                 value={numberPart}

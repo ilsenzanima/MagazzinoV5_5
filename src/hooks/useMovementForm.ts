@@ -8,6 +8,7 @@ import { createMovement, updateMovement } from "@/app/movements/actions";
 import { notify } from "@/lib/notify";
 import { isElsewhere, locateLot, WarehouseQty } from "@/lib/utils/lot-warehouse";
 import { deliveryNoteDraftsApi } from "@/lib/services/delivery-note-drafts";
+import { buildNoteNumber } from "@/lib/utils/note-number";
 
 export interface PurchaseItemToImport {
     purchaseItemId: string;
@@ -115,7 +116,11 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
     const [activeTab, setActiveTab] = useState<"entry" | "exit" | "sale" | "waste" | "transfer">(
         initialNote?.type || "exit"
     );
-    const [numberPart, setNumberPart] = useState(initialNote?.number.split("/")[0] || "");
+    // In una bozza di trasferimento la T non sta nel campo: la aggiunge la numerazione
+    const [numberPart, setNumberPart] = useState(() => {
+        const part = initialNote?.number.split("/")[0] || "";
+        return draftId && initialNote?.type === "transfer" ? part.replace(/^T/i, "") : part;
+    });
     const [date, setDate] = useState(
         initialNote?.date.split("T")[0] || new Date().toISOString().split("T")[0]
     );
@@ -201,7 +206,15 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
     const yearSuffix = date
         ? new Date(date).getFullYear().toString().slice(-2)
         : new Date().getFullYear().toString().slice(-2);
-    const fullNumber = numberPart ? `${numberPart}/PP${yearSuffix}` : `/PP${yearSuffix}`;
+    // Solo i trasferimenti nuovi: le bolle già emesse tengono il numero che hanno
+    const transferNumbering = activeTab === "transfer" && !isEditing;
+    const fullNumber = buildNoteNumber(numberPart, yearSuffix, transferNumbering);
+
+    // Passando da o a Trasferimento cambia la numerazione: il numero già scritto non vale più
+    const changeActiveTab = (tab: typeof activeTab) => {
+        if (!isEditing && (tab === "transfer") !== (activeTab === "transfer")) setNumberPart("");
+        setActiveTab(tab);
+    };
 
     useEffect(() => {
         warehousesApi.getAll().then((list) => {
@@ -1139,8 +1152,9 @@ export function useMovementForm({ initialInventory, initialJobs, initialNote, dr
         jobsLoading,
         itemsLoading,
         activeTab,
-        setActiveTab,
+        setActiveTab: changeActiveTab,
         numberPart,
+        transferNumbering,
         setNumberPart,
         date,
         setDate,

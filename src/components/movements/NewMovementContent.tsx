@@ -144,6 +144,7 @@ export default function NewMovementContent({
                         numberPart={form.numberPart}
                         setNumberPart={form.setNumberPart}
                         yearSuffix={form.yearSuffix}
+                        numberPrefix={form.transferNumbering ? "T" : undefined}
                         date={form.date}
                         setDate={form.setDate}
                         causal={form.causal}
@@ -163,6 +164,7 @@ export default function NewMovementContent({
                                 numberPart={form.numberPart}
                                 yearSuffix={form.yearSuffix}
                                 draftId={form.draftId}
+                                transfer={form.transferNumbering}
                                 onUse={form.setNumberPart}
                             />
                         )}
